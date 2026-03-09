@@ -1,0 +1,55 @@
+# Workflow Status Template
+
+# This tracks progress through BMM methodology Analysis, Planning, and Solutioning phases.
+# Implementation phase is tracked separately in sprint-status.yaml
+
+# STATUS DEFINITIONS:
+# ==================
+# Initial Status (before completion):
+#   - required: Must be completed to progress
+#   - optional: Can be completed but not required
+#   - recommended: Strongly suggested but not required
+#   - conditional: Required only if certain conditions met (e.g., if_has_ui)
+#
+# Completion Status:
+#   - {file-path}: File created/found (e.g., "docs/product-brief.md")
+#   - skipped: Optional/conditional workflow that was skipped
+
+generated: "2026-03-04"
+project: "aiforge"
+project_type: "greenfield"
+selected_track: "method"
+field_type: "greenfield"
+workflow_path: "_bmad/bmm/workflows/workflow-status/paths/method-greenfield.yaml"
+
+workflow_status:
+  # Phase 1: Analysis (Optional)
+  brainstorm-project: "_bmad-output/analysis/brainstorming-session-2026-03-04.md"  # ✅ 已完成: Five Whys (25个创意) + Chaos Engineering (6个攻击向量, 100+失败场景) + 总结报告
+  research: skipped
+  product-brief: skipped
+
+  # Phase 2: Planning
+  prd: "docs/PRD.md"
+  create-ux-design: skipped
+
+  # Phase 3: Solutioning
+  create-architecture: "docs/architect.md"
+  create-epics-and-stories: required
+  test-design: optional
+  implementation-readiness: required
+
+  # Phase 4: Implementation
+  sprint-planning: required
+
+# 当前活动
+current_activity:
+  workflow: "create-epics-and-stories"
+  status: "not_started"
+  previous_workflow: "brainstorm-project"
+  previous_output:
+    - "_bmad-output/analysis/brainstorming-session-2026-03-04.md"
+    - "_bmad-output/analysis/chaos-engineering-report.md"
+  next_steps:
+    - "运行 create-epics-and-stories 工作流"
+    - "基于 PRD + 架构文档 + 混沌工程报告生成 Epics 和 Stories"
+    - "重点将 P0 安全加固项纳入 Epic 1（地基加固）"
