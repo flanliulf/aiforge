@@ -26,14 +26,14 @@ workflow_status:
   # Phase 1: Analysis (Optional)
   brainstorm-project: "_bmad-output/analysis/brainstorming-session-2026-03-04.md"  # ✅ 已完成: Five Whys (25个创意) + Chaos Engineering (6个攻击向量, 100+失败场景) + 总结报告
   research: skipped
-  product-brief: skipped
+  product-brief: "_bmad-output/planning-artifacts/product-brief-ai-forge-2026-03-11.md"  # ✅ 已完成: 愿景+用户画像+成功指标+MVP范围
 
   # Phase 2: Planning
-  prd: "docs/PRD.md"
+  prd: "_bmad-output/planning-artifacts/prd.md"  # ✅ 已完成: 46条FR + 28条NFR + 7条用户旅程 + 创新分析 + 分阶段范围
   create-ux-design: skipped
 
   # Phase 3: Solutioning
-  create-architecture: "docs/architect.md"
+  create-architecture: required
   create-epics-and-stories: required
   test-design: optional
   implementation-readiness: required
@@ -43,13 +43,12 @@ workflow_status:
 
 # 当前活动
 current_activity:
-  workflow: "create-epics-and-stories"
+  workflow: "create-architecture"
   status: "not_started"
-  previous_workflow: "brainstorm-project"
+  previous_workflow: "prd"
   previous_output:
-    - "_bmad-output/analysis/brainstorming-session-2026-03-04.md"
-    - "_bmad-output/analysis/chaos-engineering-report.md"
+    - "_bmad-output/planning-artifacts/prd.md"
   next_steps:
-    - "运行 create-epics-and-stories 工作流"
-    - "基于 PRD + 架构文档 + 混沌工程报告生成 Epics 和 Stories"
-    - "重点将 P0 安全加固项纳入 Epic 1（地基加固）"
+    - "运行 create-architecture 工作流（architect agent）"
+    - "基于 PRD 的 46 条功能需求和 28 条非功能需求设计系统架构"
+    - "UX 设计已跳过（CLI 工具无 UI）"
