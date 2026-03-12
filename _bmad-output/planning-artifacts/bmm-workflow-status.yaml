@@ -33,7 +33,7 @@ workflow_status:
   create-ux-design: skipped
 
   # Phase 3: Solutioning
-  create-architecture: required
+  create-architecture: "_bmad-output/planning-artifacts/architecture.md"  # ✅ 已完成: 11项架构决策 + 6条实现模式 + 完整项目结构 + 验证通过
   create-epics-and-stories: required
   test-design: optional
   implementation-readiness: required
@@ -43,12 +43,11 @@ workflow_status:
 
 # 当前活动
 current_activity:
-  workflow: "create-architecture"
+  workflow: "create-epics-and-stories"
   status: "not_started"
-  previous_workflow: "prd"
+  previous_workflow: "create-architecture"
   previous_output:
-    - "_bmad-output/planning-artifacts/prd.md"
+    - "_bmad-output/planning-artifacts/architecture.md"
   next_steps:
-    - "运行 create-architecture 工作流（architect agent）"
-    - "基于 PRD 的 46 条功能需求和 28 条非功能需求设计系统架构"
-    - "UX 设计已跳过（CLI 工具无 UI）"
+    - "运行 create-epics-and-stories 工作流（pm agent）"
+    - "基于 PRD + 架构文档将需求拆分为可执行的 Epics 和 Stories"

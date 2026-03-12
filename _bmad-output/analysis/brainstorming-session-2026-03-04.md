@@ -1,8 +1,8 @@
 ---
 stepsCompleted: [1, 2]
 inputDocuments:
-  - docs/PRD.md
-  - docs/两种安装方式详解.md
+  - docs/PRD(draft).md
+  - docs/PRD(draft) - 两种安装方式详解.md
 session_topic: 'aiforge CLI 工具的技术挑战与创新解决方案'
 session_goals: '探索知识仓库结构多样性、跨平台兼容性、安全性增强、用户体验创新的解决方案'
 selected_approach: 'ai-recommended'
@@ -28,7 +28,7 @@ context_file: '_bmad/bmm/data/project-context-template.md'
 
 ### Context Guidance
 
-本次头脑风暴基于已有的详细 PRD 文档和技术说明文档,聚焦于:
+本次头脑风暴基于已有的详细 PRD 草稿文档和技术说明草稿文档,聚焦于:
 - 识别潜在技术风险和边缘场景
 - 提出创新的技术解决方案
 - 发现用户体验改进机会
