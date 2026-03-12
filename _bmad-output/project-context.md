@@ -45,7 +45,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 ai-forge uses a **pipeline architecture** with type-safe stage chain:
 
 ```
-Resolve → Auth → Clone → Detect → Match → [Install] → Report
+Resolve → Auth → Clone → Detect → Match → [Install(含preflight)] → Report
                                             ↑ dry-run skips this
 ```
 
