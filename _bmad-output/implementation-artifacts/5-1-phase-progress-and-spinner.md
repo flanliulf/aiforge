@@ -21,7 +21,7 @@ So that 知道系统在做什么，不会以为卡住了。
   - [ ] 1.2 在 `updatePhase(message)` 中更新 spinner 文本（追加进度信息）
   - [ ] 1.3 在 `completePhase()` 中停止 spinner，显示 ✓ + 阶段名
   - [ ] 1.4 spinner 输出到 stderr：`ora({ stream: process.stderr })`
-  - [ ] 1.5 错误时 spinner 显示 ✗ 标记
+  - [ ] 1.5 错误时 spinner 显示 ✗ 标记：由 `reportError()` 内部触发——如果当前有活跃 spinner，先调用 `this.spinner.fail()` 显示 ✗，再渲染三段式错误。这是 TtyReporter 的内部实现细节，不需要扩展 Reporter 接口。
 - [ ] Task 2: 实现进度计数 (AC: #2)
   - [ ] 2.1 在 Install 阶段传递总数和当前索引到 `updatePhase`
   - [ ] 2.2 格式：`"执行安装... (3/7)"` — 当前项/总项数

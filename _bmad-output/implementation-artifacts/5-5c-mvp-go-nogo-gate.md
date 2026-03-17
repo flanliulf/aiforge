@@ -35,8 +35,8 @@ So that 团队对产品是否达到发布标准有客观、一致、可追溯的
     - 国际化完整性
     - 错误消息覆盖率
 - [ ] Task 2: 执行安全审计 (AC: #1)
-  - [ ] 2.1 检查 `npm pack --dry-run` 输出，确认无公司域名、仓库地址、Token
-  - [ ] 2.2 检查 `.npmignore` 排除了 tests/、src/、.eslintrc 等
+  - [ ] 2.1 检查 `npm pack --dry-run` 输出的最终产物列表，确认无公司域名、仓库地址、Token
+  - [ ] 2.2 检查最终 packlist 不包含 tests/、src/、配置文件等非发布内容（验证产物而非绑定 `.npmignore` 或 `package.json.files` 某一种打包机制）
   - [ ] 2.3 检查 package.json 中无 `repository`、`bugs` 等含公司信息的字段
   - [ ] 2.4 搜索代码中的硬编码域名或 Token
 - [ ] Task 3: 执行关键旅程验证 (AC: #1)
@@ -106,7 +106,7 @@ grep -r "gitlab\.\|wshoto\|glpat-" src/ --include="*.ts"
 ### 依赖关系
 
 - 依赖 Epic 1-5 全部 Story（完整产品实现）
-- 依赖 Story 5.5b（E2E 测试通过）
+- 依赖 Story 5.5b（E2E 测试通过）——门禁结论的可信度直接取决于 5.5b 的测试覆盖质量，5.5b 必须先收口完成
 - 这是整个 MVP 的最后一个 Story
 
 ### 本 Story 不做的事

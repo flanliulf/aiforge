@@ -11,7 +11,7 @@ So that 不需要搜索文档就能自己解决问题。
 ## Acceptance Criteria
 
 1. **Given** 认证失败 **When** Reporter 输出错误 **Then** 显示三段式提示（FR-037，NFR-U2）：`❌ 无法访问仓库` → `Git 服务器返回 401` → 可复制的修复命令
-2. **Given** 任何 `AiforgeError` **When** Reporter 渲染错误 **Then** 格式为 `❌ ${message}` → `${why}` → `${fix.join('\n')}`，修复命令可直接复制执行
+2. **Given** 任何 `AiforgeError` **When** TtyReporter 渲染错误 **Then** 格式为 `❌ ${message}` → `${why}` → `${fix.join('\n')}`（emoji + chalk 着色）；PlainReporter 格式为 `ERROR: ${message}` → `WHY: ${why}` → `FIX: ${fix}`（纯文本前缀，无 emoji，CI 兼容）。两者保持三段式语义一致，视觉形式不同。
 3. **Given** 错误输出 **When** 检查输出流 **Then** 所有错误信息输出到 stderr
 4. **Given** 各类错误场景 **When** 触发错误 **Then** 每种错误都有针对性的 `why` 和 `fix` 内容
 
@@ -22,8 +22,8 @@ So that 不需要搜索文档就能自己解决问题。
   - [ ] 1.2 `PlainReporter.reportError()` — 纯文本三段式，无颜色
   - [ ] 1.3 `QuietReporter.reportError()` — 同 PlainReporter（错误不能被静默）
   - [ ] 1.4 所有实现输出到 stderr
-- [ ] Task 2: 审查并完善所有错误场景的 fix 内容 (AC: #4)
-  - [ ] 2.1 审查所有 `AiforgeError` 创建点，确保 `why` 和 `fix` 有针对性
+- [ ] Task 2: 审查并完善所有错误场景的 fix 内容 — **跨模块错误文案审计** (AC: #4)
+  - [ ] 2.1 审查 Epic 2~4 中所有 `AiforgeError` 创建点（`stages/`、`services/`、`commands/`），确保 `why` 和 `fix` 有针对性。注意：这是一次跨模块收口，涉及多个 Epic 的错误创建代码，工作量不应被低估。
   - [ ] 2.2 认证失败：`fix: ['npx aiforge --ssh', 'npx aiforge --token <your-token>', 'npx aiforge init']`
   - [ ] 2.3 网络错误：`fix: ['检查网络连接', 'git clone <url>  # 手动测试']`
   - [ ] 2.4 权限不足：`fix: ['chmod 755 <target-dir>', 'sudo npx aiforge -g']`

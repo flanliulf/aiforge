@@ -35,6 +35,10 @@ So that 一目了然地知道每个工具安装了什么。
 
 ## Dev Notes
 
+### 与 Story 4.6b 的边界
+
+Story 4.6b 提供最小可用的 `reportResult()` 实现（按工具分组逐行输出 + 统计行）。本 Story 在此基础上增强 TtyReporter 为树形展示（`├──`/`└──` 连接符 + chalk 着色）。PlainReporter 的制表符分隔格式已在 4.6b 中完成，本 Story 不重复实现，只在需要时微调格式。
+
 ### 树形输出格式 [Source: FR-036]
 
 TtyReporter：

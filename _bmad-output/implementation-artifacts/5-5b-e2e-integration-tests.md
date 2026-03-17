@@ -10,13 +10,13 @@ So that 在发布前能够自动验证系统整体可用性，并及时发现回
 
 ## Acceptance Criteria
 
-1. **Given** 模拟知识仓库 **When** 执行全局和项目级安装 **Then** 4 个工具的安装流程均成功，结果与规则映射一致
+1. **Given** 模拟知识仓库 **When** 执行全局和项目级安装 **Then** 按 `BUILTIN_RULES` 真实规则矩阵（约 14 条，非理想化 4×4）验证安装结果与规则映射一致
 2. **Given** 三种安装模式 **When** 分别执行复制、符号链接、flatten **Then** 三种模式均通过验证，输出符合预期
-3. **Given** `--dry-run` 模式 **When** 执行测试 **Then** 不发生任何文件写入，dry-run 输出与实际安装结果一致（NFR-U5）
-4. **Given** 文件冲突场景 **When** 执行安装测试 **Then** 备份、跳过、覆盖行为符合设计
+3. **Given** `--dry-run` 模式 **When** 执行测试 **Then** 不发生任何文件写入，dry-run 输出的完整目标路径列表和安装模式与实际安装结果一致（NFR-U5）
+4. **Given** 文件冲突场景 **When** 执行安装测试 **Then** 至少覆盖三条主路径：`--force` 覆盖、备份后覆盖、跳过，行为符合设计
 5. **Given** 零结果场景 **When** 执行测试 **Then** 触发零结果诊断输出
 6. **Given** macOS 环境 **When** 执行测试 **Then** 所有测试通过（NFR-C1）
-7. **Given** Linux 环境（CI）**When** 执行测试 **Then** 所有测试通过（NFR-C2）
+7. **Given** Linux 环境（CI）**When** 执行测试 **Then** 所有测试通过（NFR-C2）。若当前无 CI 环境，先作为手动 runner 验证项，后续补充 CI 自动化。
 
 ## Tasks / Subtasks
 
@@ -27,7 +27,7 @@ So that 在发布前能够自动验证系统整体可用性，并及时发现回
   - [ ] 1.4 包含 README.md、.gitkeep 等应被排除的文件
 - [ ] Task 2: 编写核心安装流程 E2E 测试 (AC: #1, #6, #7)
   - [ ] 2.1 `tests/integration/pipeline.test.ts` — 扩展或新建
-  - [ ] 2.2 全局安装测试：验证 4 工具 × 4 资源类型的安装结果
+  - [ ] 2.2 全局安装测试：按 Story 1.4 的真实 `BUILTIN_RULES`（约 14 条规则）验证安装结果，不按理想化的 4×4 满矩阵（部分工具不支持所有资源类型）
   - [ ] 2.3 项目级安装测试：验证项目目录下的安装结果
   - [ ] 2.4 使用临时目录隔离测试环境
   - [ ] 2.5 Mock Git 克隆（使用本地 fixture 仓库代替）
@@ -38,12 +38,14 @@ So that 在发布前能够自动验证系统整体可用性，并及时发现回
 - [ ] Task 4: 编写 dry-run 一致性测试 (AC: #3)
   - [ ] 4.1 执行 dry-run 获取安装计划
   - [ ] 4.2 执行实际安装获取结果
-  - [ ] 4.3 对比两者的文件列表和目标路径完全一致
+  - [ ] 4.3 对比两者的**完整目标路径列表**和**安装模式**（copy/symlink）一致，不仅仅比对文件名（需覆盖 flatten 场景的重命名规则）
   - [ ] 4.4 验证 dry-run 不产生文件系统副作用
 - [ ] Task 5: 编写冲突和边界场景测试 (AC: #4, #5)
-  - [ ] 5.1 冲突场景：预先在目标路径创建文件，验证 --force 覆盖行为
-  - [ ] 5.2 零结果场景：空仓库或全部跳过，验证诊断输出
-  - [ ] 5.3 排除列表：验证 README.md 等文件不被安装
+  - [ ] 5.1 冲突场景 — `--force` 覆盖：预先在目标路径创建文件，验证 `--force` 直接覆盖行为
+  - [ ] 5.2 冲突场景 — 备份后覆盖：验证 `{filename}.aiforge-backup-{YYYYMMDD}` 备份文件生成
+  - [ ] 5.3 冲突场景 — 跳过：验证用户选择跳过时文件未被修改，结果为 `status: 'skipped'`
+  - [ ] 5.4 零结果场景：空仓库或全部跳过，验证诊断输出
+  - [ ] 5.5 排除列表：验证 README.md 等文件不被安装
 
 ## Dev Notes
 
@@ -105,15 +107,27 @@ afterEach(async () => {
 
 ### dry-run 一致性验证
 
+对比完整目标路径和安装模式，不仅仅比对文件名（需覆盖 flatten 场景的重命名规则）：
+
 ```typescript
 it('dry-run output matches actual install', async () => {
   // 1. dry-run
   const plan = await runPipelineDryRun(args);
-  const plannedFiles = plan.items.flatMap(i => i.sourceFiles.map(f => f.relativePath));
+  const plannedTargets = plan.items.flatMap(i =>
+    i.sourceFiles.map(f => ({
+      targetPath: join(i.targetDir, f.relativePath),
+      mode: getInstallMode(args, plan.scope),
+    }))
+  );
 
   // 2. actual install
   const results = await runPipelineInstall(args);
-  const installedFiles = results.filter(r => r.status !== 'failed').map(r => basename(r.targetPath));
+  const installedTargets = results
+    .filter(r => r.status !== 'skipped')
+    .map(r => ({ targetPath: r.targetPath, mode: r.mode }));
+
+  // 3. compare full target paths + install mode
+  expect(plannedTargets.sort(byPath)).toEqual(installedTargets.sort(byPath));
 
   // 3. compare
   expect(plannedFiles.sort()).toEqual(installedFiles.sort());

@@ -13,7 +13,7 @@ So that 在 CI 管道中也能正常工作，在脚本中输出可解析。
 1. **Given** 非 TTY 环境（如 `npx aiforge | grep copilot`）**When** 执行安装 **Then** 自动禁用 spinner 和 ANSI 彩色码（FR-038，NFR-U4），输出纯文本行可被 `grep`/`awk` 解析
 2. **Given** 用户指定 `--quiet` **When** 执行安装 **Then** 只输出关键信息：最终成功/失败状态 + 统计行（FR-039），不显示进度 spinner 和逐文件详情
 3. **Given** `npx aiforge --dry-run 2>/dev/null` **When** 执行 **Then** stdout 只输出纯安装计划，无进度信息
-4. **Given** 非 TTY 环境下遇到需要用户决策的场景 **When** 需要交互 **Then** 直接失败，exit code 非 0
+4. **Given** 非 TTY 环境下遇到需要用户决策的场景 **When** 需要交互 **Then** 验证 Epic 4 Story 4.5 的非 TTY 冲突策略在 CLI 层正确生效（直接失败，exit code 非 0）。本 Story 不重新定义冲突处理规则，只确保 Reporter/CLI 层行为一致。
 
 ## Tasks / Subtasks
 
@@ -44,10 +44,19 @@ So that 在 CI 管道中也能正常工作，在脚本中输出可解析。
 
 ### Reporter 选择逻辑 [Source: architecture/03-core-decisions.md#D4]
 
+> **重要**：`createReporter` 保持 Story 1.3 定义的签名 `createReporter(options: { quiet: boolean; isTty: boolean }): Reporter`，不接受 `ParsedArgs`（避免 core 层反向依赖 CLI 层类型）。在 `index.ts` 中从 `ParsedArgs` 提取参数后传入：
+
 ```typescript
-export function createReporter(args: ParsedArgs): Reporter {
-  if (args.quiet) return new QuietReporter();
-  if (!process.stdout.isTTY) return new PlainReporter();
+// index.ts 中调用
+const reporter = createReporter({
+  quiet: args.quiet,
+  isTty: process.stdout.isTTY ?? false,
+});
+
+// core/reporter.ts 中实现（签名不变）
+export function createReporter(options: { quiet: boolean; isTty: boolean }): Reporter {
+  if (options.quiet) return new QuietReporter();
+  if (!options.isTty) return new PlainReporter();
   return new TtyReporter();
 }
 ```
