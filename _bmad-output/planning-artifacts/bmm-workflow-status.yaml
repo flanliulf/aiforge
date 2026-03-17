@@ -39,15 +39,15 @@ workflow_status:
   implementation-readiness: "_bmad-output/planning-artifacts/implementation-readiness-report-2026-03-17.md"  # ✅ 已完成: 实施就绪评估通过
 
   # Phase 4: Implementation
-  sprint-planning: required
+  sprint-planning: "_bmad-output/implementation-artifacts/sprint-status.yaml"  # ✅ 已完成: 5 Epic + 27 Stories + 5 Retrospective
 
 # 当前活动
 current_activity:
-  workflow: "sprint-planning"
-  status: "not_started"
-  previous_workflow: "implementation-readiness"
+  workflow: "create-story"
+  status: "ready"
+  previous_workflow: "sprint-planning"
   previous_output:
-    - "_bmad-output/planning-artifacts/implementation-readiness-report-2026-03-17.md"
+    - "_bmad-output/implementation-artifacts/sprint-status.yaml"
   next_steps:
-    - "运行 sprint-planning 工作流（sm agent）"
-    - "从 epics 文件生成 sprint-status.yaml，开始实施阶段"
+    - "使用 SM agent 的 [CS] Create Story 为 Epic 1 的第一个 Story 创建开发就绪文件"
+    - "从 Story 1.1（项目初始化与工具链配置）开始"

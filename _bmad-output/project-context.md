@@ -97,7 +97,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - Token exists in memory ONLY during clone; cleared immediately after
 - All logs/errors use `sanitizeToken()` from `core/sanitize.ts`
 - config.json file permissions: `0o600` (user-only read/write)
-- Token display format: `glpat-ab****xy` (first 8 + last 4 chars)
+- Token display format: `glpat-ab****mnop` (first 8 + `****` + last 4 chars); short tokens (< 12 chars): first 4 + `****` (no tail)
 
 ### Data Format Rules
 
