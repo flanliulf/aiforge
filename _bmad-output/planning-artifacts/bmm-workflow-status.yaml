@@ -34,7 +34,7 @@ workflow_status:
 
   # Phase 3: Solutioning
   create-architecture: "_bmad-output/planning-artifacts/architecture.md"  # ✅ 已完成: 11项架构决策 + 6条实现模式 + 完整项目结构 + 验证通过
-  create-epics-and-stories: required
+  create-epics-and-stories: "_bmad-output/planning-artifacts/epics.md"  # ✅ 已完成: 5 Epic + 24 Stories，修复 Epic 2 Story 依赖顺序
   test-design: optional
   implementation-readiness: required
 
@@ -43,11 +43,11 @@ workflow_status:
 
 # 当前活动
 current_activity:
-  workflow: "create-epics-and-stories"
+  workflow: "implementation-readiness"
   status: "not_started"
-  previous_workflow: "create-architecture"
+  previous_workflow: "create-epics-and-stories"
   previous_output:
-    - "_bmad-output/planning-artifacts/architecture.md"
+    - "_bmad-output/planning-artifacts/epics.md"
   next_steps:
-    - "运行 create-epics-and-stories 工作流（pm agent）"
-    - "基于 PRD + 架构文档将需求拆分为可执行的 Epics 和 Stories"
+    - "运行 implementation-readiness 工作流（architect agent）"
+    - "验证 PRD + 架构 + Epics & Stories 的完整性和一致性"
