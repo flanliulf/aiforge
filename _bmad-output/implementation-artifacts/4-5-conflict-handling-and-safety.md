@@ -80,9 +80,12 @@ async function resolveConflict(
 
 ```typescript
 // 在 installSingleItem 中
-const conflict = await checkConflict(targetPath, sourceHash, manifest);
+const conflict = await checkConflict(targetPath, sourceHash, manifest, manifestDegraded);
 
-if (conflict === 'user-file') {
+// 需要用户决策的冲突类型：user-file、unknown-origin、user-modified
+const needsUserDecision = ['user-file', 'unknown-origin', 'user-modified'].includes(conflict);
+
+if (needsUserDecision) {
   if (args.force) {
     // --force: 直接覆盖
   } else if (!process.stdin.isTTY) {

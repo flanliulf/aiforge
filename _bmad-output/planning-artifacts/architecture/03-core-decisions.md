@@ -124,6 +124,7 @@ interface Reporter {
   reportResult(results: InstallResult[]): void;
   reportPlan(plan: MatchedPlan): void;
   reportError(error: AiforgeError): void;
+  warn(message: string): void;
 }
 ```
 
@@ -143,6 +144,7 @@ interface Reporter {
 | `updatePhase()` | stderr | 同上 |
 | `completePhase()` | stderr | 同上 |
 | `reportError()` | stderr | 错误信息写 stderr 是 CLI 标准约定 |
+| `warn()` | stderr | 非致命警告（断链、mainFile 缺失等），诊断性质 |
 
 这确保 `npx aiforge --dry-run 2>/dev/null` 只输出纯安装计划，可被 `grep`/`awk`/`jq` 解析。
 

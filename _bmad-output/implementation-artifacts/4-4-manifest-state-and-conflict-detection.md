@@ -12,8 +12,8 @@ So that 能区分"aiforge 安装的"和"我手写的"文件，避免意外覆盖
 
 1. **Given** `services/manifest.ts` 已创建 **When** 安装完成后 **Then** 将所有已安装文件记录到 `~/.aiforge/manifest.json`（FR-025），每条记录包含 `source`、`target`、`tool`、`scope`、`mode`、`hash`（SHA256）、`installedAt`
 2. **Given** manifest.json 写入 **When** 执行写入操作 **Then** 使用原子写入：先写临时文件，再 `fs.rename()` 替换
-3. **Given** 目标路径已存在文件 **When** 检查 manifest.json **Then** hash 匹配 → "已是最新"；hash 不匹配 → "有更新"；不在 manifest → "用户手写文件"（FR-026）
-4. **Given** manifest.json 损坏或丢失 **When** 读取 manifest **Then** 降级为空 manifest，所有已存在文件视为"未知来源"（NFR-R5）
+3. **Given** 目标路径已存在文件 **When** 检查 manifest **Then** 按以下矩阵判定冲突类型：不在 manifest → `'user-file'`（用户手写）；在 manifest 且目标hash=manifest hash 且源hash=manifest hash → `'aiforge-current'`（已是最新）；在 manifest 且目标hash=manifest hash 且源hash≠manifest hash → `'aiforge-outdated'`（源有更新）；在 manifest 且目标hash≠manifest hash → `'user-modified'`（用户修改了 aiforge 安装的文件）（FR-026）
+4. **Given** manifest.json 损坏或丢失 **When** 读取 manifest **Then** 降级为空 manifest（NFR-R5），此时所有已存在文件视为 `'unknown-origin'`（系统无法判断来源），与 `'user-file'`（确定不是 aiforge 安装）语义不同
 
 ## Tasks / Subtasks
 
@@ -22,14 +22,14 @@ So that 能区分"aiforge 安装的"和"我手写的"文件，避免意外覆盖
   - [ ] 1.2 实现 `saveManifest(entries: ManifestEntry[], pathResolver: PathResolver): Promise<void>` — 原子写入
   - [ ] 1.3 损坏降级：JSON 解析失败或文件不存在 → 返回空数组（不抛错）
   - [ ] 1.4 原子写入：`writeFile(tmpPath)` → `rename(tmpPath, manifestPath)`
-- [ ] Task 2: 实现冲突检测逻辑 (AC: #3)
-  - [ ] 2.1 实现 `checkConflict(targetPath: string, manifest: ManifestEntry[]): Promise<ConflictType>`
-  - [ ] 2.2 `ConflictType`: 'none'（目标不存在）| 'aiforge-current'（hash 匹配）| 'aiforge-outdated'（hash 不匹配）| 'user-file'（不在 manifest）
+- [ ] Task 2: 实现冲突检测逻辑 (AC: #3, #4)
+  - [ ] 2.1 实现 `checkConflict(targetPath: string, sourceHash: string, manifest: ManifestEntry[], manifestDegraded: boolean): Promise<ConflictType>`
+  - [ ] 2.2 `ConflictType`: `'none'`（目标不存在）| `'aiforge-current'`（目标hash=manifest hash 且 源hash=manifest hash）| `'aiforge-outdated'`（目标hash=manifest hash 且 源hash≠manifest hash）| `'user-modified'`（在 manifest 但目标hash≠manifest hash）| `'user-file'`（不在 manifest，manifest 正常）| `'unknown-origin'`（不在 manifest，manifest 降级）
   - [ ] 2.3 在 `executeInstall` 中每个文件安装前调用冲突检测
-- [ ] Task 3: 实现安装后 manifest 更新 (AC: #1)
-  - [ ] 3.1 安装完成后，将所有成功安装的文件构建为 `ManifestEntry[]`
-  - [ ] 3.2 合并已有 manifest 条目（更新已存在的，添加新的，保留未涉及的）
-  - [ ] 3.3 调用 `saveManifest()` 持久化
+- [ ] Task 3: 提供 manifest 服务供 pipeline 层调用 (AC: #1)
+  - [ ] 3.1 导出 `buildManifestEntries(results: InstallResult[]): ManifestEntry[]`，从安装结果构建 manifest 条目
+  - [ ] 3.2 导出 `mergeManifest(existing, newEntries): ManifestEntry[]`，合并已有条目
+  - [ ] 3.3 manifest 持久化由 pipeline 层（Story 4.6a）调用 `saveManifest()`，本 Story 只提供服务函数
 - [ ] Task 4: 编写单元测试 (AC: #1-4)
   - [ ] 4.1 `tests/services/manifest.test.ts`
   - [ ] 4.2 测试用例：正常读写、原子写入验证、损坏降级、冲突检测四种类型、manifest 合并逻辑
@@ -76,30 +76,28 @@ async function loadManifest(pathResolver: PathResolver): Promise<ManifestEntry[]
 }
 ```
 
-不抛错，静默降级。所有已存在文件视为"未知来源"，冲突检测会将其标记为 'user-file'。
+不抛错，静默降级。但需设置 `manifestDegraded = true` 标志，使冲突检测对已存在文件返回 `'unknown-origin'` 而非 `'user-file'`——两者语义不同：`'unknown-origin'` 是"系统无法判断"，`'user-file'` 是"确定不是 aiforge 安装"。
 
 ### 冲突检测流程
 
 ```typescript
-type ConflictType = 'none' | 'aiforge-current' | 'aiforge-outdated' | 'user-file';
+type ConflictType = 'none' | 'aiforge-current' | 'aiforge-outdated' | 'user-modified' | 'user-file' | 'unknown-origin';
 
 async function checkConflict(
   targetPath: string,
   sourceHash: string,
-  manifest: ManifestEntry[]
+  manifest: ManifestEntry[],
+  manifestDegraded: boolean
 ): Promise<ConflictType> {
-  try {
-    await access(targetPath);
-  } catch {
-    return 'none'; // 目标不存在，无冲突
-  }
+  try { await access(targetPath); } catch { return 'none'; }
 
   const entry = manifest.find(e => e.target === targetPath);
-  if (!entry) return 'user-file'; // 不在 manifest，用户手写
+  if (!entry) return manifestDegraded ? 'unknown-origin' : 'user-file';
 
   const currentHash = await fileHash(targetPath);
-  if (currentHash === entry.hash) return 'aiforge-current'; // hash 匹配，已是最新
-  return 'aiforge-outdated'; // hash 不匹配，有更新
+  if (currentHash !== entry.hash) return 'user-modified'; // 用户修改了 aiforge 安装的文件
+  if (sourceHash === entry.hash) return 'aiforge-current'; // 源和目标都没变
+  return 'aiforge-outdated'; // 源有更新，目标未被用户修改
 }
 ```
 

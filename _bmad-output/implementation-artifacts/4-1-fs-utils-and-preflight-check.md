@@ -40,6 +40,21 @@ So that 不会在安装过程中因权限问题半途失败。
 
 ## Dev Notes
 
+### 权限判定矩阵
+
+preflight 对每个目标路径的判定规则：
+
+| 目标状态 | 判定方式 | 结果 |
+|---------|---------|------|
+| 目标不存在，父目录可写 | `fs.access(parentDir, W_OK)` | 通过，标记需创建 |
+| 目标不存在，父目录不可写 | `fs.access(parentDir, W_OK)` 失败 | fail-fast |
+| 目标为文件，可写 | `fs.access(targetPath, W_OK)` | 通过（覆盖由冲突检测 Story 4.4/4.5 决定） |
+| 目标为文件，不可写 | `fs.access(targetPath, W_OK)` 失败 | fail-fast |
+| 目标为目录 | `fs.stat` 检测 | 通过（directories 类型正常，files 类型由冲突检测处理） |
+| 目标为符号链接 | `fs.lstat` 检测 | 通过（symlink 模式会先删除再创建） |
+
+注意：preflight 只做权限和路径安全校验，不做冲突判定——冲突判定是 Story 4.4/4.5 的职责。
+
 ### 预检查是 Install 阶段的第一步 [Source: architecture/03-core-decisions.md#D6]
 
 预检查不是独立管道阶段，而是 `execute-install.ts` 的第一步。但工具函数和预检查逻辑放在 `services/fs-utils.ts` 中，供 Install 阶段调用。
@@ -56,6 +71,10 @@ export async function executeInstall(plan: MatchedPlan, ...): Promise<InstallRes
 ```
 
 ### 路径遍历检测 [Source: NFR-S5]
+
+`allowedRoot` 来源于 PathResolver 和安装 scope，与目标路径解析使用同一套来源：
+- 全局安装：`allowedRoot = pathResolver.home()`
+- 项目安装：`allowedRoot = process.cwd()`
 
 ```typescript
 import { resolve, join } from 'node:path';

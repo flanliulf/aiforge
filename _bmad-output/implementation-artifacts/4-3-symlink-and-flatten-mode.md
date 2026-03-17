@@ -29,7 +29,7 @@ So that 日常更新零额外操作，且每个工具都能正确读取配置。
   - [ ] 2.1 `flatten` 类型处理：遍历 sourceFiles（子目录），在每个子目录中查找 `rule.mainFile`（默认 `index.md`）
   - [ ] 2.2 重命名逻辑：`skills/code-review/index.md` → `code-review.md`
   - [ ] 2.3 复制到目标目录：`copyFile(mainFilePath, join(targetDir, dirName + '.md'))`
-  - [ ] 2.4 主文件不存在时：跳过该子目录，记录 warning
+  - [ ] 2.4 主文件不存在时：跳过该子目录，通过 `reporter.warn()` 记录警告，生成 `status: 'skipped'` 结果项，不写入 manifest
 - [ ] Task 3: 编写单元测试 (AC: #1-5)
   - [ ] 3.1 扩展 `tests/stages/execute-install.test.ts`
   - [ ] 3.2 测试用例：symlink files、symlink directories、-l 无 -g 拒绝、flatten 重命名、mainFile 缺失跳过、断链检测

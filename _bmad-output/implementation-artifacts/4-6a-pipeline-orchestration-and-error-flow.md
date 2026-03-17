@@ -11,8 +11,8 @@ So that 正常模式下完整管道可端到端运行。
 ## Acceptance Criteria
 
 1. **Given** 正常模式（非 dry-run）**When** 执行管道 **Then** 完整执行 Resolve → Auth → Clone → Detect → Match → Install → Report，`ParsedArgs` 由编排器持有按需注入
-2. **Given** 管道执行中某阶段抛出 `severity: 'fatal'` 错误 **When** 错误发生 **Then** 管道立即停止，输出已完成的操作清单（FR-031，NFR-R4）
-3. **Given** 管道执行中某阶段抛出 `severity: 'partial'` 错误 **When** 错误被收集 **Then** 管道继续执行后续文件，最终汇总所有 partial 错误
+2. **Given** 管道执行中某阶段抛出 `AiforgeError(severity: 'fatal')` **When** 错误发生 **Then** 管道立即停止，通过 `reporter.reportError()` 输出错误，设置 `process.exitCode`（FR-031，NFR-R4）
+3. **Given** Install 阶段正常完成 **When** 管道收尾 **Then** 由 pipeline 层调用 `saveManifest()` 持久化安装记录，然后调用 `reporter.reportResult()` 输出结果
 
 ## Tasks / Subtasks
 
@@ -24,14 +24,13 @@ So that 正常模式下完整管道可端到端运行。
   - [ ] 1.5 替换 match 占位 → `import { matchRules } from './stages/match-rules.js'`
   - [ ] 1.6 替换 install 占位 → `import { executeInstall } from './stages/execute-install.js'`
   - [ ] 1.7 确保 `ParsedArgs` 由编排器持有，按需注入各阶段
-- [ ] Task 2: 完善错误流控制 (AC: #2, #3)
+- [ ] Task 2: 完善错误流控制 (AC: #2)
   - [ ] 2.1 fatal 错误：catch AiforgeError with severity 'fatal' → 立即停止，`reporter.reportError(error)`，设置 `process.exitCode`
-  - [ ] 2.2 partial 错误：Install 阶段内部收集 partial 错误到数组，继续处理后续文件
-  - [ ] 2.3 非 AiforgeError 异常：包装为 `AiforgeError(code: 'UNEXPECTED', severity: 'fatal')`
-  - [ ] 2.4 管道完成后：如有 partial 错误，通过 Reporter 汇总输出
-- [ ] Task 3: 实现安装后 manifest 保存 (AC: #1)
-  - [ ] 3.1 Install 阶段完成后，调用 `saveManifest()` 持久化安装记录
-  - [ ] 3.2 即使有 partial 错误，也保存成功安装的文件记录
+  - [ ] 2.2 非 AiforgeError 异常：包装为 `AiforgeError(code: 'UNEXPECTED', severity: 'fatal')`
+  - [ ] 2.3 Install 阶段的文件 I/O 错误统一为 fatal（fail-fast），不存在 partial 错误概念——hash 相同跳过是正常结果 `status: 'skipped'`，不是错误
+- [ ] Task 3: 实现安装后 manifest 保存 (AC: #3)
+  - [ ] 3.1 Install 阶段完成后，由 pipeline 层调用 `saveManifest()` 持久化安装记录（manifest 保存是 pipeline 收尾职责，不在 Install 阶段内部）
+  - [ ] 3.2 只保存 `status: 'new'` 和 `status: 'updated'` 的文件记录
 - [ ] Task 4: 编写集成测试 (AC: #1-3)
   - [ ] 4.1 `tests/integration/pipeline.test.ts` — 完整管道端到端测试
   - [ ] 4.2 测试用例：正常模式完整流程、fatal 错误停止、partial 错误继续、dry-run 路径
@@ -77,9 +76,14 @@ export async function runPipeline(args: ParsedArgs, reporter: Reporter): Promise
 }
 ```
 
-### partial 错误收集
+### 错误语义统一决策
 
-partial 错误在 Install 阶段内部处理（Story 4.2 的 executeInstall），不会抛到管道层。Install 返回的 `InstallResult[]` 中 `status: 'failed'` 的项即为 partial 错误。
+**Epic 4 统一规则：Install 阶段不存在 partial 错误概念。**
+
+- 文件 I/O 错误（权限不足、磁盘满、路径无效）→ 抛出 `AiforgeError(severity: 'fatal')`，管道立即终止
+- hash 相同跳过 → 正常结果 `status: 'skipped'`，不是错误
+- 冲突跳过（用户选择 skip）→ 正常结果 `status: 'skipped'`，不是错误
+- Install 返回的 `InstallResult[]` 中只有 `'new'`、`'updated'`、`'skipped'` 三种状态，没有 `'failed'`
 
 管道层只处理 fatal 错误（立即停止）。
 

@@ -14,8 +14,8 @@ So that 各工具能读取到正确的配置内容。
 2. **Given** `MatchedPlan` 中有 `type: 'directories'` 的规则 **When** 执行安装 **Then** 将源目录整体复制到目标位置，保持目录结构
 3. **Given** 安装范围为全局（`-g`）**When** 执行安装 **Then** 目标路径为用户 Home 目录下的工具配置目录（FR-016）
 4. **Given** 安装范围为项目（默认）**When** 执行安装 **Then** 目标路径为当前项目目录下的工具配置目录（FR-017）
-5. **Given** 知识仓库包含 agents、skills、instructions、mcp-tools 四类资源 **When** 执行安装 **Then** 四类资源全部正确安装到对应目标路径（FR-018）
-6. **Given** 安装过程中某个文件操作失败 **When** 错误发生 **Then** 立即停止后续安装（fail-fast），输出已完成的操作清单（FR-031）
+5. **Given** 知识仓库包含 agents、skills、instructions、mcp-tools 四类资源 **When** 执行 copy 模式安装 **Then** copy 模式适用的资源类型（`files` 和 `directories`）正确安装到对应目标路径（FR-018）。注意：`flatten` 类型（如 Cursor skills）由 Story 4.3 实现，本 Story 不覆盖。
+6. **Given** 安装过程中某个文件 I/O 操作失败（权限不足、磁盘满等）**When** 错误发生 **Then** 抛出 `AiforgeError(severity: 'fatal')`，管道立即终止，返回已完成的操作清单（FR-031）。注意：hash 相同跳过（`status: 'skipped'`）是正常结果，不是错误。
 
 ## Tasks / Subtasks
 
@@ -77,22 +77,15 @@ export async function executeInstall(
     await ensureDir(item.targetDir);
 
     for (const file of item.sourceFiles) {
-      try {
-        const result = await installSingleItem(file, item, args);
-        results.push(result);
-        reporter.updatePhase(`${file.relativePath}`);
-      } catch (error) {
-        results.push({
-          sourcePath: file.absolutePath,
-          targetPath: join(item.targetDir, file.relativePath),
-          tool: item.rule.tool,
-          status: 'failed',
-          mode: 'copy',
-          error: error instanceof Error ? error.message : '未知错误',
-        });
-        // fail-fast: 停止后续安装
-        break;
+      const status = await determineStatus(file.absolutePath, join(item.targetDir, file.relativePath));
+      if (status === 'skipped') {
+        results.push({ ..., status: 'skipped' });
+        continue; // 跳过是正常结果，不是错误
       }
+      // I/O 操作失败直接抛 AiforgeError(fatal)，管道终止
+      await installSingleItem(file, item, args);
+      results.push({ ..., status });
+      reporter.updatePhase(`${file.relativePath}`);
     }
   }
 
