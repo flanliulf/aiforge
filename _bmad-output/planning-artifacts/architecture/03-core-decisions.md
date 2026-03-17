@@ -122,6 +122,7 @@ interface Reporter {
   updatePhase(message: string): void;
   completePhase(): void;
   reportResult(results: InstallResult[]): void;
+  reportPlan(plan: MatchedPlan): void;
   reportError(error: AiforgeError): void;
 }
 ```

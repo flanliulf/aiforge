@@ -10,7 +10,7 @@ So that 不需要手动指定就能为所有工具安装配置。
 
 ## Acceptance Criteria
 
-1. **Given** 用户环境中安装了 Copilot（存在 `~/.copilot/` 或 `.github/`）**When** 执行工具检测 **Then** 检测到 copilot 工具，返回 `DetectedEnv` 包含该工具（FR-013）
+1. **Given** 用户环境中安装了 Copilot（存在 `~/.copilot/` 或 `.github/`）**When** 执行工具检测 **Then** 同时扫描全局（`home()` 下）和项目（`cwd()` 下）的标志路径，任一侧命中即视为检测到该工具，返回 `DetectedEnv` 包含该工具（FR-013）
 2. **Given** 用户环境中安装了多个工具（Copilot + Claude + Cursor）**When** 执行工具检测 **Then** 返回所有检测到的工具列表
 3. **Given** 用户通过 `--tools copilot claude` 手动指定 **When** 执行工具检测 **Then** 跳过自动扫描，直接使用用户指定的工具列表（FR-014），无效 ID 报错
 4. **Given** 自动检测未发现任何工具 **When** 检测完成 **Then** 触发诊断输出：列出扫描路径、检测标志文件、建议安装工具（FR-015），抛出 `AiforgeError`（severity: 'fatal'）
@@ -22,10 +22,10 @@ So that 不需要手动指定就能为所有工具安装配置。
 - [ ] Task 1: 创建 `src/stages/detect-tools.ts` — Detect 管道阶段 (AC: #1-6)
   - [ ] 1.1 实现 `detectTools(repo: LocalRepo, args: ParsedArgs, reporter: Reporter): Promise<DetectedEnv>`
   - [ ] 1.2 手动指定模式：`args.tools` 非空时，按 ID 在 `TOOL_DEFINITIONS` 中查找，无效 ID → `AiforgeError(code: 'UNKNOWN_TOOL', severity: 'fatal')`
-  - [ ] 1.3 自动检测模式：遍历 `TOOL_DEFINITIONS`，检查标志路径是否存在
-  - [ ] 1.4 全局检测：使用 `pathResolver.toolGlobalDir(toolId)` 获取路径，检查 `detect.global[]` 中的标志路径
-  - [ ] 1.5 项目检测：检查 `process.cwd()` 下 `detect.project[]` 中的标志路径
-  - [ ] 1.6 确定安装范围 `scope`：`args.global` → 'global'，否则 → 'project'
+  - [ ] 1.3 自动检测模式：遍历 `TOOL_DEFINITIONS`，对每个工具同时检查全局和项目两侧的标志路径，任一侧命中即视为已安装
+  - [ ] 1.4 全局侧检测：使用 `pathResolver.home()` 作为基准路径，拼接 `detect.global[]` 中的标志路径检查存在性（注意：`pathResolver.toolGlobalDir()` 是 aiforge 自身的安装目标目录，不是真实工具目录，检测阶段不使用）
+  - [ ] 1.5 项目侧检测：使用 `process.cwd()` 作为基准路径，拼接 `detect.project[]` 中的标志路径检查存在性
+  - [ ] 1.6 确定安装范围 `scope`：`args.global` → 'global'，否则 → 'project'（scope 决定安装范围，不决定检测范围——检测始终扫描两侧）
   - [ ] 1.7 无工具检测到 → 诊断输出 + `AiforgeError(code: 'NO_TOOLS', severity: 'fatal')`
   - [ ] 1.8 调用 `reporter.startPhase('检测 AI 工具...')` 输出进度
 - [ ] Task 2: 实现诊断输出 (AC: #4)
@@ -51,25 +51,33 @@ interface DetectedEnv {
 
 ### 检测逻辑 [Source: architecture/03-core-decisions.md#D5]
 
+检测始终扫描全局 + 项目两侧，任一侧命中即视为已安装。`scope` 只决定后续安装范围，不影响检测范围。
+
+> **重要**：检测使用 `pathResolver.home()` + `detect.global[]` 和 `process.cwd()` + `detect.project[]`。`pathResolver.toolGlobalDir(toolId)` 是 aiforge 自身的安装目标目录（`~/.aiforge/tools/${toolId}/`），与真实工具目录（如 `~/.copilot/`）无关，检测阶段不使用。
+
 ```typescript
 import { TOOL_DEFINITIONS } from '../data/tool-registry.js';
 import { access } from 'node:fs/promises';
 
 async function detectSingleTool(
   tool: ToolDefinition,
-  pathResolver: PathResolver,
-  scope: 'global' | 'project'
+  pathResolver: PathResolver
 ): Promise<boolean> {
-  const paths = scope === 'global' ? tool.detect.global : tool.detect.project;
-  const basePath = scope === 'global' ? pathResolver.home() : process.cwd();
+  // 同时检查全局和项目两侧
+  const globalBase = pathResolver.home();
+  const projectBase = process.cwd();
 
-  for (const flagPath of paths) {
+  for (const flagPath of tool.detect.global) {
     try {
-      await access(join(basePath, flagPath));
-      return true; // 任一标志路径存在即视为已安装
-    } catch {
-      continue;
-    }
+      await access(join(globalBase, flagPath));
+      return true;
+    } catch { continue; }
+  }
+  for (const flagPath of tool.detect.project) {
+    try {
+      await access(join(projectBase, flagPath));
+      return true;
+    } catch { continue; }
   }
   return false;
 }
@@ -120,7 +128,7 @@ if (args.tools && args.tools.length > 0) {
 ### 模块边界
 
 - `stages/detect-tools.ts` 依赖 `core/`（types、errors）、`data/tool-registry.ts`
-- 使用 `PathResolver` 获取全局工具路径
+- 使用 `PathResolver.home()` 获取全局检测基准路径（不使用 `toolGlobalDir()`）
 - 不依赖 `services/`（检测不需要 Git 或配置服务）
 
 ### 依赖关系

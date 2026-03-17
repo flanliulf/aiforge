@@ -14,12 +14,12 @@ So that 知道会发生什么，建立对工具的信任。
 2. **Given** dry-run 模式 **When** Reporter 输出安装计划 **Then** 按工具分组展示每个文件的源路径和目标路径，标注安装类型和模式，输出到 stdout
 3. **Given** dry-run 模式 **When** 检查文件系统 **Then** 没有任何文件被写入、复制或创建
 4. **Given** dry-run 输出的安装计划 **When** 与实际安装结果对比 **Then** 两者一致（NFR-U5）
-5. **Given** dry-run 模式下管道执行 **When** 检查管道编排器 **Then** Resolve → Auth → Clone → Detect → Match 全部正常执行，只有 Install 阶段被跳过
+5. **Given** dry-run 模式下管道执行 **When** 检查管道编排器 **Then** Detect → Match 阶段使用真实实现，dry-run 在 Match 后分叉调用 `reportPlan()`，Install 阶段被跳过。Resolve → Auth → Clone 阶段的真实接入由 Epic 2 完成后自然生效，本 Story 验收不要求前序阶段为真实实现。
 
 ## Tasks / Subtasks
 
 - [ ] Task 1: 实现 `Reporter.reportPlan()` 方法 — 安装计划输出 (AC: #2)
-  - [ ] 1.1 在 `core/reporter.ts` 的 Reporter 接口中确认 `reportPlan(plan: MatchedPlan): void` 方法存在（Story 1.3 已定义）
+  - [ ] 1.1 在 `core/reporter.ts` 的 Reporter 接口中确认 `reportPlan(plan: MatchedPlan): void` 方法存在（Story 1.3 已定义）。注意：`architecture/03-core-decisions.md` 的 Reporter 接口代码块中漏掉了 `reportPlan()`，但同文档的 stdout/stderr 分工表已引用该方法——实现时以 Story 1.3 为准，架构文档需同步补齐。
   - [ ] 1.2 实现 `TtyReporter.reportPlan()` — 彩色分组输出
   - [ ] 1.3 实现 `PlainReporter.reportPlan()` — 纯文本输出（CI 友好）
   - [ ] 1.4 实现 `QuietReporter.reportPlan()` — 只输出统计摘要
@@ -102,13 +102,24 @@ copilot  skills/refactor/        →  ~/.copilot/skills/refactor/        directo
 
 ### 安装模式确定
 
-dry-run 阶段需要预判安装模式：
+dry-run 必须与真实安装共享同一套参数校验，不能在预览时放宽规则。
+
+- `scope === 'project' && args.link` → **必须报错**，抛出 `AiforgeError(code: 'LINK_PROJECT_REJECTED', severity: 'fatal')`，提示 `-l` 仅支持全局安装（FR-021，project-context.md 明确要求）
 - `args.link && scope === 'global'` → symlink
 - 否则 → copy
-- 注意：`-l` 符号链接模式仅全局安装支持（FR-021），项目级必须拒绝
 
 ```typescript
 function getInstallMode(args: ParsedArgs, scope: 'global' | 'project'): 'copy' | 'symlink' {
+  if (args.link && scope === 'project') {
+    throw new AiforgeError(
+      '符号链接模式不支持项目级安装',
+      'LINK_PROJECT_REJECTED',
+      3,
+      'fatal',
+      '-l/--link 仅支持全局安装模式（-g）',
+      ['npx aiforge -g -l <repo>  # 全局 + 符号链接']
+    );
+  }
   if (args.link && scope === 'global') return 'symlink';
   return 'copy';
 }
@@ -120,7 +131,7 @@ function getInstallMode(args: ParsedArgs, scope: 'global' | 'project'): 'copy' |
 - `detect` → `import { detectTools } from './stages/detect-tools.js'`
 - `match` → `import { matchRules } from './stages/match-rules.js'`
 
-Resolve、Auth、Clone 阶段的替换由 Epic 2 的 Story 负责（如果尚未替换，本 Story 中保持占位）。
+Resolve、Auth、Clone 阶段的替换由 Epic 2 的 Story 负责。本 Story 中这些阶段保持占位不影响验收——验收重点是 Detect + Match + Reporter 分叉路径的正确性。
 
 ### 模块边界
 
