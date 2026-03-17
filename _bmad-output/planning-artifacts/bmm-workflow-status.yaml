@@ -33,21 +33,21 @@ workflow_status:
   create-ux-design: skipped
 
   # Phase 3: Solutioning
-  create-architecture: "_bmad-output/planning-artifacts/architecture.md"  # ✅ 已完成: 11项架构决策 + 6条实现模式 + 完整项目结构 + 验证通过
-  create-epics-and-stories: "_bmad-output/planning-artifacts/epics.md"  # ✅ 已完成: 5 Epic + 24 Stories，修复 Epic 2 Story 依赖顺序
+  create-architecture: "_bmad-output/planning-artifacts/architecture/"  # ✅ 已完成: 11项架构决策 + 6条实现模式（已切分为 7 个章节文件）
+  create-epics-and-stories: "_bmad-output/planning-artifacts/epics/"  # ✅ 已完成: 5 Epic + 24 Stories（已切分为 index.md + epic-1~5.md）
   test-design: optional
-  implementation-readiness: required
+  implementation-readiness: "_bmad-output/planning-artifacts/implementation-readiness-report-2026-03-17.md"  # ✅ 已完成: 实施就绪评估通过
 
   # Phase 4: Implementation
   sprint-planning: required
 
 # 当前活动
 current_activity:
-  workflow: "implementation-readiness"
+  workflow: "sprint-planning"
   status: "not_started"
-  previous_workflow: "create-epics-and-stories"
+  previous_workflow: "implementation-readiness"
   previous_output:
-    - "_bmad-output/planning-artifacts/epics.md"
+    - "_bmad-output/planning-artifacts/implementation-readiness-report-2026-03-17.md"
   next_steps:
-    - "运行 implementation-readiness 工作流（architect agent）"
-    - "验证 PRD + 架构 + Epics & Stories 的完整性和一致性"
+    - "运行 sprint-planning 工作流（sm agent）"
+    - "从 epics 文件生成 sprint-status.yaml，开始实施阶段"
