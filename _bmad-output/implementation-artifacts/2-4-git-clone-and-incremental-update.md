@@ -14,9 +14,9 @@ So that 首次克隆高效，后续更新只拉取变更。
 2. **Given** 本地已有该仓库的副本 **When** 执行获取 **Then** 执行 `git pull` 增量更新，而非全量重新克隆（FR-004）
 3. **Given** 用户通过 `--clone-dir <path>` 指定自定义路径 **When** 执行克隆 **Then** 克隆到用户指定的路径
 4. **Given** 克隆过程中网络中断 **When** 克隆失败 **Then** 清理不完整的克隆目录（NFR-R1），抛出 `AiforgeError`（severity: 'fatal'）含网络错误修复建议
-5. **Given** Token 被注入到克隆 URL 中 **When** 克隆完成 **Then** Token 从内存中立即清除（NFR-S2），`.git/config` 中不包含 Token
-6. **Given** 首次克隆 aicoding-base 规模仓库 **When** 测量总耗时 **Then** < 30 秒（NFR-P1）
-7. **Given** 已有本地仓库执行增量更新 **When** 测量总耗时 **Then** < 15 秒（NFR-P2）
+5. **Given** Token 被注入到克隆 URL 中 **When** 克隆完成 **Then** `.git/config` 中的 remote URL 不含 Token（通过 `git remote set-url` 重写为 clean URL），代码中不再保留可访问的 token-bearing URL 引用（NFR-S2）
+6. **Given** 首次克隆 aicoding-base 规模仓库 **When** 测量总耗时 **Then** < 30 秒（NFR-P1，基准目标，人工验证项，测量条件：正常网络环境）
+7. **Given** 已有本地仓库执行增量更新 **When** 测量总耗时 **Then** < 15 秒（NFR-P2，基准目标，人工验证项，测量条件：正常网络环境）
 
 ## Tasks / Subtasks
 

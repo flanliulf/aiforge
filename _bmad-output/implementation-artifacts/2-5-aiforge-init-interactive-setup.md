@@ -101,12 +101,17 @@ try {
 ### 配置保存流程
 
 ```
-解析 URL → 提取 hostname → 选择认证 → 验证连接 → 构建 AiforgeConfig → saveConfig()
+解析 URL → 提取 hostname（复用 Story 2.2 的 URL 解析逻辑）→ 选择认证 → 验证连接 → 构建 AiforgeConfig → saveConfig()
 ```
 
 ```typescript
-const hostname = new URL(repoUrl).hostname; // HTTPS
-// 或从 SSH URL 提取 hostname
+// 复用 Story 2.2 的 GitSourceResolver 解析 URL，提取 hostname
+// 不要在 init 中重复实现 URL 解析逻辑
+import { GitSourceResolver } from '../services/git.js';
+
+const resolver = new GitSourceResolver();
+const resolved = resolver.resolve(repoUrl);
+const hostname = resolved.hostname;
 
 const config: AiforgeConfig = {
   defaultRepo: repoUrl,
@@ -127,17 +132,23 @@ await saveConfig(config, pathResolver);
 
 ### 已有配置处理
 
+> **注意**：init 是交互式命令，信息输出直接使用 `console.log`（输出到 stdout），不复用 Reporter 接口。Reporter 专为管道阶段的进度/结果输出设计，init 的交互式场景不适用。
+
 ```typescript
 try {
   const existing = await loadConfig(pathResolver);
-  reporter.info(`当前配置：`);
-  reporter.info(`  仓库: ${existing.defaultRepo}`);
-  reporter.info(`  认证: ${Object.keys(existing.auth).map(h => `${h} (${existing.auth[h].method})`).join(', ')}`);
+  console.log(`当前配置：`);
+  console.log(`  仓库: ${existing.defaultRepo}`);
+  console.log(`  认证: ${Object.keys(existing.auth).map(h => `${h} (${existing.auth[h].method})`).join(', ')}`);
 
   const modify = await confirm({ message: '是否修改当前配置？', default: false });
   if (!modify) return;
-} catch {
-  // 无配置，继续首次配置流程
+} catch (error) {
+  if (error instanceof AiforgeError && error.code === 'CONFIG_CORRUPT') {
+    // 配置损坏：显式提示用户，询问是否重建
+    console.log('⚠️ 配置文件损坏，将重新配置。');
+  }
+  // CONFIG_NOT_FOUND：无配置，继续首次配置流程
 }
 ```
 
@@ -163,6 +174,7 @@ if (!process.stdin.isTTY) {
 
 - `commands/init.ts` 依赖 `core/`（errors、types）、`services/config.ts`、`services/git.ts`
 - 依赖 `@inquirer/prompts`（交互式输入）
+- 信息输出使用 `console.log`（不复用 Reporter，init 是交互式命令而非管道阶段）
 - 不依赖 `stages/`、`data/`、`pipeline.ts`
 
 ### 依赖关系

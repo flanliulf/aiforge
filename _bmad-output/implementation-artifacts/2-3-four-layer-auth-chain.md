@@ -100,9 +100,9 @@ interface AuthenticatedSource extends ResolvedSource {
 ### Token 注入 URL 构建
 
 ```typescript
-// HTTPS + Token
+// HTTPS + Token（GitLab 标准格式）
 function buildTokenUrl(source: ResolvedSource, token: string): string {
-  return `https://${token}@${source.hostname}/${source.repoPath}.git`;
+  return `https://oauth2:${token}@${source.hostname}/${source.repoPath}.git`;
 }
 
 // SSH

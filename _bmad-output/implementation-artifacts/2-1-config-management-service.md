@@ -14,14 +14,14 @@ So that 不需要每次运行都重新输入仓库地址和认证方式。
 2. **Given** 配置文件已存在 **When** 读取配置 **Then** 正确解析 `AiforgeConfig` 结构：`defaultRepo`、`cloneDir`、`language`、`preferSSH`、`auth`（FR-040）
 3. **Given** 用户配置了多个 Git host 的认证 **When** 读取特定 host 的认证信息 **Then** 返回该 host 对应的 `method` 和 `token`（FR-042），不同 host 可以使用不同的认证方式
 4. **Given** 配置文件损坏（非法 JSON）**When** 读取配置 **Then** 抛出 `AiforgeError`，提示配置文件损坏并建议运行 `aiforge init` 重新配置
-5. **Given** 配置文件不存在 **When** 用户运行主命令（非 init）**Then** 提示用户先运行 `aiforge init` 完成配置（FR-041）
+5. **Given** 配置文件不存在 **When** 调用 `loadConfig()` **Then** 抛出 `AiforgeError(code: 'CONFIG_NOT_FOUND', severity: 'fatal')`，由调用方（CLI / pipeline）负责向用户提示运行 `aiforge init`（FR-041）
 
 ## Tasks / Subtasks
 
 - [ ] Task 1: 创建 `src/services/config.ts` — 配置读写服务 (AC: #1, #2, #3, #4, #5)
   - [ ] 1.1 实现 `loadConfig(pathResolver: PathResolver): Promise<AiforgeConfig>` — 读取并解析 config.json
   - [ ] 1.2 实现 `saveConfig(config: AiforgeConfig, pathResolver: PathResolver): Promise<void>` — 写入 config.json（原子写入：临时文件 + rename）
-  - [ ] 1.3 实现 `getHostAuth(config: AiforgeConfig, hostname: string): HostAuth | undefined` — 按 host 查找认证信息
+  - [ ] 1.3 实现 `getHostAuth(config: AiforgeConfig, hostname: string): HostAuth | undefined` — 按 host 查找认证信息（`HostAuth` 类型需在 Story 1.2 的 `core/types.ts` 中补充定义：`{ method: AuthMethod; token?: string }`）
   - [ ] 1.4 实现 `ensureConfigDir(pathResolver: PathResolver): Promise<void>` — 确保 `~/.aiforge/` 目录存在
   - [ ] 1.5 文件权限处理：写入后 `fs.chmod(configPath, 0o600)`
   - [ ] 1.6 错误处理：JSON 解析失败 → `AiforgeError(code: 'CONFIG_CORRUPT')`；文件不存在 → `AiforgeError(code: 'CONFIG_NOT_FOUND')`
