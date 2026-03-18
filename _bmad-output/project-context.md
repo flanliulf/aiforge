@@ -75,20 +75,23 @@ index.ts → pipeline.ts → stages/* → services/*
 ### Error Handling Rules
 
 - **ALL errors MUST use `AiforgeError`** — never throw raw `Error`
-- AiforgeError has: `code`, `exitCode`, `severity` ('fatal'|'partial'), `why`, `fix[]`
-- `severity: 'fatal'` → pipeline stops immediately
-- `severity: 'partial'` → pipeline collects error and continues
+- AiforgeError has: `code`, `exitCode`, `severity` ('fatal'), `why`, `fix[]`
+- `severity: 'fatal'` → pipeline stops immediately (Install 阶段 fail-fast，无 partial 概念)
 - **Three-part error messages:** what broke → why → how to fix (copyable commands)
 - Exit codes: `0`=success, `1`=install failure, `2`=auth failure, `3`=arg error
 - **Never swallow errors or return null instead of throwing**
+- **InstallResult status 只有三种：** `'new'` | `'updated'` | `'skipped'`（无 `'failed'`——I/O 错误直接抛 fatal，hash 相同或用户选择跳过为 `'skipped'`）
 
 ### Output Rules
 
 - **ALL user-visible output MUST go through Reporter interface** — never `console.log` directly
+- **Exceptions (formally allowed):**
+  - `aiforge init` 交互式命令：使用 `console.log` + `@inquirer/prompts` 直接输出（init 不走管道，不适用 Reporter）
+  - Reporter 创建前的语言回退提示：允许 `process.stderr.write()`（此时 Reporter 尚未实例化）
 - Three Reporter implementations: `TtyReporter` (spinner+color), `PlainReporter` (CI/non-TTY), `QuietReporter` (--quiet)
 - Progress phase names: verb + object in Chinese (`"解析仓库地址..."`, `"克隆仓库..."`)
-- Result icons: `✅` new, `🔄` updated, `⏭️` skipped, `❌` failed
-- Stats line: `安装: N 项  更新: N 项  跳过: N 项  失败: N 项`
+- Result icons: `✅` new, `🔄` updated, `⏭️` skipped
+- Stats line: `安装: N 项  更新: N 项  跳过: N 项`
 - Output strings centralized in `data/messages.ts`
 
 ### Security Rules
@@ -151,4 +154,4 @@ index.ts → pipeline.ts → stages/* → services/*
 - Update when technology stack or patterns change
 - Remove rules that become obvious over time
 
-Last Updated: 2026-03-12
+Last Updated: 2026-03-18

@@ -33,7 +33,6 @@ so that `npx aiforge --help` 可运行，管道框架就绪可逐步填充阶段
   - [ ] 2.4 每个阶段为占位函数：`throw new AiforgeError('未实现', 'NOT_IMPLEMENTED', 1, 'fatal', '该阶段尚未实现', [])`
   - [ ] 2.5 `dryRun` 为 true 时跳过 install 阶段，直接将 MatchedPlan 传给 report
   - [ ] 2.6 fatal 错误捕获：立即停止管道，调用 `reporter.reportError()`
-  - [ ] 2.7 partial 错误收集：收集到内存数组中，保留扩展点供后续阶段消费（MVP 阶段不要求格式化输出 partial 错误列表，仅需确保收集机制就绪）
 - [ ] Task 3: 创建 `src/commands/init.ts` — init 子命令占位 (AC: #1)
   - [ ] 3.1 占位实现，输出"aiforge init 尚未实现"
 - [ ] Task 4: 连接 CLI → Pipeline (AC: #1, #4)
@@ -41,7 +40,7 @@ so that `npx aiforge --help` 可运行，管道框架就绪可逐步填充阶段
   - [ ] 4.2 根据 `--quiet` 和 TTY 检测选择 Reporter 实现
   - [ ] 4.3 管道错误时设置 `process.exitCode`
 - [ ] Task 5: 编写单元测试 (AC: #3, #4, #5)
-  - [ ] 5.1 `tests/pipeline.test.ts` — 管道阶段链执行顺序、dryRun 跳过 install、fatal 错误停止、partial 错误收集
+  - [ ] 5.1 `tests/pipeline.test.ts` — 管道阶段链执行顺序、dryRun 跳过 install、fatal 错误停止
   - [ ] 5.2 CLI 参数解析测试（可选，commander 自身已有测试保障）
 - [ ] Task 6: 端到端验证 (AC: #1, #2, #6)
   - [ ] 6.1 `npx aiforge --help` 输出正确
@@ -89,7 +88,7 @@ try {
     process.exitCode = error.exitCode;
     return; // 立即停止
   }
-  // partial 错误收集到数组，继续执行
+  // 所有错误统一为 fatal，立即停止
 }
 ```
 

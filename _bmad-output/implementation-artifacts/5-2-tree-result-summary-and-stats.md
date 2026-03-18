@@ -11,7 +11,7 @@ So that 一目了然地知道每个工具安装了什么。
 ## Acceptance Criteria
 
 1. **Given** 安装完成，涉及多个工具 **When** Reporter 输出结果 **Then** 按工具分组展示树形结构（FR-036），每个工具显示安装项数
-2. **Given** 结果汇总 **When** 所有文件展示完毕 **Then** 显示统计行：`安装: 7 项  更新: 1 项  跳过: 1 项  失败: 0 项`
+2. **Given** 结果汇总 **When** 所有文件展示完毕 **Then** 显示统计行：`安装: 7 项  更新: 1 项  跳过: 1 项`
 3. **Given** 结果输出 **When** 检查输出流 **Then** 树形结果和统计行输出到 stdout
 
 ## Tasks / Subtasks
@@ -21,12 +21,11 @@ So that 一目了然地知道每个工具安装了什么。
   - [ ] 1.2 每个工具组标题：工具显示名 + 项数（使用 chalk 着色）
   - [ ] 1.3 树形缩进：`├──` 和 `└──` 连接符
   - [ ] 1.4 每行：状态图标 + 源路径 → 目标路径
-  - [ ] 1.5 failed 项额外显示红色错误信息
-  - [ ] 1.6 底部统计行使用 chalk 着色
-  - [ ] 1.7 输出到 stdout
+  - [ ] 1.5 底部统计行使用 chalk 着色
+  - [ ] 1.6 输出到 stdout
 - [ ] Task 2: 完善 `PlainReporter.reportResult()` — 纯文本输出 (AC: #3)
   - [ ] 2.1 制表符分隔格式：`status\ttool\tsource\ttarget`
-  - [ ] 2.2 底部统计行：`installed: N  updated: N  skipped: N  failed: N`
+  - [ ] 2.2 底部统计行：`installed: N  updated: N  skipped: N`
   - [ ] 2.3 无颜色、无树形符号，可被 `grep`/`awk`/`cut` 解析
 - [ ] Task 3: 编写单元测试 (AC: #1-3)
   - [ ] 3.1 扩展 `tests/core/reporter.test.ts`
@@ -51,10 +50,9 @@ TtyReporter：
 
 🔧 Claude Code (2 项)
   ├── ✅ instructions/CLAUDE.md     → ~/.claude/instructions/CLAUDE.md
-  └── ❌ mcp-tools/server.json      → ~/.claude/mcp-tools/server.json
-       权限不足
+  └── ✅ mcp-tools/server.json      → ~/.claude/mcp-tools/server.json
 
-安装: 3 项  更新: 1 项  跳过: 1 项  失败: 1 项
+安装: 5 项  更新: 1 项  跳过: 1 项
 ```
 
 ### chalk v5+ 使用 [Source: project-context.md#Technology-Stack]
@@ -64,8 +62,7 @@ import chalk from 'chalk';
 
 const toolHeader = chalk.bold(`🔧 ${toolName} (${count} 项)`);
 const newItem = chalk.green(`✅ ${source} → ${target}`);
-const failedItem = chalk.red(`❌ ${source} → ${target}`);
-const statsLine = `${chalk.green(`安装: ${stats.installed} 项`)}  ${chalk.blue(`更新: ${stats.updated} 项`)}  ${chalk.gray(`跳过: ${stats.skipped} 项`)}  ${chalk.red(`失败: ${stats.failed} 项`)}`;
+const statsLine = `${chalk.green(`安装: ${stats.installed} 项`)}  ${chalk.blue(`更新: ${stats.updated} 项`)}  ${chalk.gray(`跳过: ${stats.skipped} 项`)}`;
 ```
 
 chalk v5+ 是 ESM-only，与项目配置兼容。

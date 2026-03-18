@@ -118,7 +118,7 @@ async function installFlatten(
 import { lstat, readlink } from 'node:fs/promises';
 
 async function checkBrokenLinks(results: InstallResult[]): Promise<void> {
-  for (const r of results.filter(r => r.mode === 'symlink' && r.status !== 'failed')) {
+  for (const r of results.filter(r => r.mode === 'symlink')) {
     try {
       const target = await readlink(r.targetPath);
       await access(target);

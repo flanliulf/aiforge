@@ -11,7 +11,7 @@
 | D2b | 规则匹配 | Map 索引（tool:scope） | O(1) 查找，规则增长友好 |
 | D3a | config.json 结构 | 按 host 分层认证 | FR-042 要求，多仓库就绪 |
 | D3b | manifest.json 写入 | 内存累积 + 原子写入 + 崩溃降级 | 平衡性能与可靠性 |
-| D4a | 错误类型 | 单一 AiforgeError + severity | fatal/partial 区分，三段式内嵌 |
+| D4a | 错误类型 | 单一 AiforgeError + severity | fatal only，Install fail-fast |
 | D4b | 输出抽象 | Reporter 接口 + 三种实现 | TTY/Plain/Quiet 集中管理 |
 | D5a | 工具检测 | 数据驱动注册表 | 配置驱动，新增工具只加数据 |
 | D5b | 路径解析 | PathResolver 集中管理 | 平台差异封装一处 |
@@ -105,13 +105,15 @@ interface ManifestEntry {
 class AiforgeError extends Error {
   code: string;                // 'AUTH_FAILED' | 'CLONE_FAILED' | ...
   exitCode: number;            // 0=成功, 1=安装失败, 2=认证失败, 3=参数错误
-  severity: 'fatal' | 'partial'; // fatal=停止管道, partial=继续
+  severity: 'fatal';           // 始终为 fatal（Install fail-fast，无 partial 概念）
   why: string;                 // 为什么（简短原因）
   fix: string[];               // 怎么修（可复制的命令列表）
 }
 ```
 
-- 管道编排器：`fatal` → 立即停止并报告；`partial` → 收集错误继续执行
+- 管道编排器：`fatal` → 立即停止并报告
+- Install 阶段 I/O 错误直接抛 `AiforgeError(severity: 'fatal')`，管道终止
+- `InstallResult` 只有 `'new'` | `'updated'` | `'skipped'` 三种状态（无 `'failed'`）
 - Reporter 渲染三段式：`❌ ${message}` → `${why}` → `${fix.join('\n')}`
 
 **输出抽象 — Reporter 接口 + 三种实现：**

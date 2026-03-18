@@ -76,7 +76,6 @@ function buildStats(results: InstallResult[]): Stats {
     installed: results.filter(r => r.status === 'new').length,
     updated: results.filter(r => r.status === 'updated').length,
     skipped: results.filter(r => r.status === 'skipped').length,
-    failed: results.filter(r => r.status === 'failed').length,
   };
 }
 ```
@@ -84,13 +83,12 @@ function buildStats(results: InstallResult[]): Stats {
 ### 使用 data/messages.ts 的常量 [Source: Story 1.4]
 
 ```typescript
-import { ICON_NEW, ICON_UPDATED, ICON_SKIPPED, ICON_FAILED, STATS_TEMPLATE } from '../data/messages.js';
+import { ICON_NEW, ICON_UPDATED, ICON_SKIPPED, STATS_TEMPLATE } from '../data/messages.js';
 
 const STATUS_ICONS: Record<string, string> = {
   new: ICON_NEW,       // ✅
   updated: ICON_UPDATED, // 🔄
   skipped: ICON_SKIPPED, // ⏭️
-  failed: ICON_FAILED,   // ❌
 };
 ```
 

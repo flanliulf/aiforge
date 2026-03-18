@@ -33,7 +33,7 @@ So that 正常模式下完整管道可端到端运行。
   - [ ] 3.2 只保存 `status: 'new'` 和 `status: 'updated'` 的文件记录
 - [ ] Task 4: 编写集成测试 (AC: #1-3)
   - [ ] 4.1 `tests/integration/pipeline.test.ts` — 完整管道端到端测试
-  - [ ] 4.2 测试用例：正常模式完整流程、fatal 错误停止、partial 错误继续、dry-run 路径
+  - [ ] 4.2 测试用例：正常模式完整流程、fatal 错误停止、dry-run 路径
   - [ ] 4.3 使用临时目录、fixture 仓库、mock Git 服务
 
 ## Dev Notes

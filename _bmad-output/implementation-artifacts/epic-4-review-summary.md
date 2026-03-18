@@ -303,3 +303,78 @@ Epic 4 的 story 集合**具备较强的实施价值和较高的业务完整度*
 - **输出边界统一**：Epic 4 先交付什么，Epic 5 再增强什么，不能前后重复覆盖
 
 **建议：优先修订 Story 4.2、4.4、4.6a、4.6b，再将 Epic 4 正式移交开发。**
+
+---
+
+## 实际修正总结（2026-03-17）
+
+基于上述审查结论，已在 commit `d4ca0b1` 中完成以下修正：
+
+### Story 4.1: 文件操作工具与预检查
+
+**已修正**：
+
+1. Dev Notes 补充完整的权限判定矩阵（6 种目标状态 × 判定方式 × 结果），明确 preflight 只做权限和路径安全校验，不做冲突判定
+2. 路径遍历的 `allowedRoot` 来源明确定义：全局安装 = `pathResolver.home()`，项目安装 = `process.cwd()`，与目标路径解析使用同一套来源
+
+### Story 4.2: 复制模式安装执行
+
+**已修正**：
+
+1. AC #5 收窄为"copy 模式适用的资源类型（`files` 和 `directories`）"，明确 `flatten` 类型由 Story 4.3 实现
+2. AC #6 统一为 fatal 错误语义：文件 I/O 操作失败抛出 `AiforgeError(severity: 'fatal')`，管道立即终止；hash 相同跳过是正常结果 `status: 'skipped'`，不是错误
+3. Dev Notes 示例代码完全重写：移除 try-catch + break 的 partial 模式，改为 `determineStatus()` 判断 + fatal 抛出的 fail-fast 模式
+
+### Story 4.3: 符号链接与 flatten 模式
+
+**已修正**：
+
+1. Task 2.4 明确 flatten 缺失 `mainFile` 时的完整行为：通过 `reporter.warn()` 记录警告，生成 `status: 'skipped'` 结果项，不写入 manifest — 消除结果语义的歧义
+
+### Story 4.4: manifest 状态管理与冲突检测
+
+**已修正**：
+
+1. `checkConflict()` 签名统一为 4 参数：`(targetPath, sourceHash, manifest, manifestDegraded)` — 消除 Task 与 Dev Notes 的签名不一致
+2. `ConflictType` 从 4 种扩展为 6 种：`'none'` | `'aiforge-current'` | `'aiforge-outdated'` | `'user-modified'` | `'user-file'` | `'unknown-origin'` — 新增 `'user-modified'`（用户修改了 aiforge 安装的文件）和 `'unknown-origin'`（manifest 降级时系统无法判断来源）
+3. AC #3 重写为完整的冲突判定矩阵，明确三方 hash 比较逻辑（源hash、目标hash、manifest hash）
+4. AC #4 将"未知来源"与"用户手写"分离：manifest 降级时返回 `'unknown-origin'`，manifest 正常时返回 `'user-file'`
+5. manifest 保存职责明确为 pipeline 层：Task 3 改为"提供 manifest 服务供 pipeline 层调用"，导出 `buildManifestEntries()` 和 `mergeManifest()` 服务函数，持久化由 Story 4.6a 的 pipeline 层负责
+6. Dev Notes 的 `loadManifest()` 降级说明补充 `manifestDegraded` 标志，`checkConflict()` 示例代码完全重写
+
+### Story 4.5: 冲突处理与安全保护
+
+**已修正**：
+
+1. `checkConflict()` 调用签名与 Story 4.4 对齐，补充 `manifestDegraded` 参数
+2. 冲突处理逻辑扩展为覆盖新增的冲突类型：`user-file`、`unknown-origin`、`user-modified` 三种类型统一归入"需要用户决策"分支
+
+### Story 4.6a: 管道完整编排与错误流控制
+
+**已修正**：
+
+1. AC #3 从"partial 错误收集继续执行"改写为"Install 完成后由 pipeline 层调用 `saveManifest()` 持久化，然后调用 `reporter.reportResult()` 输出结果"
+2. Task 2 移除 partial 错误概念：明确"Install 阶段不存在 partial 错误概念"，文件 I/O 错误统一为 fatal（fail-fast），hash 相同跳过和冲突跳过是正常结果
+3. Task 3 明确 manifest 保存是 pipeline 收尾职责（不在 Install 阶段内部），只保存 `status: 'new'` 和 `status: 'updated'` 的文件记录
+4. Dev Notes 新增"错误语义统一决策"章节，明确 `InstallResult[]` 只有 `'new'`、`'updated'`、`'skipped'` 三种状态，没有 `'failed'`
+
+### Story 4.6b: 安装结果汇总与输出流分工
+
+**已修正**：
+
+1. Task 1 标题改为"最小可用版本"，TtyReporter 收窄为"按工具分组逐行输出 + 统计行（基础格式，树形美化留给 Epic 5 Story 5.2）"
+2. Task 2 标题改为"基础版本"，移除 `ICON_FAILED`（因 InstallResult 不再有 failed 状态），移除 failed 项额外显示错误信息的任务
+3. "本 Story 不做的事"补充明确的边界说明
+4. 新增与 Epic 5 的边界声明："本 Story 交付最小可用的 `reportResult()` 实现，Epic 5 在此基础上增强为树形美化、彩色高亮、TTY 自适应等完整输出体验"
+
+### 修正覆盖评估
+
+| 审查问题 | 修正状态 |
+|---------|---------|
+| Epic 4 对"安装失败"的语义没有统一 | ✅ 已修正（统一为 fatal fail-fast，移除 partial 概念） |
+| Story 4.4/4.5 冲突检测接口未收口 | ✅ 已修正（统一 4 参数签名 + 6 种冲突类型） |
+| Story 4.3/4.5 使用未定义的 Reporter 提示能力 | ✅ 已修正（Story 1.3 新增 `warn()` 方法） |
+| Story 4.6a 与 4.4 manifest 保存责任重复 | ✅ 已修正（统一为 pipeline 收尾职责） |
+| Story 4.6b 与 Epic 5 输出 Story 重叠 | ✅ 已修正（收窄为最小可用版本，明确边界） |
+| preflight 权限判定矩阵 | ✅ 已修正（补充完整矩阵） |
+| flatten 缺失 mainFile 的结果语义 | ✅ 已修正（`warn()` + `skipped` + 不写 manifest） |

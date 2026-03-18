@@ -26,7 +26,7 @@ So that 各工具能读取到正确的配置内容。
   - [ ] 1.4 `files` 类型：对每个 sourceFile 调用 `copyFile(src, join(targetDir, filename))`
   - [ ] 1.5 `directories` 类型：对每个 sourceFile（目录）调用 `copyDir(src, join(targetDir, dirname))`
   - [ ] 1.6 目标目录不存在时调用 `ensureDir(targetDir)`
-  - [ ] 1.7 每个文件操作后构建 `InstallResult` 记录（status: 'new'|'updated'|'skipped'|'failed'）
+  - [ ] 1.7 每个文件操作后构建 `InstallResult` 记录（status: 'new'|'updated'|'skipped'）
   - [ ] 1.8 fail-fast：文件操作异常时停止后续安装，返回已完成的结果列表
   - [ ] 1.9 调用 `reporter.startPhase('执行安装...')` 输出进度
 - [ ] Task 2: 实现安装状态判定 (AC: #1)
@@ -48,9 +48,8 @@ interface InstallResult {
   sourcePath: string;
   targetPath: string;
   tool: string;
-  status: 'new' | 'updated' | 'skipped' | 'failed';
+  status: 'new' | 'updated' | 'skipped';
   mode: 'copy' | 'symlink';
-  error?: string;  // status: 'failed' 时的错误信息
 }
 ```
 
@@ -135,7 +134,7 @@ async function determineStatus(srcPath: string, destPath: string): Promise<'new'
 
 - [Source: architecture/03-core-decisions.md#D6] — 管道阶段和 Install 设计
 - [Source: architecture/05-project-structure.md] — stages/execute-install.ts 位置
-- [Source: project-context.md#Error-Handling-Rules] — fail-fast 和 partial 错误
+- [Source: project-context.md#Error-Handling-Rules] — fail-fast 错误处理
 
 ## Dev Agent Record
 

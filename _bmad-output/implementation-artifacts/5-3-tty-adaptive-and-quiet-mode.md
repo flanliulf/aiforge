@@ -78,13 +78,13 @@ export function createReporter(options: { quiet: boolean; isTty: boolean }): Rep
 new	copilot	agents/coding-agent.md	~/.copilot/agents/coding-agent.md
 updated	copilot	agents/review-agent.md	~/.copilot/agents/review-agent.md
 ---
-installed: 1	updated: 1	skipped: 0	failed: 0
+installed: 1	updated: 1	skipped: 0
 ```
 
 ### QuietReporter 输出示例
 
 ```
-安装: 3 项  更新: 1 项  跳过: 1 项  失败: 0 项
+安装: 3 项  更新: 1 项  跳过: 1 项
 ```
 
 错误时：

@@ -56,7 +56,7 @@ const MESSAGES: Record<Language, MessageSet> = {
       install: '执行安装...',
     },
     stats: {
-      template: '安装: {installed} 项  更新: {updated} 项  跳过: {skipped} 项  失败: {failed} 项',
+      template: '安装: {installed} 项  更新: {updated} 项  跳过: {skipped} 项',
     },
     // ...
   },
@@ -70,7 +70,7 @@ const MESSAGES: Record<Language, MessageSet> = {
       install: 'Installing...',
     },
     stats: {
-      template: 'Installed: {installed}  Updated: {updated}  Skipped: {skipped}  Failed: {failed}',
+      template: 'Installed: {installed}  Updated: {updated}  Skipped: {skipped}',
     },
     // ...
   },
