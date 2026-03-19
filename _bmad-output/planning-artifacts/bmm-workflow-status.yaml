@@ -16,7 +16,7 @@
 #   - skipped: Optional/conditional workflow that was skipped
 
 generated: "2026-03-04"
-project: "aiforge"
+project: "ai-forge"
 project_type: "greenfield"
 selected_track: "method"
 field_type: "greenfield"
@@ -34,7 +34,7 @@ workflow_status:
 
   # Phase 3: Solutioning
   create-architecture: "_bmad-output/planning-artifacts/architecture/"  # ✅ 已完成: 11项架构决策 + 6条实现模式（已切分为 7 个章节文件）
-  create-epics-and-stories: "_bmad-output/planning-artifacts/epics/"  # ✅ 已完成: 5 Epic + 24 Stories（已切分为 index.md + epic-1~5.md）
+  create-epics-and-stories: "_bmad-output/planning-artifacts/epics/"  # ✅ 已完成: 5 Epic + 27 Stories（已切分为 index.md + epic-1~5.md；原始 24 Stories 经审查后拆分为 27）
   test-design: optional
   implementation-readiness: "_bmad-output/planning-artifacts/implementation-readiness-report-2026-03-17.md"  # ✅ 已完成: 实施就绪评估通过
 
@@ -43,11 +43,12 @@ workflow_status:
 
 # 当前活动
 current_activity:
-  workflow: "create-story"
+  workflow: "dev-story"
   status: "ready"
   previous_workflow: "sprint-planning"
   previous_output:
     - "_bmad-output/implementation-artifacts/sprint-status.yaml"
+  notes: "27 个 Story 已全部创建并通过审查收口（2026-03-19），可开始开发"
   next_steps:
-    - "使用 SM agent 的 [CS] Create Story 为 Epic 1 的第一个 Story 创建开发就绪文件"
-    - "从 Story 1.1（项目初始化与工具链配置）开始"
+    - "使用 Dev agent 的 dev-story 工作流，从 Epic 1 Story 1.1 开始实现"
+    - "按 Epic 顺序推进：Epic 1 → 2 → 3 → 4 → 5"

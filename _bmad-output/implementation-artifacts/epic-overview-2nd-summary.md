@@ -161,6 +161,10 @@
 
 ---
 
+> **注意：以上内容为二次审查的历史分析记录。最终结论以下方"最终修正记录"与"最终状态"为准。**
+
+---
+
 ## 最终修正记录（2026-03-18）
 
 基于上述二次审查结论，已按建议顺序完成最后一轮一致性修订。
@@ -197,7 +201,7 @@
 
 修正完成后执行全文搜索验证：
 
-- Story 文件中不再有活跃的 `status: 'failed'`、`ICON_FAILED`、`partial 错误收集/继续` 残留
+- Story 文件中不再有活跃的 `status: 'failed'`、`ICON_FAILED`、`partial 错误收集/继续` 残留（包括 Story 描述、AC、示例输出、测试任务和 Task 清单）
 - 仅 review-summary 和本文件中保留历史审查记录中的引用（属于正常的审查历史描述）
 - `project-context.md` 和 `architecture/03-core-decisions.md` 两份全局基线已完全统一
 

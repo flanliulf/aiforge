@@ -6,11 +6,11 @@ Status: ready-for-dev
 
 As a 用户,
 I want 看到清晰的安装结果汇总,
-So that 知道哪些文件安装成功、更新、跳过或失败。
+So that 知道哪些文件是新安装、更新还是跳过。
 
 ## Acceptance Criteria
 
-1. **Given** 安装执行完成 **When** Reporter 输出结果 **Then** 按工具分组展示每个文件的状态：✅ 新建、🔄 更新、⏭️ 跳过、❌ 失败，显示统计行 `安装: N 项  更新: N 项  跳过: N 项  失败: N 项`
+1. **Given** 安装执行完成 **When** Reporter 输出结果 **Then** 按工具分组展示每个文件的状态：✅ 新建、🔄 更新、⏭️ 跳过，显示统计行 `安装: N 项  更新: N 项  跳过: N 项`
 2. **Given** 安装结果 **When** 检查输出流 **Then** 结果输出到 stdout（可被 `grep`/`awk` 解析），错误输出到 stderr
 
 ## Tasks / Subtasks
@@ -26,7 +26,7 @@ So that 知道哪些文件安装成功、更新、跳过或失败。
   - [ ] 2.3 统计行计算：按 status 分类计数
 - [ ] Task 3: 编写单元测试 (AC: #1, #2)
   - [ ] 3.1 `tests/core/reporter.test.ts` — 扩展 reportResult 测试
-  - [ ] 3.2 测试用例：单工具结果、多工具分组、全部成功、有失败项、统计行正确性
+  - [ ] 3.2 测试用例：单工具结果、多工具分组、全部成功、全部跳过、统计行正确性
   - [ ] 3.3 捕获 stdout/stderr 输出验证流分工
 
 ## Dev Notes
@@ -42,10 +42,8 @@ TtyReporter（彩色终端）：
 
 🔧 Claude Code
   ✅ instructions/CLAUDE.md     → ~/.claude/instructions/CLAUDE.md
-  ❌ mcp-tools/server.json      → ~/.claude/mcp-tools/server.json
-     错误: 权限不足
 
-安装: 2 项  更新: 1 项  跳过: 1 项  失败: 1 项
+安装: 2 项  更新: 1 项  跳过: 1 项
 ```
 
 PlainReporter（CI/管道）：
@@ -54,9 +52,8 @@ new     copilot  agents/coding-agent.md  ~/.copilot/agents/coding-agent.md
 updated copilot  agents/review-agent.md  ~/.copilot/agents/review-agent.md
 skipped copilot  skills/refactor/        ~/.copilot/skills/refactor/
 new     claude   instructions/CLAUDE.md  ~/.claude/instructions/CLAUDE.md
-failed  claude   mcp-tools/server.json   ~/.claude/mcp-tools/server.json
 ---
-installed: 2  updated: 1  skipped: 1  failed: 1
+installed: 2  updated: 1  skipped: 1
 ```
 
 ### stdout/stderr 分工 [Source: architecture/03-core-decisions.md#D4]

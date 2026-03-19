@@ -22,7 +22,7 @@ So that 中英文用户都能舒适使用，且后续无需重新初始化即可
   - [ ] 1.1 重构 MESSAGES 结构为双语支持：`{ 'zh-CN': {...}, 'en': {...} }`
   - [ ] 1.2 添加所有阶段名英文版：`"Resolving repository..."`, `"Authenticating..."`, `"Cloning repository..."` 等
   - [ ] 1.3 添加所有状态图标标签英文版
-  - [ ] 1.4 添加统计行英文模板：`Installed: N  Updated: N  Skipped: N  Failed: N`
+  - [ ] 1.4 添加统计行英文模板：`Installed: N  Updated: N  Skipped: N`
   - [ ] 1.5 添加所有错误消息英文版
   - [ ] 1.6 导出 `setLanguage(lang: string): void`（模块级全局状态）和 `msg(key: string): string`（按 dot notation 查找）
   - [ ] 1.7 **跨 Epic 字符串抽取**：将 Epic 1~4 中所有硬编码的用户可见中文字符串替换为 `msg()` 调用（`stages/`、`services/`、`commands/` 中的 `reporter.startPhase()`、`AiforgeError()` 构造等）

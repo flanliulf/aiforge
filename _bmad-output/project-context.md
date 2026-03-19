@@ -33,7 +33,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 ### TypeScript & ESM Rules
 
 - **ESM imports MUST include `.js` extension:** `import { foo } from './bar.js'` (not `'./bar'`)
-- **Named exports only, NO default exports:** `export function foo()` (not `export default`)
+- **Named exports only, NO default exports:** `export function foo()` (not `export default`) — **仅约束业务代码**；工具配置文件（`tsup.config.ts`、`vitest.config.ts` 等）使用工具官方 API 的 `export default defineConfig(...)` 形式，豁免此规则
 - **Interfaces: PascalCase, no `I` prefix:** `SourceResolver` (not `ISourceResolver`)
 - **Constants: UPPER_SNAKE_CASE:** `BUILTIN_RULES`, `DEFAULT_EXCLUDES`
 - **Functions/variables: camelCase:** `loadRules()`, `ruleIndex`
