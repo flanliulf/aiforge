@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
+import { spawnSync } from 'child_process'
 
 const pkgPath = resolve(process.cwd(), 'package.json')
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
@@ -68,5 +69,58 @@ describe('project toolchain configuration', () => {
   it('chalk version is ^5', () => {
     const deps = pkg.dependencies ?? {}
     expect(deps['chalk']).toMatch(/\^5/)
+  })
+})
+
+describe('project directory structure (AC: #1)', () => {
+  const dirs = [
+    'src/core',
+    'src/data',
+    'src/stages',
+    'src/services',
+    'src/commands',
+    'tests/core',
+    'tests/data',
+    'tests/stages',
+    'tests/services',
+    'tests/commands',
+  ]
+
+  for (const dir of dirs) {
+    it(`directory ${dir} exists`, () => {
+      expect(existsSync(resolve(process.cwd(), dir))).toBe(true)
+    })
+  }
+})
+
+describe('tsconfig.json configuration (AC: #1)', () => {
+  const tsconfig = JSON.parse(readFileSync(resolve(process.cwd(), 'tsconfig.json'), 'utf-8'))
+
+  it('strict mode is enabled', () => {
+    expect(tsconfig.compilerOptions?.strict).toBe(true)
+  })
+
+  it('module is NodeNext', () => {
+    expect(tsconfig.compilerOptions?.module).toBe('NodeNext')
+  })
+
+  it('moduleResolution is NodeNext', () => {
+    expect(tsconfig.compilerOptions?.moduleResolution).toBe('NodeNext')
+  })
+})
+
+describe('vitest configuration (AC: #3)', () => {
+  it('passWithNoTests is configured', () => {
+    const vitestConfig = readFileSync(resolve(process.cwd(), 'vitest.config.ts'), 'utf-8')
+    expect(vitestConfig).toContain('passWithNoTests: true')
+  })
+})
+
+const distPath = resolve(process.cwd(), 'dist/index.js')
+
+describe('CLI --version behavior (AC: #1)', () => {
+  it.skipIf(!existsSync(distPath))('--version outputs version matching package.json', () => {
+    const result = spawnSync('node', [distPath, '--version'], { encoding: 'utf-8' })
+    expect(result.stdout.trim()).toBe(pkg.version)
   })
 })
