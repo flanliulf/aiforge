@@ -58,6 +58,15 @@ export type { ResolvedSource, InstallResult, MatchedPlan } from './types.js';
 
 <!-- PATTERNS_APPEND_1 -->
 
+### Type Semantic Layers（类型语义分层）
+
+**`AuthMethod` 类型区分两个语义层：**
+
+- 运行时认证方式（`AuthenticatedSource.authMethod`）：`'ssh' | 'token' | 'credential-manager'`
+- 持久化配置（`AiforgeConfig.auth[host].method`）：仅 `'ssh' | 'token'`
+
+不要直接复用运行时类型到持久化接口，应使用内联字面量类型收窄。同理适用于其他存在运行时/持久化语义差异的类型。
+
 ### Data Format Patterns
 
 **JSON 文件字段命名：** camelCase（与 TypeScript 接口一致）
@@ -83,6 +92,8 @@ export type { ResolvedSource, InstallResult, MatchedPlan } from './types.js';
 - 绝不吞掉错误或返回 null 代替错误
 
 **错误创建模式：**
+
+`exitCode` 使用类型级约束 `type ExitCode = 0 | 1 | 2 | 3`，不接受任意 `number`。
 
 ```typescript
 ✅ throw new AiforgeError({
@@ -119,6 +130,19 @@ export type { ResolvedSource, InstallResult, MatchedPlan } from './types.js';
 
 <!-- PATTERNS_APPEND_2 -->
 
+### Security Patterns
+
+**Token 脱敏规则：**
+
+- token 长度 > 12：first 8 + `****` + last 4（如 `glpat-ab****mnop`）
+- token 长度 <= 12：first 4 + `****`（无尾部）
+- **边界验证：** 实现脱敏逻辑时，必须验证阈值边界处（token 长度恰好等于阈值）脱敏后不可逆推原文
+
+**URL 脱敏规则：**
+
+- `sanitizeUrl` 必须处理 GitLab 标准 `oauth2:token@host` 格式：`https://oauth2:${token}@host/repo.git`
+- 脱敏时只处理冒号后的凭据部分，保留 `oauth2:` 前缀
+
 ### Testing Patterns
 
 **测试命名：** `describe` 用模块名，`it` 用行为描述
@@ -151,4 +175,5 @@ describe('authenticate', () => {
 4. JSON 文件字段一律 camelCase
 5. ESM 导入路径必须带 `.js` 扩展名
 6. 命名导出，不用默认导出（工具配置文件如 `tsup.config.ts`、`vitest.config.ts` 豁免）
+7. **当 story Dev Notes 中的代码片段与架构文档（`architecture/*.md`）存在差异时，以架构文档为准。** Story 代码片段仅为示意，不保证字段的 optional/required 标记完整
 
