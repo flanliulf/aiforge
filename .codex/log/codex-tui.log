@@ -1,0 +1,30 @@
+2026-03-18T10:02:30.084183Z  INFO codex_core::auth: Reloading auth
+2026-03-18T10:02:30.085938Z  INFO codex_core::auth: Reloaded auth, changed: true
+2026-03-18T10:02:38.798115Z  INFO codex_core::models_manager::manager: models cache: evaluating cache eligibility client_version="0.114.0"
+2026-03-18T10:02:38.798166Z  INFO codex_core::models_manager::cache: models cache: attempting load_fresh cache_path=/Users/fancyliu/IdeaProjects/wshoto-gitlab-workspace/ai-forge/.codex/models_cache.json expected_version="0.114.0"
+2026-03-18T10:02:38.798839Z  INFO codex_core::models_manager::manager: models cache: no usable cache entry
+2026-03-18T10:02:38.799988Z  INFO codex_core::models_manager::manager: models cache: evaluating cache eligibility client_version="0.114.0"
+2026-03-18T10:02:38.799991Z  INFO codex_core::models_manager::cache: models cache: attempting load_fresh cache_path=/Users/fancyliu/IdeaProjects/wshoto-gitlab-workspace/ai-forge/.codex/models_cache.json expected_version="0.114.0"
+2026-03-18T10:02:38.800011Z  INFO codex_core::models_manager::manager: models cache: no usable cache entry
+2026-03-18T10:02:42.554083Z  INFO codex_tui::app: Selected model: gpt-5.4, Selected effort: default
+2026-03-18T10:02:42.561210Z  INFO codex_core::models_manager::manager: models cache: evaluating cache eligibility client_version="0.114.0"
+2026-03-18T10:02:42.561229Z  INFO codex_core::models_manager::cache: models cache: attempting load_fresh cache_path=/Users/fancyliu/IdeaProjects/wshoto-gitlab-workspace/ai-forge/.codex/models_cache.json expected_version="0.114.0"
+2026-03-18T10:02:42.561796Z  INFO codex_core::models_manager::manager: models cache: no usable cache entry
+2026-03-18T10:02:42.561803Z  INFO codex_core::models_manager::manager: models cache: cache miss, fetching remote models
+2026-03-18T10:02:45.489163Z  INFO session_init: codex_core::codex: new
+2026-03-18T10:02:45.537494Z  INFO session_init:shell_snapshot{thread_id=019d0065-cf74-7963-8770-01b7599b3448}: codex_core::shell_snapshot: new
+2026-03-18T10:02:45.537701Z  INFO codex_core::rollout::metadata: state db backfill scanned=0, upserted=0, failed=0
+2026-03-18T10:02:45.546329Z  INFO session_loop{thread_id=019d0065-cf74-7963-8770-01b7599b3448}: codex_core::codex: new
+2026-03-18T10:02:45.548354Z  INFO session_loop{thread_id=019d0065-cf74-7963-8770-01b7599b3448}:submission_dispatch{submission.id="019d0065-cfac-7342-bf3a-03e18c678f02"}: codex_core::codex: new
+2026-03-18T10:02:45.549024Z  INFO session_loop{thread_id=019d0065-cf74-7963-8770-01b7599b3448}:submission_dispatch{submission.id="019d0065-cfac-7342-bf3a-03e18c678f02"}: codex_core::codex: close time.busy=655µs time.idle=13.8µs
+2026-03-18T10:02:45.549255Z  INFO session_loop{thread_id=019d0065-cf74-7963-8770-01b7599b3448}:submission_dispatch{submission.id="019d0065-cfac-7342-bf3a-03faed3c2d5f"}: codex_core::codex: new
+2026-03-18T10:02:45.552971Z  INFO session_loop{thread_id=019d0065-cf74-7963-8770-01b7599b3448}:submission_dispatch{submission.id="019d0065-cfac-7342-bf3a-03faed3c2d5f"}: codex_core::codex: close time.busy=3.29ms time.idle=427µs
+2026-03-18T10:02:46.448779Z  INFO session_init:shell_snapshot{thread_id=019d0065-cf74-7963-8770-01b7599b3448}: codex_core::shell_snapshot: Shell snapshot successfully created: /Users/fancyliu/IdeaProjects/wshoto-gitlab-workspace/ai-forge/.codex/shell_snapshots/019d0065-cf74-7963-8770-01b7599b3448.tmp-1773828165539005000
+2026-03-18T10:02:46.475464Z  WARN session_init:shell_snapshot{thread_id=019d0065-cf74-7963-8770-01b7599b3448}: codex_core::shell_snapshot: Failed to delete shell snapshot at "/Users/fancyliu/IdeaProjects/wshoto-gitlab-workspace/ai-forge/.codex/shell_snapshots/019d0065-cf74-7963-8770-01b7599b3448.tmp-1773828165539005000": Os { code: 2, kind: NotFound, message: "No such file or directory" }
+2026-03-18T10:02:46.475601Z  INFO session_init:shell_snapshot{thread_id=019d0065-cf74-7963-8770-01b7599b3448}: codex_core::shell_snapshot: close time.busy=6.76ms time.idle=931ms
+2026-03-18T10:02:46.475607Z  INFO session_init: codex_core::codex: close time.busy=35.7ms time.idle=951ms
+2026-03-18T10:02:57.302192Z  INFO codex_tui::app: Selected model: gpt-5.4, Selected effort: xhigh
+2026-03-19T01:40:55.997943Z  INFO session_loop{thread_id=019d0065-cf74-7963-8770-01b7599b3448}:submission_dispatch{submission.id="019d03c0-bc3d-7350-b8a9-5507340dc293"}: codex_core::codex: new
+2026-03-19T01:40:55.998500Z  INFO session_loop{thread_id=019d0065-cf74-7963-8770-01b7599b3448}:submission_dispatch{submission.id="019d03c0-bc3d-7350-b8a9-5507340dc293"}: codex_core::codex::handlers: Shutting down Codex instance
+2026-03-19T01:40:55.999012Z  INFO session_loop{thread_id=019d0065-cf74-7963-8770-01b7599b3448}:submission_dispatch{submission.id="019d03c0-bc3d-7350-b8a9-5507340dc293"}: codex_core::codex: close time.busy=1.02ms time.idle=47.9µs
+2026-03-19T01:40:55.999049Z  INFO session_loop{thread_id=019d0065-cf74-7963-8770-01b7599b3448}: codex_core::codex: close time.busy=5.42ms time.idle=56290s
