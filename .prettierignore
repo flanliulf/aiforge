@@ -1,0 +1,16 @@
+dist/
+node_modules/
+_bmad/
+_bmad-output/
+docs/
+.kiro/
+.codex/
+.opencode/
+.trae/
+.windsurf/
+.augment/
+.claude/
+.cursor/
+.github/
+.iflow/
+README.md
