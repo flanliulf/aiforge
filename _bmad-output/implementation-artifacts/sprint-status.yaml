@@ -41,8 +41,8 @@ development_status:
   # Epic 1: 项目基础设施与核心框架（Foundation Sprint）
   epic-1: backlog
   1-1-project-init-and-toolchain: done
-  1-2-core-types-and-error-system: review
-  1-3-output-abstraction-and-path-resolver: ready-for-dev
+  1-2-core-types-and-error-system: done
+  1-3-output-abstraction-and-path-resolver: done
   1-4-data-layer-configuration: ready-for-dev
   1-5-cli-entry-and-pipeline-skeleton: ready-for-dev
   epic-1-retrospective: optional
