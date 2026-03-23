@@ -1,6 +1,6 @@
 # Story 2.1: 配置管理服务
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -18,17 +18,17 @@ So that 不需要每次运行都重新输入仓库地址和认证方式。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建 `src/services/config.ts` — 配置读写服务 (AC: #1, #2, #3, #4, #5)
-  - [ ] 1.1 实现 `loadConfig(pathResolver: PathResolver): Promise<AiforgeConfig>` — 读取并解析 config.json
-  - [ ] 1.2 实现 `saveConfig(config: AiforgeConfig, pathResolver: PathResolver): Promise<void>` — 写入 config.json（原子写入：临时文件 + rename）
-  - [ ] 1.3 实现 `getHostAuth(config: AiforgeConfig, hostname: string): HostAuth | undefined` — 按 host 查找认证信息（`HostAuth` 类型需在 Story 1.2 的 `core/types.ts` 中补充定义：`{ method: AuthMethod; token?: string }`）
-  - [ ] 1.4 实现 `ensureConfigDir(pathResolver: PathResolver): Promise<void>` — 确保 `~/.aiforge/` 目录存在
-  - [ ] 1.5 文件权限处理：写入后 `fs.chmod(configPath, 0o600)`
-  - [ ] 1.6 错误处理：JSON 解析失败 → `AiforgeError(code: 'CONFIG_CORRUPT')`；文件不存在 → `AiforgeError(code: 'CONFIG_NOT_FOUND')`
-- [ ] Task 2: 编写单元测试 (AC: #1-5)
-  - [ ] 2.1 `tests/services/config.test.ts`
-  - [ ] 2.2 测试用例：正常读写、多 host 认证查找、损坏 JSON 抛错、文件不存在抛错、目录自动创建、文件权限 0o600
-  - [ ] 2.3 使用 vitest mock `fs` 模块，注入 mock PathResolver
+- [x] Task 1: 创建 `src/services/config.ts` — 配置读写服务 (AC: #1, #2, #3, #4, #5)
+  - [x] 1.1 实现 `loadConfig(pathResolver: PathResolver): Promise<AiforgeConfig>` — 读取并解析 config.json
+  - [x] 1.2 实现 `saveConfig(config: AiforgeConfig, pathResolver: PathResolver): Promise<void>` — 写入 config.json（原子写入：临时文件 + rename）
+  - [x] 1.3 实现 `getHostAuth(config: AiforgeConfig, hostname: string): HostAuth | undefined` — 按 host 查找认证信息（`HostAuth` 类型需在 Story 1.2 的 `core/types.ts` 中补充定义：`{ method: AuthMethod; token?: string }`）
+  - [x] 1.4 实现 `ensureConfigDir(pathResolver: PathResolver): Promise<void>` — 确保 `~/.aiforge/` 目录存在
+  - [x] 1.5 文件权限处理：写入后 `fs.chmod(configPath, 0o600)`
+  - [x] 1.6 错误处理：JSON 解析失败 → `AiforgeError(code: 'CONFIG_CORRUPT')`；文件不存在 → `AiforgeError(code: 'CONFIG_NOT_FOUND')`
+- [x] Task 2: 编写单元测试 (AC: #1-5)
+  - [x] 2.1 `tests/services/config.test.ts`
+  - [x] 2.2 测试用例：正常读写、多 host 认证查找、损坏 JSON 抛错、文件不存在抛错、目录自动创建、文件权限 0o600
+  - [x] 2.3 使用 vitest mock `fs` 模块，注入 mock PathResolver
 
 ## Dev Notes
 
@@ -146,8 +146,30 @@ config.json 字段一律 camelCase，与 TypeScript 接口一致：
 
 ### Agent Model Used
 
+Claude Sonnet 4 (via Claude Code)
+
 ### Debug Log References
+
+无异常
 
 ### Completion Notes List
 
+- ✅ 实现 `loadConfig()` — 读取 config.json，ENOENT → CONFIG_NOT_FOUND，JSON.parse 失败 → CONFIG_CORRUPT
+- ✅ 实现 `saveConfig()` — 原子写入（tmp + rename + chmod 0o600），写入前自动 ensureConfigDir
+- ✅ 实现 `getHostAuth()` — 按 hostname 从 config.auth 查找 HostAuth
+- ✅ 实现 `ensureConfigDir()` — access 检查 + recursive mkdir
+- ✅ 新增 `HostAuth` 接口到 `core/types.ts`，`AiforgeConfig.auth` 改为 `Record<string, HostAuth>`
+- ✅ 更新 `services/index.ts` barrel export
+- ✅ 12 个单元测试全部通过：正常读写、多 host 认证、损坏 JSON、文件不存在、目录自动创建、权限 0o600
+- ✅ 全量 218 测试零回归
+
+### Change Log
+
+- 2026-03-23: Story 2.1 实现完成 — 配置管理服务（loadConfig/saveConfig/getHostAuth/ensureConfigDir）+ 12 单元测试
+
 ### File List
+
+- `src/services/config.ts` — 新增：配置读写服务（loadConfig、saveConfig、getHostAuth、ensureConfigDir）
+- `src/services/index.ts` — 修改：添加 config 模块 barrel export
+- `src/core/types.ts` — 修改：新增 HostAuth 接口，AiforgeConfig.auth 类型引用 HostAuth
+- `tests/services/config.test.ts` — 新增：12 个单元测试

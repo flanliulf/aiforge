@@ -48,8 +48,8 @@ development_status:
   epic-1-retrospective: done
 
   # Epic 2: 知识仓库获取与认证
-  epic-2: backlog
-  2-1-config-management-service: ready-for-dev
+  epic-2: in-progress
+  2-1-config-management-service: done
   2-2-source-resolver-and-git-service: ready-for-dev
   2-3-four-layer-auth-chain: ready-for-dev
   2-4-git-clone-and-incremental-update: ready-for-dev

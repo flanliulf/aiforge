@@ -103,11 +103,17 @@ export interface ManifestEntry {
   installedAt: string
 }
 
+// Data structure: per-host authentication config
+export interface HostAuth {
+  method: 'ssh' | 'token'
+  token?: string
+}
+
 // Data structure: aiforge configuration file
 export interface AiforgeConfig {
   defaultRepo?: string
   cloneDir?: string
   language?: string
   preferSSH?: boolean
-  auth: Record<string, { method: 'ssh' | 'token'; token?: string }>
+  auth: Record<string, HostAuth>
 }
