@@ -52,6 +52,10 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Functions/variables: camelCase:** `loadRules()`, `ruleIndex`
 - **Enums: PascalCase values:** `InstallType.Files`, `Severity.Fatal`
 - **File naming: kebab-case:** `resolve-source.ts`, `detect-tools.ts`
+- **字符串联合类型 vs enum 选型规则：**
+  - 当值域小（2-3 个值）、值本身是有意义的字符串、且需要与外部数据（JSON/YAML/manifest）序列化交互时，优先使用**字符串字面量联合类型**（如 `'global' | 'project'`）——零运行时开销、JSON 直接可用
+  - 当值域作为引擎核心概念需要命名空间组织、或需要反向映射时，使用 **enum**（如 `InstallType.Files`）
+  - **关键约束：** `data/` 模块有零运行时依赖要求，引用 enum 会产生运行时 import，因此 data/ 内使用 `import type` + 字符串字面量断言（`'Files' as InstallType`）来避免运行时依赖
 
 ### Architecture Rules — Pipeline
 
@@ -112,8 +116,8 @@ index.ts → pipeline.ts → stages/* → services/*
   - Reporter 创建前的语言回退提示：允许 `process.stderr.write()`（此时 Reporter 尚未实例化）
 - Three Reporter implementations: `TtyReporter` (spinner+color), `PlainReporter` (CI/non-TTY), `QuietReporter` (--quiet)
 - Progress phase names: verb + object in Chinese (`"解析仓库地址..."`, `"克隆仓库..."`)
-- Result icons: `✅` new, `🔄` updated, `⏭️` skipped
-- Stats line: `安装: N 项  更新: N 项  跳过: N 项`
+- Result icons: `✅` new, `🔄` updated, `⏭️` skipped, `❌` failed
+- Stats line: `安装: N 项  更新: N 项  跳过: N 项  失败: N 项`
 - Output strings centralized in `data/messages.ts`
 
 ### Security Rules
