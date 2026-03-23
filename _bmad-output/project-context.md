@@ -22,6 +22,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 |------|------|
 | `_bmad-output/project-context.md` | AI agent 主规则文件（本文件），优化为 LLM 消费 |
 | `_bmad-output/planning-artifacts/architecture/04-implementation-patterns.md` | 命名/导出/测试/错误处理等实现模式，面向人类可读 |
+| `_bmad-output/planning-artifacts/architecture/03-core-decisions.md` | 技术决策事项记录，面向人类可读 |
 
 > 两份文档内容互为镜像，任何一处规则变更必须同时更新另一处。
 
