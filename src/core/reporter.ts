@@ -45,7 +45,7 @@ class TtyReporter implements Reporter {
   reportPlan(plan: MatchedPlan): void {
     for (const item of plan.items) {
       process.stdout.write(
-        chalk.cyan(`[${item.rule.tool}] ${item.rule.sourceDir} → ${item.targetPath}\n`)
+        chalk.cyan(`[${item.rule.tool}] ${item.rule.sourceDir} → ${item.targetPath}\n`),
       )
     }
   }
@@ -117,7 +117,7 @@ class QuietReporter implements Reporter {
     const updatedCount = results.items.filter((i) => i.status === 'updated').length
     const skippedCount = results.items.filter((i) => i.status === 'skipped').length
     process.stdout.write(
-      `✓ 安装: ${newCount} 项  更新: ${updatedCount} 项  跳过: ${skippedCount} 项\n`
+      `✓ 安装: ${newCount} 项  更新: ${updatedCount} 项  跳过: ${skippedCount} 项\n`,
     )
   }
 

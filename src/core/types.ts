@@ -13,8 +13,17 @@ export enum InstallType {
 // Stage 1 output: parsed CLI arguments
 export interface ParsedArgs {
   source: string
+  global: boolean
+  link: boolean
+  tools: string[]
+  dirs: string[]
   dryRun: boolean
   quiet: boolean
+  force: boolean
+  ssh: boolean
+  token?: string
+  cloneDir?: string
+  // legacy aliases kept for internal use
   symlink: boolean
   flatten: boolean
   language?: string

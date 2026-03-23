@@ -14,7 +14,7 @@ export class AiforgeError extends Error {
     public readonly exitCode: ExitCode,
     public readonly severity: Severity,
     public readonly why: string,
-    public readonly fix: string[]
+    public readonly fix: string[],
   ) {
     super(message)
     this.name = 'AiforgeError'

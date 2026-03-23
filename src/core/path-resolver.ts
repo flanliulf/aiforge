@@ -23,7 +23,7 @@ export class UnixPathResolver implements PathResolver {
         EXIT_ARG_ERROR,
         'fatal',
         'os.homedir() 返回空值，HOME 环境变量可能未设置',
-        ['请确保 HOME 环境变量已正确设置', '例如: export HOME=/home/youruser']
+        ['请确保 HOME 环境变量已正确设置', '例如: export HOME=/home/youruser'],
       )
     }
     this.homeDir = homeDir

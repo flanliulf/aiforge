@@ -79,7 +79,13 @@ describe('PlainReporter', () => {
     reporter.reportPlan({
       items: [
         {
-          rule: { tool: 'claude', scope: 'global', sourceDir: 'agents', type: 0 as never, targetDir: '~/.claude' },
+          rule: {
+            tool: 'claude',
+            scope: 'global',
+            sourceDir: 'agents',
+            type: 0 as never,
+            targetDir: '~/.claude',
+          },
           sourceFiles: [],
           targetPath: '~/.claude/agents',
         },
@@ -132,7 +138,13 @@ describe('TtyReporter', () => {
     reporter.reportPlan({
       items: [
         {
-          rule: { tool: 'claude', scope: 'global', sourceDir: 'agents', type: 0 as never, targetDir: '~/.claude' },
+          rule: {
+            tool: 'claude',
+            scope: 'global',
+            sourceDir: 'agents',
+            type: 0 as never,
+            targetDir: '~/.claude',
+          },
           sourceFiles: [],
           targetPath: '~/.claude/agents',
         },

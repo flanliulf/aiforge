@@ -22,8 +22,16 @@ describe('core/types — pipeline data contracts (AC: #1)', () => {
   it('ParsedArgs has required fields', () => {
     const v: ParsedArgs = {
       source: 'gitlab.example.com/org/repo',
+      global: false,
+      link: false,
+      tools: ['claude'],
+      dirs: ['agents'],
       dryRun: false,
       quiet: false,
+      force: false,
+      ssh: false,
+      token: 'glpat-xxx',
+      cloneDir: '/tmp/clone',
       symlink: false,
       flatten: false,
       language: 'zh',
@@ -84,7 +92,13 @@ describe('core/types — pipeline data contracts (AC: #1)', () => {
 
   it('InstallResult has items with status, sourcePath, targetPath', () => {
     const v: InstallResult = {
-      items: [{ status: 'new', sourcePath: '/tmp/repo/agents/dev.md', targetPath: '~/.claude/agents/dev.md' }],
+      items: [
+        {
+          status: 'new',
+          sourcePath: '/tmp/repo/agents/dev.md',
+          targetPath: '~/.claude/agents/dev.md',
+        },
+      ],
     }
     expectTypeOf(v).toMatchTypeOf<InstallResult>()
   })

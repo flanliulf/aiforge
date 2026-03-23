@@ -1,1 +1,1 @@
-// commands module placeholder
+export { registerInitCommand } from './init.js'

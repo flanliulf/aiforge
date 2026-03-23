@@ -1,6 +1,6 @@
 # Story 1.2: 核心类型定义与错误体系
 
-Status: review
+Status: done
 
 ## Story
 

@@ -48,7 +48,10 @@ describe('AiforgeError — unified error type (AC: #2)', () => {
   })
 
   it('stores fix array', () => {
-    const err = new AiforgeError('msg', 'ERR_TEST', 1, 'fatal', 'why', ['aiforge init', 'aiforge install'])
+    const err = new AiforgeError('msg', 'ERR_TEST', 1, 'fatal', 'why', [
+      'aiforge init',
+      'aiforge install',
+    ])
     expect(err.fix).toEqual(['aiforge init', 'aiforge install'])
   })
 
@@ -76,7 +79,12 @@ describe('exit code constants (AC: #2)', () => {
   })
 
   it('exit code constants are assignable to ExitCode type', () => {
-    const codes: ExitCode[] = [EXIT_SUCCESS, EXIT_INSTALL_FAILURE, EXIT_AUTH_FAILURE, EXIT_ARG_ERROR]
+    const codes: ExitCode[] = [
+      EXIT_SUCCESS,
+      EXIT_INSTALL_FAILURE,
+      EXIT_AUTH_FAILURE,
+      EXIT_ARG_ERROR,
+    ]
     expect(codes).toEqual([0, 1, 2, 3])
   })
 })

@@ -39,12 +39,12 @@ story_location: "_bmad-output/implementation-artifacts"
 
 development_status:
   # Epic 1: 项目基础设施与核心框架（Foundation Sprint）
-  epic-1: in-progress
+  epic-1: done
   1-1-project-init-and-toolchain: done
   1-2-core-types-and-error-system: done
   1-3-output-abstraction-and-path-resolver: done
   1-4-data-layer-configuration: done
-  1-5-cli-entry-and-pipeline-skeleton: ready-for-dev
+  1-5-cli-entry-and-pipeline-skeleton: done
   epic-1-retrospective: optional
 
   # Epic 2: 知识仓库获取与认证
