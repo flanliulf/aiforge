@@ -115,7 +115,7 @@ So that 新增工具或规则只需修改数据，不需要改引擎代码。
 
 **Given** `data/install-rules.ts` 已创建
 **When** 检查 `BUILTIN_RULES` 常量
-**Then** 包含 PRD 定义的完整 MVP 规则映射表（14 条规则，覆盖 Copilot/Claude/Cursor/VS Code × 全局/项目）
+**Then** 包含 PRD 定义的完整 MVP 规则映射表（16 条规则，覆盖 Copilot/Claude/Cursor/VS Code × 全局/项目）
 **And** 每条规则包含 `tool`、`scope`、`sourceDir`、`type`、`targetDir` 等字段
 **And** 预留 `loadRules()` 函数接口，MVP 返回 `BUILTIN_RULES`
 
