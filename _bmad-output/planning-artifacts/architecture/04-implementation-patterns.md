@@ -97,6 +97,25 @@ export type { ResolvedSource, InstallResult, MatchedPlan } from './types.js';
 - 不可预期的系统错误（如 fs 权限）→ 包装为 `AiforgeError` 后抛出
 - 绝不吞掉错误或返回 null 代替错误
 
+**catch 块必须区分错误类型：**
+
+- 禁止使用 `catch {}` 或 `catch { /* ignore */ }`
+- 如需对特定错误降级，必须使用以下模式：
+
+```typescript
+✅ catch (error) {
+     if (error instanceof AiforgeError && error.code === 'CONFIG_NOT_FOUND') {
+       // 仅此错误码降级为无默认配置，注释说明理由
+     } else {
+       throw error  // 默认行为：透传
+     }
+   }
+❌ catch {}
+❌ catch { /* ignore */ }
+```
+
+- 默认行为是 `throw`（透传），降级是例外且必须在注释中说明理由
+
 **错误创建模式：**
 
 `exitCode` 使用类型级约束 `type ExitCode = 0 | 1 | 2 | 3`，不接受任意 `number`。
@@ -136,6 +155,53 @@ export type { ResolvedSource, InstallResult, MatchedPlan } from './types.js';
 
 <!-- PATTERNS_APPEND_2 -->
 
+### Input Validation Patterns
+
+**输入校验必须在归一化之后执行：**
+
+正则/格式匹配只保证输入"在语法上有效"，不保证"在语义上有效"。所有关键校验（非空、格式合法性、范围约束）必须在标准化处理（如 `stripGitSuffix()`、`pathname.replace()`）之后执行。
+
+```typescript
+✅ const repoPath = stripGitSuffix(scpMatch[2]!)
+   assertRepoPath(repoPath, url)  // 归一化之后校验
+   return { hostname, repoPath, protocol: 'ssh' }
+
+❌ // 仅依赖正则 .+ 保证非空，跳过归一化后校验
+   return { hostname, repoPath: stripGitSuffix(scpMatch[2]!), protocol: 'ssh' }
+```
+
+**多分支校验一致性原则：**
+
+当函数包含多个条件分支（如协议分发、URL 格式判断）时：
+
+1. 新增任何校验逻辑必须审查**所有并行分支**是否需要同步应用
+2. 优先将校验逻辑抽取为公共辅助函数，然后在所有分支中调用
+
+```typescript
+✅ // 三个分支统一调用 assertRepoPath()
+   // ssh:// 分支
+   assertRepoPath(repoPath, url)
+   // SCP-style 分支
+   assertRepoPath(repoPath, url)
+   // HTTPS 分支
+   assertRepoPath(repoPath, url)
+
+❌ // 只在 HTTPS 和 ssh:// 分支加了校验，SCP-style 遗漏
+```
+
+**修复校验类 bug 时，验证约束不被扩大：**
+
+- 修复是否意外扩大了输入的合法范围（如白名单新增了不该有的选项）
+- 若修改涉及白名单/黑名单类逻辑，必须列出完整的预期接受/拒绝列表并逐条验证
+
+```typescript
+✅ // 修复 UNSUPPORTED_PROTOCOL 时，白名单仅保留 https:
+   if (parsed.protocol !== 'https:') { throw ... }
+
+❌ // 修复时无意中将 http: 也纳入白名单
+   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') { throw ... }
+```
+
 ### Security Patterns
 
 **Token 脱敏规则：**
@@ -148,6 +214,24 @@ export type { ResolvedSource, InstallResult, MatchedPlan } from './types.js';
 
 - `sanitizeUrl` 必须处理 GitLab 标准 `oauth2:token@host` 格式：`https://oauth2:${token}@host/repo.git`
 - 脱敏时只处理冒号后的凭据部分，保留 `oauth2:` 前缀
+
+**脱敏函数必须覆盖边界形态输入：**
+
+- sanitizeToken/sanitizeUrl 的正则/匹配逻辑必须覆盖用户可能构造的边界形态输入（如不完整 URL、缺少 host 的 URL、尾部截断的 token）
+- 新增任何 `AiforgeError` 的 `why` 字段时，检查是否包含用户原始输入——如果是，必须通过 sanitizeUrl/sanitizeToken 处理，不能有"漏调"
+
+```typescript
+✅ // 新增 AiforgeError 时，why 字段使用 sanitizeUrl
+   throw new AiforgeError(
+     '仓库地址缺少仓库路径',
+     'INVALID_URL', EXIT_ARG_ERROR, 'fatal',
+     `仓库地址缺少仓库路径: ${sanitizeUrl(url)}`,  // ← 脱敏
+     [...]
+   )
+
+❌ // why 字段直接拼接原始 URL
+   `仓库地址缺少仓库路径: ${url}`
+```
 
 ### Testing Patterns
 

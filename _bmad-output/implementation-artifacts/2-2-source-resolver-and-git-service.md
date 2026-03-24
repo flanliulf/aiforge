@@ -1,6 +1,6 @@
 # Story 2.2: 知识源解析与 Git 服务封装
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -18,22 +18,22 @@ So that 系统知道从哪里获取 AI 编码配置内容。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建 `src/stages/resolve-source.ts` — Resolve 管道阶段 (AC: #1, #2, #3, #5)
-  - [ ] 1.1 实现 `resolveSource(args: ParsedArgs, reporter: Reporter): Promise<ResolvedSource>`
-  - [ ] 1.2 URL 解析逻辑：HTTPS URL → 提取 hostname、repoPath、protocol='https'
-  - [ ] 1.3 SSH URL 解析：`git@host:org/repo.git` → hostname、repoPath、protocol='ssh'
-  - [ ] 1.4 无 URL 时回退到 `loadConfig()` 读取 `defaultRepo`
-  - [ ] 1.5 无 URL 且无默认配置 → 抛出 `AiforgeError(code: 'NO_REPO', severity: 'fatal')`
-  - [ ] 1.6 调用 `reporter.startPhase('解析仓库地址...')` 输出进度
-- [ ] Task 2: 创建 `src/services/git.ts` — Git 服务封装 (AC: #4)
-  - [ ] 2.1 实现 `GitSourceResolver` 类，实现 `SourceResolver` 接口
-  - [ ] 2.2 `canHandle(source: string): boolean` — 判断是否为 Git URL（HTTPS 或 SSH 格式）
-  - [ ] 2.3 `resolve(source: string, options: ResolveOptions): Promise<ResolvedSource>` — 解析 URL
-  - [ ] 2.4 对 simple-git 的薄封装：导出 `createGit()` 工厂函数，返回 `SimpleGit` 实例
-- [ ] Task 3: 编写单元测试 (AC: #1-5)
-  - [ ] 3.1 `tests/stages/resolve-source.test.ts` — HTTPS URL 解析、SSH URL 解析、默认配置回退、无配置抛错
-  - [ ] 3.2 `tests/services/git.test.ts` — canHandle 各种 URL 格式、resolve 返回正确结构
-  - [ ] 3.3 Mock `services/config.ts` 的 `loadConfig`，mock simple-git
+- [x] Task 1: 创建 `src/stages/resolve-source.ts` — Resolve 管道阶段 (AC: #1, #2, #3, #5)
+  - [x] 1.1 实现 `resolveSource(args: ParsedArgs, reporter: Reporter): Promise<ResolvedSource>`
+  - [x] 1.2 URL 解析逻辑：HTTPS URL → 提取 hostname、repoPath、protocol='https'
+  - [x] 1.3 SSH URL 解析：`git@host:org/repo.git` → hostname、repoPath、protocol='ssh'
+  - [x] 1.4 无 URL 时回退到 `loadConfig()` 读取 `defaultRepo`
+  - [x] 1.5 无 URL 且无默认配置 → 抛出 `AiforgeError(code: 'NO_REPO', severity: 'fatal')`
+  - [x] 1.6 调用 `reporter.startPhase('解析仓库地址...')` 输出进度
+- [x] Task 2: 创建 `src/services/git.ts` — Git 服务封装 (AC: #4)
+  - [x] 2.1 实现 `GitSourceResolver` 类，实现 `SourceResolver` 接口
+  - [x] 2.2 `canHandle(source: string): boolean` — 判断是否为 Git URL（HTTPS 或 SSH 格式）
+  - [x] 2.3 `resolve(source: string, options: ResolveOptions): Promise<ResolvedSource>` — 解析 URL
+  - [x] 2.4 对 simple-git 的薄封装：导出 `createGit()` 工厂函数，返回 `SimpleGit` 实例
+- [x] Task 3: 编写单元测试 (AC: #1-5)
+  - [x] 3.1 `tests/stages/resolve-source.test.ts` — HTTPS URL 解析、SSH URL 解析、默认配置回退、无配置抛错
+  - [x] 3.2 `tests/services/git.test.ts` — canHandle 各种 URL 格式、resolve 返回正确结构
+  - [x] 3.3 Mock `services/config.ts` 的 `loadConfig`，mock simple-git
 
 ## Dev Notes
 
@@ -122,8 +122,37 @@ type ResolveStage = (args: ParsedArgs, reporter: Reporter) => Promise<ResolvedSo
 
 ### Agent Model Used
 
+Claude Sonnet 4 (via Claude Code)
+
 ### Debug Log References
+
+无异常，全部测试一次通过。
 
 ### Completion Notes List
 
+- **Task 1:** 创建 `src/stages/resolve-source.ts`，实现 `resolveSource()` 管道阶段函数。支持 HTTPS/SSH/SCP-style URL 解析，无 URL 时从 config 回退 defaultRepo，无配置时抛出 `AiforgeError(NO_REPO)`。函数签名增加 `pathResolver` 参数以注入 `loadConfig` 依赖。
+- **Task 2:** 创建 `src/services/git.ts`，实现 `GitSourceResolver` 类（`SourceResolver` 接口）含 `canHandle()` 和 `resolve()` 方法。导出 `createGit()` 工厂函数作为 simple-git 薄封装。`SourceResolver` 接口定义在本文件中导出，避免超出 story scope 修改 core/types.ts。
+- **Task 3:** 创建 `tests/stages/resolve-source.test.ts`（12 个测试）和 `tests/services/git.test.ts`（15 个测试），mock loadConfig 和 simple-git，覆盖全部 5 个 AC。
+- **设计决策:** `resolveSource` 函数签名为 `(args, reporter, pathResolver)` 而非 story 中原始的 `(args, reporter)`，增加 `pathResolver` 参数是因为需要传递给 `loadConfig(pathResolver)` 进行依赖注入，与项目已有的 config 服务模式一致。
+- **设计决策:** `SourceResolver` 接口定义在 `services/git.ts` 中，未添加到 `core/types.ts`，因为 story scope 未要求修改 core 模块。未来可提升至 core/types.ts。
+- **全量测试:** 16 个测试文件，249 个测试全部通过，零回归。
+
 ### File List
+
+- `src/stages/resolve-source.ts` — 新增: Resolve 管道阶段实现
+- `src/services/git.ts` — 新增: GitSourceResolver 类 + createGit 工厂函数
+- `tests/stages/resolve-source.test.ts` — 新增: resolve-source 单元测试 (12 tests)
+- `tests/services/git.test.ts` — 新增: git 服务单元测试 (15 tests)
+
+### Change Log
+
+- 2026-03-23: Story 2.2 实现完成 — 创建 Resolve 管道阶段和 Git 服务封装，含 27 个单元测试，覆盖全部 5 个 AC
+- 2026-03-24: CR 跨 LLM 代码审查完成（共 6 轮，GPT-5.4 审查 + Claude Sonnet 4 评估/修复）：
+  - Round 1-2: resolve 负向测试覆盖、不支持协议收口、Token 脱敏一致性
+  - Round 3: hostless token-bearing URL 脱敏
+  - Round 4: http:// 协议收口为 UNSUPPORTED_PROTOCOL
+  - Round 5: HTTPS/ssh:// host-only URL repoPath 非空校验
+  - Round 6: SCP-style SSH 分支 repoPath 归一化后非空校验（三分支一致性闭环）
+  - 最终测试: 267/267 全绿，lint ✅，build ✅
+  - 推迟项: ResolveFn 签名契约统一 → Story 4.6a
+- 2026-03-24: Story 状态 review → done

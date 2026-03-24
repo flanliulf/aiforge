@@ -4,7 +4,7 @@ user_name: 'chunxiao'
 date: '2026-03-12'
 sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 32
+rule_count: 38
 optimized_for_llm: true
 ---
 
@@ -107,7 +107,14 @@ index.ts → pipeline.ts → stages/* → services/*
 - **Three-part error messages:** what broke → why → how to fix (copyable commands)
 - Exit codes: `0`=success, `1`=install failure, `2`=auth failure, `3`=arg error
 - **Never swallow errors or return null instead of throwing**
+- **catch 块必须区分错误类型：** 禁止使用 `catch {}` 或 `catch { /* ignore */ }`。如需对特定错误降级，必须使用 `catch (error) { if (error instanceof AiforgeError && error.code === 'SPECIFIC_CODE') { ... } else { throw error } }` 模式。默认行为是 `throw`（透传），降级是例外且必须在注释中说明理由
 - **InstallResult status 只有三种：** `'new'` | `'updated'` | `'skipped'`（无 `'failed'`——I/O 错误直接抛 fatal，hash 相同或用户选择跳过为 `'skipped'`）
+
+### Input Validation Rules
+
+- **输入校验必须在归一化之后执行：** 正则/格式匹配只保证输入"在语法上有效"，不保证"在语义上有效"。所有关键校验（非空、格式合法性、范围约束）必须在标准化处理（如 `stripGitSuffix()`、`pathname.replace()`）之后执行，不能以"正则已限制输入范围"为由跳过归一化后的语义校验
+- **多分支校验一致性原则：** 当函数包含多个条件分支（如协议分发、URL 格式判断）时，新增任何校验逻辑必须审查所有并行分支是否需要同步应用。优先将校验逻辑抽取为公共辅助函数（如 `assertRepoPath()`），然后在所有分支中调用——避免"逐分支复制"导致遗漏
+- **修复校验类 bug 时，必须验证相关约束不被扩大：** 修复是否意外扩大了输入的合法范围（如白名单新增了不该有的选项）；若修改涉及白名单/黑名单类逻辑，必须列出完整的预期接受/拒绝列表并逐条验证
 
 ### Output Rules
 
@@ -130,6 +137,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - Token display format: `glpat-ab****mnop` (first 8 + `****` + last 4 chars); short tokens (<= 12 chars): first 4 + `****` (no tail)
 - **sanitizeToken 边界验证：** 实现脱敏逻辑时，必须验证阈值边界处（token 长度恰好等于阈值）脱敏后不可逆推原文
 - **sanitizeUrl 必须处理 `oauth2:token@host` 格式：** GitLab 标准 token URL 为 `https://oauth2:${token}@host/repo.git`，脱敏时只处理冒号后的凭据部分，保留 `oauth2:` 前缀
+- **脱敏函数必须覆盖边界形态输入：** sanitizeToken/sanitizeUrl 的正则/匹配逻辑必须覆盖用户可能构造的边界形态输入（如不完整 URL、缺少 host 的 URL、尾部截断的 token）。新增任何 `AiforgeError` 的 `why` 字段时，检查是否包含用户原始输入——如果是，必须通过 sanitizeUrl/sanitizeToken 处理，不能有"漏调"
 
 ### Data Format Rules
 
@@ -184,4 +192,4 @@ index.ts → pipeline.ts → stages/* → services/*
 - Update when technology stack or patterns change
 - Remove rules that become obvious over time
 
-Last Updated: 2026-03-19
+Last Updated: 2026-03-24
