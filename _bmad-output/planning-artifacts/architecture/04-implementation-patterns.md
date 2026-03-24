@@ -116,6 +116,32 @@ export type { ResolvedSource, InstallResult, MatchedPlan } from './types.js';
 
 - 默认行为是 `throw`（透传），降级是例外且必须在注释中说明理由
 
+**catch 降级必须逐码白名单：**
+
+- 禁止创建辅助函数（如 `isConfigError()`）将多个错误码归类后批量降级
+- 每个被降级的错误码必须逐个 `error.code === 'XXX'` 匹配，并在注释中单独说明降级理由
+- 如需对新错误码降级，逐码新增 `||` 条件并附带独立注释
+
+```typescript
+✅ catch (error) {
+     if (error instanceof AiforgeError && error.code === 'CONFIG_NOT_FOUND') {
+       // 配置不存在 = 首次使用，降级到系统凭据合理
+     } else {
+       throw error
+     }
+   }
+
+❌ // 辅助函数批量归类，掩盖了不该降级的错误
+   function isConfigError(code: string): boolean {
+     return code === 'CONFIG_NOT_FOUND' || code === 'CONFIG_CORRUPT' || code === 'CONFIG_READ_FAILED'
+   }
+   catch (error) {
+     if (error instanceof AiforgeError && isConfigError(error.code)) { ... }
+   }
+```
+
+> 来源：Story 2-3 CR — `isConfigError()` 将三种错误码统一降级，`CONFIG_CORRUPT` 被静默吞掉，掩盖了配置损坏的真实根因。
+
 **错误创建模式：**
 
 `exitCode` 使用类型级约束 `type ExitCode = 0 | 1 | 2 | 3`，不接受任意 `number`。
@@ -254,6 +280,46 @@ describe('authenticate', () => {
 
 - 单元测试：每个管道阶段独立测试，mock 外部依赖
 - 集成测试：管道端到端测试，使用临时目录和 fixture 仓库
+
+**Mock 断言必须验证被测函数的实际调用链：**
+
+当测试涉及安全关键行为（如 Token 脱敏、权限检查）时，禁止在测试中直接调用 mock 函数来验证其行为。必须通过被测函数的入口触发 mock，然后断言调用链完整性。
+
+```typescript
+✅ // 通过被测函数入口触发，验证完整调用链
+   it('环境变量分支：sanitizeToken 被调用且 reporter 收到脱敏 token', async () => {
+     process.env['AIFORGE_TOKEN'] = 'glpat-secrettoken9999'
+     await authenticate(mockSource, makeArgs(), mockReporter)
+     // (1) mock 被调用且参数正确
+     expect(vi.mocked(sanitizeToken)).toHaveBeenCalledWith('glpat-secrettoken9999')
+     // (2) 输出包含 mock 处理结果，而非原始输入
+     const arg = (mockReporter.updatePhase as any).mock.calls[0]?.[0]
+     expect(arg).not.toContain('glpat-secrettoken9999')
+     expect(arg).toContain('****')
+   })
+
+❌ // 直接调用 mock 函数，只验证了 mock 自身行为
+   it('sanitizeToken 格式正确', () => {
+     const result = sanitizeToken('glpat-abcdefgh1234')  // ← 直接调用 mock
+     expect(result).toMatch(/^.{8}\*{4}.{4}$/)
+   })
+```
+
+> 来源：Story 2-3 CR — AC #7 脱敏测试直接调用 mock 的 `sanitizeToken()`，如果被测函数删掉脱敏调用，测试仍然通过，无法守住安全回归。
+
+### CR Workflow Patterns
+
+**CR 修复后必须同步更新 Story Dev Agent Record：**
+
+CR 修复涉及新增/删除测试用例或代码变更导致全仓测试数变化时，修复完毕后必须同步更新 Story 的 Completion Notes：
+
+1. 当前 Story 测试用例数
+2. 全仓测试通过数
+3. Lint 状态
+
+更新时应标注变更原因（如"原 18 + CR Round-1 修复新增 3"），便于追溯。
+
+> 来源：Story 2-3 CR — 修复新增 3 个测试后 Story 记录仍写"18 个测试用例"和"285 tests pass"，延续一整轮 CR 才关闭。
 
 ### Enforcement Guidelines
 

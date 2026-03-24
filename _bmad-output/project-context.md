@@ -4,7 +4,7 @@ user_name: 'chunxiao'
 date: '2026-03-12'
 sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 38
+rule_count: 41
 optimized_for_llm: true
 ---
 
@@ -108,6 +108,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - Exit codes: `0`=success, `1`=install failure, `2`=auth failure, `3`=arg error
 - **Never swallow errors or return null instead of throwing**
 - **catch 块必须区分错误类型：** 禁止使用 `catch {}` 或 `catch { /* ignore */ }`。如需对特定错误降级，必须使用 `catch (error) { if (error instanceof AiforgeError && error.code === 'SPECIFIC_CODE') { ... } else { throw error } }` 模式。默认行为是 `throw`（透传），降级是例外且必须在注释中说明理由
+- **catch 降级必须逐码白名单：** 禁止创建辅助函数（如 `isConfigError()`）将多个错误码归类后批量降级。每个被降级的错误码必须逐个 `error.code === 'XXX'` 匹配，并在注释中单独说明降级理由。如需对新错误码降级，逐码新增 `||` 条件并附带独立注释。（来源：Story 2-3 CR — `isConfigError()` 将 `CONFIG_NOT_FOUND`/`CONFIG_CORRUPT`/`CONFIG_READ_FAILED` 统一降级，掩盖了配置损坏的真实根因）
 - **InstallResult status 只有三种：** `'new'` | `'updated'` | `'skipped'`（无 `'failed'`——I/O 错误直接抛 fatal，hash 相同或用户选择跳过为 `'skipped'`）
 
 ### Input Validation Rules
@@ -155,6 +156,11 @@ index.ts → pipeline.ts → stages/* → services/*
 - PathResolver → inject mock with fixed paths in tests
 - Unit tests: each pipeline stage independently, mock external deps
 - Integration tests: end-to-end pipeline with temp dirs and fixture repos
+- **Mock 断言必须验证被测函数的实际调用链：** 当测试涉及安全关键行为（如 Token 脱敏、权限检查）时，禁止在测试中直接调用 mock 函数来验证其行为。必须通过被测函数的入口触发 mock，然后断言：(1) mock 函数被调用且参数正确（`toHaveBeenCalledWith`）；(2) 被测函数的输出/副作用中包含 mock 处理结果而非原始输入。（来源：Story 2-3 CR — AC #7 脱敏测试直接调用 mock 的 `sanitizeToken()`，无法守住安全回归）
+
+### CR Workflow Rules
+
+- **CR 修复后必须同步更新 Story Dev Agent Record：** CR 修复涉及新增/删除测试用例或代码变更导致全仓测试数变化时，修复完毕后必须同步更新 Story 的 Completion Notes：(1) 当前 Story 测试用例数；(2) 全仓测试通过数；(3) Lint 状态。更新时应标注变更原因（如"原 18 + CR Round-1 修复新增 3"）。（来源：Story 2-3 CR — 修复新增 3 个测试后 Story 记录仍写"18 个测试"，延续一整轮 CR 才关闭）
 
 ### Install Rules Data Architecture
 
