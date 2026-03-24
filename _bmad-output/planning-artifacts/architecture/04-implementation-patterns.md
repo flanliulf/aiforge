@@ -142,6 +142,62 @@ export type { ResolvedSource, InstallResult, MatchedPlan } from './types.js';
 
 > 来源：Story 2-3 CR — `isConfigError()` 将三种错误码统一降级，`CONFIG_CORRUPT` 被静默吞掉，掩盖了配置损坏的真实根因。
 
+**fs 存在性检查必须使用 ENOENT/ENOTDIR 白名单降级：**
+
+使用 `fs.access()` / `fs.stat()` 判断文件/目录是否存在时，禁止 `catch { return false }` 无差别降级。
+
+```typescript
+✅ async function dirExists(path: string): Promise<boolean> {
+     try {
+       await access(path)
+       return true
+     } catch (error) {
+       if (error instanceof Error && 'code' in error &&
+           (error.code === 'ENOENT' || error.code === 'ENOTDIR')) {
+         return false  // 不存在 / 路径组件非目录：正常
+       }
+       throw error  // EACCES 权限拒绝、EIO 等：必须向上抛出
+     }
+   }
+
+❌ async function dirExists(path: string): Promise<boolean> {
+     try { await access(path); return true }
+     catch { return false }  // 权限拒绝也被误判为"不存在"
+   }
+```
+
+> 来源：Story 2-4 CR — `hasLocalRepo()` 和 `dirExists()` 各出现一次同样问题，3 轮 CR 才彻底收敛。
+
+**CR 修复引入的新代码必须贯彻同等规则标准：**
+
+修复 A 函数的问题时若新增了 B 辅助函数，B 必须遵循与 A 相同的规则。修复者提交前应自查：新增的每个函数/分支是否与项目规则一致。
+
+```typescript
+❌ // 修复 hasLocalRepo() 的 catch {} 问题，但新增的 dirExists() 又用了 catch {}
+   // → 被下一轮 CR 发现，多浪费一轮审查
+```
+
+> 来源：Story 2-4 CR Round 2 — 修复 `hasLocalRepo()` 时新增 `dirExists()`，重复了同样的 `catch {}` 错误。
+
+**新增 AiforgeError 错误码必须同步补负向测试：**
+
+新增 `try/catch` + `throw new AiforgeError(NEW_CODE)` 的错误处理分支时，必须同步补至少 1 条负向测试。
+
+```typescript
+✅ // 源码新增了 SANITIZE_REMOTE_FAILED
+   // 同时补测试：
+   it('remote set-url 失败时抛出 SANITIZE_REMOTE_FAILED', async () => {
+     mockGit.remote.mockRejectedValue(new Error('git error'))
+     await expect(cloneRepo(...)).rejects.toMatchObject({
+       code: 'SANITIZE_REMOTE_FAILED', severity: 'fatal'
+     })
+   })
+
+❌ // 新增了错误码但没补测试 → 后续重构可能无感知回退为 raw Error
+```
+
+> 来源：Story 2-4 CR Round 2 — Round 1 修复新增 `SANITIZE_REMOTE_FAILED`/`SCAN_FAILED` 但无测试。
+
 **错误创建模式：**
 
 `exitCode` 使用类型级约束 `type ExitCode = 0 | 1 | 2 | 3`，不接受任意 `number`。

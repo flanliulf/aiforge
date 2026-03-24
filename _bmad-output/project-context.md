@@ -109,6 +109,9 @@ index.ts → pipeline.ts → stages/* → services/*
 - **Never swallow errors or return null instead of throwing**
 - **catch 块必须区分错误类型：** 禁止使用 `catch {}` 或 `catch { /* ignore */ }`。如需对特定错误降级，必须使用 `catch (error) { if (error instanceof AiforgeError && error.code === 'SPECIFIC_CODE') { ... } else { throw error } }` 模式。默认行为是 `throw`（透传），降级是例外且必须在注释中说明理由
 - **catch 降级必须逐码白名单：** 禁止创建辅助函数（如 `isConfigError()`）将多个错误码归类后批量降级。每个被降级的错误码必须逐个 `error.code === 'XXX'` 匹配，并在注释中单独说明降级理由。如需对新错误码降级，逐码新增 `||` 条件并附带独立注释。（来源：Story 2-3 CR — `isConfigError()` 将 `CONFIG_NOT_FOUND`/`CONFIG_CORRUPT`/`CONFIG_READ_FAILED` 统一降级，掩盖了配置损坏的真实根因）
+- **fs 存在性检查必须使用 ENOENT/ENOTDIR 白名单降级：** 使用 `fs.access()` / `fs.stat()` 判断文件/目录是否存在时，禁止 `catch { return false }` 无差别降级。仅对 `error.code === 'ENOENT'`（不存在）和 `error.code === 'ENOTDIR'`（路径组件非目录）降级为 `false`，其他错误（`EACCES` 权限拒绝、`EIO` I/O 错误等）必须向上抛出。否则权限问题会被误判为"不存在"，导致后续逻辑走错分支。（来源：Story 2-4 CR — `hasLocalRepo()` 和 `dirExists()` 各出现一次同样问题，共 3 轮 CR 才彻底收敛）
+- **CR 修复引入的新函数/新代码必须贯彻同等规则标准：** 修复 A 函数的问题时若新增了 B 辅助函数，B 必须遵循与 A 相同的规则。修复者提交前应自查：新增的每个函数/分支是否与项目规则一致。（来源：Story 2-4 CR — 修复 `hasLocalRepo()` 的 catch 问题时新增 `dirExists()`，但 `dirExists()` 重复了同样的 `catch {}` 错误，被下一轮 CR 发现）
+- **新增 AiforgeError 错误码必须同步补负向测试：** 新增 `try/catch` + `throw new AiforgeError(NEW_CODE)` 的错误处理分支时，必须同步补至少 1 条负向测试，强制触发该分支并断言 `code` 和 `severity`。否则回归保护为零，后续重构可能无感知地回退为 raw Error。（来源：Story 2-4 CR — Round 1 修复新增 `SANITIZE_REMOTE_FAILED`/`SCAN_FAILED` 但无测试，Round 2 发现）
 - **InstallResult status 只有三种：** `'new'` | `'updated'` | `'skipped'`（无 `'failed'`——I/O 错误直接抛 fatal，hash 相同或用户选择跳过为 `'skipped'`）
 
 ### Input Validation Rules

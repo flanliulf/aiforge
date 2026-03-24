@@ -1,6 +1,6 @@
 # Story 2.4: Git 克隆与增量更新
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -20,29 +20,29 @@ So that 首次克隆高效，后续更新只拉取变更。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建 `src/stages/clone.ts` — Clone 管道阶段 (AC: #1-5)
-  - [ ] 1.1 实现 `cloneRepo(source: AuthenticatedSource, args: ParsedArgs, reporter: Reporter): Promise<LocalRepo>`
-  - [ ] 1.2 计算克隆目标路径：`args.cloneDir` || `pathResolver.reposDir()` + repo-name
-  - [ ] 1.3 repo-name 提取：从 `source.repoPath` 取最后一段（如 `org/aicoding-base` → `aicoding-base`）
-  - [ ] 1.4 判断本地是否已有仓库：检查目标路径是否存在且包含 `.git` 目录
-  - [ ] 1.5 首次克隆：`git.clone(source.cloneUrl, targetDir, ['--depth', '1'])`
-  - [ ] 1.6 增量更新：`git.cwd(targetDir).pull()`
-  - [ ] 1.7 克隆完成后清理 Token：重写 remote URL 为不含 Token 的版本
-  - [ ] 1.8 失败清理：克隆失败时删除不完整的目标目录
-  - [ ] 1.9 返回 `LocalRepo` 对象：`{ repoDir, isNew, sourceFiles }`
-  - [ ] 1.10 调用 `reporter.startPhase('克隆仓库...')` 输出进度
-- [ ] Task 2: 实现 Token 清理逻辑 (AC: #5)
-  - [ ] 2.1 克隆完成后：`git.remote(['set-url', 'origin', sanitizedUrl])`
-  - [ ] 2.2 验证 `.git/config` 不含 Token
-  - [ ] 2.3 将 `source.cloneUrl` 中的 Token 引用置空（内存清除）
-- [ ] Task 3: 实现源文件扫描 (AC: #1)
-  - [ ] 3.1 克隆/更新后扫描仓库根目录，列出顶层目录和文件
-  - [ ] 3.2 排除 `.git`、`DEFAULT_EXCLUDES` 中的文件
-  - [ ] 3.3 返回 `sourceFiles: string[]`（相对路径列表）
-- [ ] Task 4: 编写单元测试 (AC: #1-5)
-  - [ ] 4.1 `tests/stages/clone.test.ts`
-  - [ ] 4.2 测试用例：首次浅克隆、增量 pull、自定义路径、失败清理、Token 清理、源文件扫描
-  - [ ] 4.3 Mock simple-git（`clone`、`pull`、`remote`、`cwd`）、mock fs 操作
+- [x] Task 1: 创建 `src/stages/clone.ts` — Clone 管道阶段 (AC: #1-5)
+  - [x] 1.1 实现 `cloneRepo(source: AuthenticatedSource, args: ParsedArgs, reporter: Reporter): Promise<LocalRepo>`
+  - [x] 1.2 计算克隆目标路径：`args.cloneDir` || `pathResolver.reposDir()` + repo-name
+  - [x] 1.3 repo-name 提取：从 `source.repoPath` 取最后一段（如 `org/aicoding-base` → `aicoding-base`）
+  - [x] 1.4 判断本地是否已有仓库：检查目标路径是否存在且包含 `.git` 目录
+  - [x] 1.5 首次克隆：`git.clone(source.cloneUrl, targetDir, ['--depth', '1'])`
+  - [x] 1.6 增量更新：`git.cwd(targetDir).pull()`
+  - [x] 1.7 克隆完成后清理 Token：重写 remote URL 为不含 Token 的版本
+  - [x] 1.8 失败清理：克隆失败时删除不完整的目标目录
+  - [x] 1.9 返回 `LocalRepo` 对象：`{ repoDir, isNew, sourceFiles }`
+  - [x] 1.10 调用 `reporter.startPhase('克隆仓库...')` 输出进度
+- [x] Task 2: 实现 Token 清理逻辑 (AC: #5)
+  - [x] 2.1 克隆完成后：`git.remote(['set-url', 'origin', sanitizedUrl])`
+  - [x] 2.2 验证 `.git/config` 不含 Token
+  - [x] 2.3 将 `source.cloneUrl` 中的 Token 引用置空（内存清除）
+- [x] Task 3: 实现源文件扫描 (AC: #1)
+  - [x] 3.1 克隆/更新后扫描仓库根目录，列出顶层目录和文件
+  - [x] 3.2 排除 `.git`、`DEFAULT_EXCLUDES` 中的文件
+  - [x] 3.3 返回 `sourceFiles: string[]`（相对路径列表）
+- [x] Task 4: 编写单元测试 (AC: #1-5)
+  - [x] 4.1 `tests/stages/clone.test.ts`
+  - [x] 4.2 测试用例：首次浅克隆、增量 pull、自定义路径、失败清理、Token 清理、源文件扫描
+  - [x] 4.3 Mock simple-git（`clone`、`pull`、`remote`、`cwd`）、mock fs 操作
 
 ## Dev Notes
 
@@ -155,8 +155,26 @@ await repoGit.pull();
 
 ### Agent Model Used
 
+claude-sonnet-4.6
+
 ### Debug Log References
+
+无
 
 ### Completion Notes List
 
+- 实现 `src/stages/clone.ts`：cloneRepo 管道阶段函数，支持首次浅克隆（--depth 1）和增量更新（git pull）
+- Token 清理：仅 `authMethod === 'token'` 时调用 `git remote set-url origin <clean-url>`，并清除 `source.cloneUrl` 内存引用；SSH / credential-manager 不触发
+- 失败清理（条件清理）：`freshClone()` 记录 `targetExistedBefore`，只删除本次克隆创建的目录，不删除原本存在的用户目录；cleanup 失败信息追加到 `CLONE_FAILED.fix` 中暴露给用户（无裸 `catch {}`）
+- 源文件扫描：`readdir` + `withFileTypes` 过滤 `.git` 和 `DEFAULT_EXCLUDES`，返回顶层相对路径列表
+- `hasLocalRepo()`：`access(.git)` 判断，对 ENOENT/ENOTDIR 白名单降级为 false，其他错误（EACCES 等）向上抛出
+- `dirExists()`：与 `hasLocalRepo()` 保持一致的白名单降级逻辑，ENOENT/ENOTDIR 降级，其他错误抛出
+- `sanitizeRemoteUrl()`/`scanSourceFiles()` 底层错误已包装为 AiforgeError（`SANITIZE_REMOTE_FAILED`/`SCAN_FAILED`）
+- pathResolver 以依赖注入形式传入，测试中注入固定路径 mock，保证可测性
+- 单元测试 31 个（`tests/stages/clone.test.ts`），全部通过；全仓 319 个测试，0 失败（原 21 + CR Round-1 修复新增 5 + CR Round-2 修复新增 3 + CR Round-3 修复新增 2）
+- Lint（ESLint）无警告无错误；Prettier 格式全绿
+
 ### File List
+
+- `src/stages/clone.ts` (新增)
+- `tests/stages/clone.test.ts` (新增)
