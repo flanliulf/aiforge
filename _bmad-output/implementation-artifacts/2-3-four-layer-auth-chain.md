@@ -1,6 +1,6 @@
 # Story 2.3: 四层认证解析链
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -20,22 +20,22 @@ So that 无论在开发环境、CI 还是新电脑上都能顺利访问私有仓
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建 `src/stages/authenticate.ts` — Auth 管道阶段 (AC: #1-7)
-  - [ ] 1.1 实现 `authenticate(source: ResolvedSource, args: ParsedArgs, reporter: Reporter): Promise<AuthenticatedSource>`
-  - [ ] 1.2 互斥校验：`args.ssh && args.token` 同时存在时抛出 `AiforgeError(code: 'ARG_CONFLICT', severity: 'fatal')`
-  - [ ] 1.3 四层优先级链实现：
+- [x] Task 1: 创建 `src/stages/authenticate.ts` — Auth 管道阶段 (AC: #1-7)
+  - [x] 1.1 实现 `authenticate(source: ResolvedSource, args: ParsedArgs, reporter: Reporter): Promise<AuthenticatedSource>`
+  - [x] 1.2 互斥校验：`args.ssh && args.token` 同时存在时抛出 `AiforgeError(code: 'ARG_CONFLICT', severity: 'fatal')`
+  - [x] 1.3 四层优先级链实现：
     - Layer 1: `args.ssh` → SSH 认证 / `args.token` → Token 认证（CLI 参数，最高优先级）
     - Layer 2: `process.env.AIFORGE_TOKEN` || `process.env.GITLAB_TOKEN`（环境变量）
     - Layer 3: `getHostAuth(config, source.hostname)`（配置文件 per-host）
     - Layer 4: 系统 Git 凭据管理器（降级，不注入任何认证信息）
-  - [ ] 1.4 构建 `AuthenticatedSource`：包含 `cloneUrl`（注入 Token 的 HTTPS URL 或 SSH URL）和 `authMethod`
-  - [ ] 1.5 Token 注入 HTTPS URL：`https://oauth2:${token}@${hostname}/${repoPath}.git`（GitLab 标准格式）
-  - [ ] 1.6 所有日志输出中的 Token 使用 `sanitizeToken()` 脱敏
-  - [ ] 1.7 调用 `reporter.startPhase('验证认证信息...')` 输出进度
-- [ ] Task 2: 编写单元测试 (AC: #1-7)
-  - [ ] 2.1 `tests/stages/authenticate.test.ts`
-  - [ ] 2.2 测试用例：--ssh 与 --token 互斥报错、CLI --ssh 优先、CLI --token 优先、环境变量回退、配置文件回退、系统凭据降级、Token 脱敏验证
-  - [ ] 2.3 Mock `process.env`、`services/config.ts`、`core/sanitize.ts`
+  - [x] 1.4 构建 `AuthenticatedSource`：包含 `cloneUrl`（注入 Token 的 HTTPS URL 或 SSH URL）和 `authMethod`
+  - [x] 1.5 Token 注入 HTTPS URL：`https://oauth2:${token}@${hostname}/${repoPath}.git`（GitLab 标准格式）
+  - [x] 1.6 所有日志输出中的 Token 使用 `sanitizeToken()` 脱敏
+  - [x] 1.7 调用 `reporter.startPhase('验证认证信息...')` 输出进度
+- [x] Task 2: 编写单元测试 (AC: #1-7)
+  - [x] 2.1 `tests/stages/authenticate.test.ts`
+  - [x] 2.2 测试用例：--ssh 与 --token 互斥报错、CLI --ssh 优先、CLI --token 优先、环境变量回退、配置文件回退、系统凭据降级、Token 脱敏验证
+  - [x] 2.3 Mock `process.env`、`services/config.ts`、`core/sanitize.ts`
 
 ## Dev Notes
 
@@ -158,8 +158,21 @@ function buildPlainUrl(source: ResolvedSource): string {
 
 ### Agent Model Used
 
+claude-sonnet-4-5 / claude-sonnet-4-6
+
 ### Debug Log References
+
+无阻塞问题。既有 `src/services/git.ts:74` TS 错误为 story 前既有问题，已确认不属于本 story 范围。
 
 ### Completion Notes List
 
+- **Task 1 (authenticate.ts):** 实现四层认证链 if-else 结构，含 `buildTokenUrl`/`buildSshUrl`/`buildPlainUrl` 辅助函数。函数签名增加可选 `pathResolver?: PathResolver` 参数（与 `resolveSource` 模式一致），Layer 3 内部创建 `UnixPathResolver` 作为默认值，避免 `null as never` hack。
+- **Task 2 (authenticate.test.ts):** 21 个测试用例覆盖全部 7 条 AC（原 18 + CR Round-1 修复新增 3：`CONFIG_CORRUPT` 透传、`CONFIG_READ_FAILED` 透传、stage 级脱敏集成断言）。完整 mock `services/config`、`core/sanitize`、`process.env`。
+- **全量回归：** 288 tests pass，0 regression。Lint clean。
+
 ### File List
+
+- `src/stages/authenticate.ts` (新增)
+- `tests/stages/authenticate.test.ts` (新增)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (更新: ready-for-dev → review)
+- `_bmad-output/implementation-artifacts/2-3-four-layer-auth-chain.md` (更新: 任务标记 + Dev Agent Record)
