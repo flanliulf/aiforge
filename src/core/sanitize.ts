@@ -14,7 +14,8 @@ export function sanitizeToken(token: string): string {
 export function sanitizeUrl(url: string): string {
   // Match userinfo in https://[user:]token@host/... pattern
   // Handles both https://token@host and https://oauth2:token@host (GitLab standard)
-  return url.replace(/^(https?:\/\/)([^@]+)(@.+)$/, (_match, scheme, userinfo, rest) => {
+  // Also handles hostless URLs like https://oauth2:token@ (bare @ with no host/path)
+  return url.replace(/^(https?:\/\/)([^@]+)(@.*)$/, (_match, scheme, userinfo, rest) => {
     const colonIdx = userinfo.indexOf(':')
     if (colonIdx !== -1) {
       // oauth2:token format — sanitize only the credential after ':'

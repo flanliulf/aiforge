@@ -70,4 +70,20 @@ describe('sanitizeUrl (AC: #4)', () => {
     expect(result).toContain('****')
     expect(result).not.toContain('shortok')
   })
+
+  // CR Round 3 Fix: hostless token-bearing URL (bare @ with no host/path)
+  it('masks token in hostless oauth2:token@ URL (bare @ ending)', () => {
+    const url = 'https://oauth2:glpat-abcdefghijklmno@'
+    const result = sanitizeUrl(url)
+    expect(result).not.toContain('glpat-abcdefghijklmno')
+    expect(result).toContain('glpat-ab****lmno')
+    expect(result).toContain('oauth2:')
+  })
+
+  it('masks token in hostless token@ URL without oauth2 prefix', () => {
+    const url = 'https://glpat-abcdefghijklmno@'
+    const result = sanitizeUrl(url)
+    expect(result).not.toContain('glpat-abcdefghijklmno')
+    expect(result).toContain('glpat-ab****lmno')
+  })
 })
