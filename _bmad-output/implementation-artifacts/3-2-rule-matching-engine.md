@@ -1,6 +1,6 @@
 # Story 3.2: 规则匹配引擎
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -18,25 +18,25 @@ So that 知道哪些文件需要安装到哪里。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建 `src/stages/match-rules.ts` — Match 管道阶段 (AC: #1-5)
-  - [ ] 1.1 实现 `matchRules(env: DetectedEnv, args: ParsedArgs, reporter: Reporter): Promise<MatchedPlan>`
-  - [ ] 1.2 使用 `RULE_INDEX`（Story 1.4 构建的 Map）按 `${tool.id}:${scope}` 查找规则
-  - [ ] 1.3 对每个检测到的工具，查找其对应 scope 的所有规则
-  - [ ] 1.4 `--dirs` 过滤：如果 `args.dirs` 非空，只保留 `rule.sourceDir` 在 `args.dirs` 中的规则
-  - [ ] 1.5 源文件扫描：对每条规则，在 `repo.repoDir` 中扫描 `rule.sourceDir` 目录下的文件
-  - [ ] 1.6 排除过滤：使用 `DEFAULT_EXCLUDES` 过滤掉不需要的文件
-  - [ ] 1.7 目标路径计算：使用 `PathResolver` 解析 `rule.targetDir` 中的路径模板
-  - [ ] 1.8 构建 `MatchedPlan`：每个匹配项包含 rule、sourceFiles、targetPath
-  - [ ] 1.9 调用 `reporter.startPhase('匹配安装规则...')` 输出进度
-- [ ] Task 2: 实现源文件扫描逻辑 (AC: #3, #5)
-  - [ ] 2.1 `files` 类型：扫描 sourceDir 下所有文件（不递归子目录）
-  - [ ] 2.2 `directories` 类型：扫描 sourceDir 下所有子目录（每个子目录作为一个安装单元）
-  - [ ] 2.3 `flatten` 类型：扫描 sourceDir 下所有子目录，每个子目录的内容将被合并到 mainFile
-  - [ ] 2.4 所有类型都应用 `DEFAULT_EXCLUDES` 过滤
-- [ ] Task 3: 编写单元测试 (AC: #1-5)
-  - [ ] 3.1 `tests/stages/match-rules.test.ts`
-  - [ ] 3.2 测试用例：单工具全局匹配、多工具匹配、--dirs 过滤、排除列表过滤、files/directories/flatten 三种类型扫描、空目录处理
-  - [ ] 3.3 Mock fs 操作（readdir）、注入 mock PathResolver、使用 fixture 目录结构
+- [x] Task 1: 创建 `src/stages/match-rules.ts` — Match 管道阶段 (AC: #1-5)
+  - [x] 1.1 实现 `matchRules(env: DetectedEnv, args: ParsedArgs, reporter: Reporter): Promise<MatchedPlan>`
+  - [x] 1.2 使用 `RULE_INDEX`（Story 1.4 构建的 Map）按 `${tool.id}:${scope}` 查找规则
+  - [x] 1.3 对每个检测到的工具，查找其对应 scope 的所有规则
+  - [x] 1.4 `--dirs` 过滤：如果 `args.dirs` 非空，只保留 `rule.sourceDir` 在 `args.dirs` 中的规则
+  - [x] 1.5 源文件扫描：对每条规则，在 `repo.repoDir` 中扫描 `rule.sourceDir` 目录下的文件
+  - [x] 1.6 排除过滤：使用 `DEFAULT_EXCLUDES` 过滤掉不需要的文件
+  - [x] 1.7 目标路径计算：使用 `PathResolver` 解析 `rule.targetDir` 中的路径模板
+  - [x] 1.8 构建 `MatchedPlan`：每个匹配项包含 rule、sourceFiles、targetPath
+  - [x] 1.9 调用 `reporter.startPhase('匹配安装规则...')` 输出进度
+- [x] Task 2: 实现源文件扫描逻辑 (AC: #3, #5)
+  - [x] 2.1 `files` 类型：扫描 sourceDir 下所有文件（不递归子目录）
+  - [x] 2.2 `directories` 类型：扫描 sourceDir 下所有子目录（每个子目录作为一个安装单元）
+  - [x] 2.3 `flatten` 类型：扫描 sourceDir 下所有子目录，每个子目录的内容将被合并到 mainFile
+  - [x] 2.4 所有类型都应用 `DEFAULT_EXCLUDES` 过滤
+- [x] Task 3: 编写单元测试 (AC: #1-5)
+  - [x] 3.1 `tests/stages/match-rules.test.ts`
+  - [x] 3.2 测试用例：单工具全局匹配、多工具匹配、--dirs 过滤、排除列表过滤、files/directories/flatten 三种类型扫描、空目录处理
+  - [x] 3.3 Mock fs 操作（readdir）、注入 mock PathResolver、使用 fixture 目录结构
 
 ## Dev Notes
 
@@ -183,8 +183,40 @@ function resolveTargetDir(
 
 ### Agent Model Used
 
+claude-sonnet-4-5 (claude-code)
+
 ### Debug Log References
+
+- `types.ts` 中的 `MatchedPlan` 类型与 Story Dev Notes 存在差异：`sourceFiles: string[]`（绝对路径）而非 `SourceFile[]`（含 relativePath + absolutePath）。以 `types.ts` 为准（遵循 project-context.md 规则）
+- `readdir` 返回类型 `Dirent<string>` vs `Dirent<NonSharedBuffer>` TS 兼容性问题：使用 `any[]` + 内联类型注解解决（clone.ts 存在同样的预存在问题）
 
 ### Completion Notes List
 
+- **实现文件:** `src/stages/match-rules.ts` — Match 管道阶段主函数 `matchRules()`，含 `scanSourceFiles()` 和 `resolveTargetDir()` 辅助函数
+- **测试文件:** `tests/stages/match-rules.test.ts` — 20 个测试用例，覆盖所有 AC
+- **全量回归:** 366 个测试通过（本 Story 新增 20 个），0 失败
+- **Lint:** ESLint 无警告；Prettier 已通过（CR Round-1 修复后）
+- **关键设计决策:**
+  - `scanSourceFiles()` 对 ENOENT/ENOTDIR 静默返回 `[]`（遵循空目录处理规范）
+  - `resolveTargetDir()` 全局路径去掉 `~/` 前缀后拼接 `pathResolver.home()`，项目路径使用 `process.cwd()`（MVP 简化）
+  - 使用 `any[]` 类型规避 `Dirent<NonSharedBuffer>` 兼容性问题（与 clone.ts 保持一致的处理方式）
+
+### ⚠️ 已知问题（待 Story 4.6a 修复）
+
+**`matchRules()` 签名与 `pipeline.ts` 中 `MatchFn` 类型契约不一致：**
+
+- `MatchFn`（`pipeline.ts:73-77`）期望三参数：`(env: DetectedEnv, args: ParsedArgs, reporter: Reporter) => Promise<MatchedPlan>`
+- `matchRules()`（`match-rules.ts:107`）实际为五参数：`(repo: LocalRepo, env: DetectedEnv, args: ParsedArgs, reporter: Reporter, pathResolver: PathResolver) => Promise<MatchedPlan>`
+
+**原因：** `matchRules()` 需要 `repo.repoDir`（源文件扫描路径）和 `pathResolver`（目标路径解析），这两个依赖在 Story 3-2 中通过显式参数注入（便于测试）。`MatchFn` 类型尚未反映此设计。
+
+**影响范围：** 不影响 Story 3-2 自身功能及测试；影响 Story 4.6a（pipeline 集成接线）时的编排逻辑。
+
+**建议修复方案（Story 4.6a）：** 更新 `MatchFn` 类型签名，将 `repo` 和 `pathResolver` 纳入；或在 pipeline 编排层用闭包包装 `matchRules()` 以适配现有 `MatchFn` 接口。来源：CR Round-1 发现 #1 评估结论。
+
 ### File List
+
+- `src/stages/match-rules.ts` (新增)
+- `tests/stages/match-rules.test.ts` (新增)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (修改)
+- `_bmad-output/implementation-artifacts/3-2-rule-matching-engine.md` (修改)

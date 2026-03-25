@@ -59,7 +59,7 @@ development_status:
   # Epic 3: 智能检测与安装规划
   epic-3: in-progress
   3-1-ai-tool-auto-detection: done
-  3-2-rule-matching-engine: ready-for-dev
+  3-2-rule-matching-engine: done
   3-3-dry-run-preview-and-install-plan: ready-for-dev
   epic-3-retrospective: optional
 
