@@ -16,9 +16,11 @@ FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
 NEW_STRING=$(echo "$INPUT" | jq -r '.tool_input.new_string // .tool_input.content // empty')
 
 # 规则文档清单（Rule Document Registry）
+# 与 CLAUDE.md 中 Rule Document Registry 保持一致
 RULE_DOCS=(
   "_bmad-output/project-context.md"
   "_bmad-output/planning-artifacts/architecture/04-implementation-patterns.md"
+  "_bmad-output/planning-artifacts/architecture/03-core-decisions.md"
 )
 
 # ── Hook 1: 修改了规则文档本身 ──────────────────────────────────────────────
@@ -55,7 +57,7 @@ if [[ "$FILE_PATH" == */src/* ]] || [[ "$FILE_PATH" == */tests/* ]]; then
 fi
 
 if $is_business_code; then
-  RULE_KEYWORDS=("豁免" "规则边界" "已确认豁免" "exemption" "override" "规则变更" "约定变更" "仅约束")
+  RULE_KEYWORDS=("豁免" "规则边界" "已确认豁免" "exemption" "rule override" "规则变更" "约定变更" "仅约束")
 
   for kw in "${RULE_KEYWORDS[@]}"; do
     if echo "$NEW_STRING" | grep -qF "$kw"; then
@@ -74,7 +76,7 @@ fi
 
 # ── Hook 3: story 文件 + CR 写入特征 ────────────────────────────────────────
 is_story_file=false
-if echo "$FILE_PATH" | grep -qE '_bmad-output/implementation-artifacts/[0-9]+-[0-9]+-.*\.md$'; then
+if echo "$FILE_PATH" | grep -qE '_bmad-output/implementation-artifacts/[0-9]+-[0-9]+-[^/]*\.md$'; then
   is_story_file=true
 fi
 
