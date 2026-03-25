@@ -50,7 +50,8 @@ current_activity:
     - "_bmad-output/implementation-artifacts/sprint-status.yaml"
   completed_epics:
     - epic-1: "done"  # 项目基础设施与核心框架 — 5/5 Stories 完成（2026-03-23）
-  notes: "Epic 1（Foundation Sprint）已全部完成，Epic 2 开发中 — Story 2.1, 2.2, 2.3, 2.4 已完成（2.4 经 3 轮跨 LLM CR 收敛：GPT-5.4 审查 × Claude Opus 4.6 评估，31 测试 / 319 全仓）"
+    - epic-2: "done"  # 知识仓库获取与认证 — 5/5 Stories 完成（2026-03-25）
+  notes: "Epic 1 + Epic 2 已全部完成，Story 2.5 经 3 轮跨 LLM CR 收敛后 Approved（GPT-5.4 审查 × Claude Sonnet 4 评估+修复），13 测试 / 330 全仓"
   next_steps:
-    - "使用 Dev agent 的 dev-story 工作流，继续 Epic 2 Story 2.5 实现"
-    - "按 Epic 顺序推进：Epic 2（剩余 2.5）→ 3 → 4 → 5"
+    - "Epic 2 Retrospective（可选）"
+    - "按 Epic 顺序推进：Epic 3 → 4 → 5"

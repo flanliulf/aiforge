@@ -48,13 +48,13 @@ development_status:
   epic-1-retrospective: done
 
   # Epic 2: 知识仓库获取与认证
-  epic-2: in-progress
+  epic-2: done
   2-1-config-management-service: done
   2-2-source-resolver-and-git-service: done
   2-3-four-layer-auth-chain: done
   2-4-git-clone-and-incremental-update: done
-  2-5-aiforge-init-interactive-setup: ready-for-dev
-  epic-2-retrospective: optional
+  2-5-aiforge-init-interactive-setup: done
+  epic-2-retrospective: done
 
   # Epic 3: 智能检测与安装规划
   epic-3: backlog

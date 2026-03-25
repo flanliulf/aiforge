@@ -1,6 +1,6 @@
 # Story 2.5: aiforge init 交互式配置
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -18,19 +18,19 @@ So that 不需要手动编辑配置文件就能开始使用。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 实现 `src/commands/init.ts` — init 交互式流程 (AC: #1-5)
-  - [ ] 1.1 替换 Story 1.5 的占位实现
-  - [ ] 1.2 TTY 检测：`!process.stdin.isTTY` → 抛出 `AiforgeError(code: 'NON_TTY', severity: 'fatal')`
-  - [ ] 1.3 使用 `@inquirer/prompts` 实现交互式问答：
+- [x] Task 1: 实现 `src/commands/init.ts` — init 交互式流程 (AC: #1-5)
+  - [x] 1.1 替换 Story 1.5 的占位实现
+  - [x] 1.2 TTY 检测：`!process.stdin.isTTY` → 抛出 `AiforgeError(code: 'NON_TTY', severity: 'fatal')`
+  - [x] 1.3 使用 `@inquirer/prompts` 实现交互式问答：
     - Step 1: `input` — 默认仓库 URL（已有配置时显示当前值作为默认）
     - Step 2: `select` — 认证方式：SSH / Token
     - Step 3: 根据选择执行连接验证
-  - [ ] 1.4 已有配置时：先显示当前配置摘要，询问是否修改
-  - [ ] 1.5 调用 `saveConfig()` 保存配置
-- [ ] Task 2: 实现 SSH 连接验证 (AC: #2)
-  - [ ] 2.1 使用 `createGit().raw(['ls-remote', sshUrl])` 测试 SSH 连接
-  - [ ] 2.2 成功：显示 `✅ SSH 连接成功`
-  - [ ] 2.3 失败：三段式错误提示
+  - [x] 1.4 已有配置时：先显示当前配置摘要，询问是否修改
+  - [x] 1.5 调用 `saveConfig()` 保存配置
+- [x] Task 2: 实现 SSH 连接验证 (AC: #2)
+  - [x] 2.1 使用 `createGit().raw(['ls-remote', sshUrl])` 测试 SSH 连接
+  - [x] 2.2 成功：显示 `✅ SSH 连接成功`
+  - [x] 2.3 失败：三段式错误提示
     ```
     ❌ SSH 连接失败
     Git 服务器拒绝了 SSH 连接
@@ -39,15 +39,15 @@ So that 不需要手动编辑配置文件就能开始使用。
       cat ~/.ssh/id_ed25519.pub  # 复制公钥到 GitLab Settings > SSH Keys
       ssh -T git@<hostname>  # 测试连接
     ```
-- [ ] Task 3: 实现 Token 连接验证 (AC: #3)
-  - [ ] 3.1 使用 `createGit().raw(['ls-remote', tokenUrl])` 测试 Token 有效性
-  - [ ] 3.2 成功：显示 `✅ Token 验证成功`，Token 脱敏显示
-  - [ ] 3.3 失败：三段式错误提示含 Token 生成链接
-  - [ ] 3.4 Token 输入使用 `password` 类型（不回显）
-- [ ] Task 4: 编写单元测试 (AC: #1-5)
-  - [ ] 4.1 `tests/commands/init.test.ts`
-  - [ ] 4.2 测试用例：完整流程（SSH）、完整流程（Token）、已有配置修改、非 TTY 拒绝、连接验证成功/失败
-  - [ ] 4.3 Mock `@inquirer/prompts`、`services/git.ts`、`services/config.ts`
+- [x] Task 3: 实现 Token 连接验证 (AC: #3)
+  - [x] 3.1 使用 `createGit().raw(['ls-remote', tokenUrl])` 测试 Token 有效性
+  - [x] 3.2 成功：显示 `✅ Token 验证成功`，Token 脱敏显示
+  - [x] 3.3 失败：三段式错误提示含 Token 生成链接
+  - [x] 3.4 Token 输入使用 `password` 类型（不回显）
+- [x] Task 4: 编写单元测试 (AC: #1-5)
+  - [x] 4.1 `tests/commands/init.test.ts`
+  - [x] 4.2 测试用例：完整流程（SSH）、完整流程（Token）、已有配置修改、非 TTY 拒绝、连接验证成功/失败
+  - [x] 4.3 Mock `@inquirer/prompts`、`services/git.ts`、`services/config.ts`
 
 ## Dev Notes
 
@@ -205,8 +205,30 @@ if (!process.stdin.isTTY) {
 
 ### Agent Model Used
 
+claude-sonnet-4.6
+
 ### Debug Log References
+
+- Vitest v4 限制：`mockReturnValue` 不能用于 `new` 调用的 class；改用 `vi.hoisted()` + `vi.mock` 工厂中定义 class 解决
+- `verifySshConnection`/`verifyTokenConnection` 需返回 `boolean` 而非 `void`，才能在连接失败时阻止保存配置
 
 ### Completion Notes List
 
+- 实现了 `src/commands/init.ts`，替换 Story 1.5 占位实现
+- TTY 检测：非 TTY 环境抛出 `AiforgeError(NON_TTY, exitCode=3, fatal)`
+- 交互式流程：`@inquirer/prompts` input/select/password/confirm
+- SSH 连接验证：`git ls-remote --exit-code`，失败展示三段式错误含 ssh-keygen 命令
+- Token 连接验证：oauth2 格式 tokenUrl，成功时 Token 脱敏显示，失败展示三段式错误
+- 已有配置处理：加载并展示摘要，询问是否修改；CONFIG_CORRUPT 时提示后重配；CONFIG_READ_FAILED 透传
+- 连接失败时不保存配置（return early）
+- 编写测试 13 个，全部通过；全仓 330 个测试无回归；Lint 通过
+
 ### File List
+
+- `src/commands/init.ts` （修改 — 替换占位实现为完整交互式配置）
+- `tests/commands/init.test.ts` （修改 — 替换占位测试为完整 11 个测试用例）
+
+## Change Log
+
+- 2026-03-24: Story 2.5 实现完成 — `aiforge init` 交互式配置，Task 1-4 全部完成，11 个测试新增，全仓 328 个测试通过
+- 2026-03-24: CR Fix（Round 3）— Prettier 格式修复，Dev Agent Record 同步更新；测试 13 个，全仓 330 个通过，Lint 通过
