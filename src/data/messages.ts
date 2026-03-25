@@ -37,3 +37,11 @@ export function STATS_FORMAT(
 ): string {
   return `安装: ${installed} 项  更新: ${updated} 项  跳过: ${skipped} 项  失败: ${failed} 项`
 }
+
+/**
+ * dry-run 计划统计行
+ * 格式: 计划安装: N 项 (M 个工具)
+ */
+export function PLAN_STATS_FORMAT(totalFiles: number, toolCount: number): string {
+  return `计划安装: ${totalFiles} 项 (${toolCount} 个工具)`
+}

@@ -61,6 +61,7 @@ export interface MatchedPlan {
     rule: InstallRule
     sourceFiles: string[]
     targetPath: string
+    mode: 'copy' | 'symlink'
   }>
 }
 

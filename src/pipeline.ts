@@ -1,12 +1,15 @@
 /**
  * 管道编排器 — 阶段链骨架
  *
- * 来源: Story 1.5 Task 2 — 管道编排器
+ * 来源: Story 1.5 Task 2 — 管道编排器 / Story 3.3 — dry-run 预览与安装计划
  * 架构: architecture/03-core-decisions.md#D6
  *
  * 阶段链: Resolve → Auth → Clone → Detect → Match → [Install] → Report
  * 每个阶段为占位函数，抛出"未实现"错误
  * dryRun 为 true 时跳过 Install 阶段
+ *
+ * Story 3.3: 新增 createProductionStages(pathResolver) 工厂函数
+ * 将 detect/match 占位替换为真实实现（通过闭包注入 pathResolver）
  */
 
 import type {
@@ -19,7 +22,10 @@ import type {
   InstallResult,
 } from './core/types.js'
 import type { Reporter } from './core/reporter.js'
+import type { PathResolver } from './core/path-resolver.js'
 import { AiforgeError, EXIT_INSTALL_FAILURE } from './core/errors.js'
+import { detectTools } from './stages/detect-tools.js'
+import { matchRules } from './stages/match-rules.js'
 
 // 重导出供 index.ts 使用，维持模块边界: index.ts → pipeline.ts + commands/
 export type { ParsedArgs } from './core/types.js'
@@ -144,6 +150,37 @@ export const DEFAULT_STAGES: PipelineStages = {
   match,
   install,
   report,
+}
+
+/**
+ * createProductionStages — 生产环境阶段集合工厂
+ *
+ * 来源: Story 3.3 Task 2 — 替换 detect/match 占位为真实实现
+ *
+ * 将 detect/match 阶段替换为真实实现（detectTools/matchRules），
+ * 通过闭包注入 pathResolver（避免修改 DetectFn/MatchFn 类型签名）。
+ * resolve/auth/clone/install 仍为占位实现（由 Epic 2/4 负责替换）。
+ *
+ * @param pathResolver - 路径解析器（生产环境用 UnixPathResolver）
+ */
+export function createProductionStages(pathResolver: PathResolver): PipelineStages {
+  // 用于在 match 阶段闭包中保存 clone 阶段输出的 repo 信息
+  // 注意：repo 由 clone 阶段填充，match 阶段读取（通过共享变量传递）
+  let lastRepo: LocalRepo = { repoDir: '', isNew: false, sourceFiles: [] }
+
+  return {
+    resolve,
+    authenticate,
+    clone: async (authed, args, reporter) => {
+      const repo = await clone(authed, args, reporter)
+      lastRepo = repo
+      return repo
+    },
+    detect: (repo, args, reporter) => detectTools(repo, args, reporter, pathResolver),
+    match: (env, args, reporter) => matchRules(lastRepo, env, args, reporter, pathResolver),
+    install,
+    report,
+  }
 }
 
 /**

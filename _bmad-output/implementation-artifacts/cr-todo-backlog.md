@@ -7,9 +7,9 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 2 |
+| 🔴 open | 3 |
 | 🟡 in-progress | 0 |
-| ✅ resolved | 0 |
+| ✅ resolved | 1 |
 
 ---
 
@@ -28,14 +28,25 @@
 - **状态**: open
 - **解决记录**:
 
-### TODO-002: `detectTools` 函数签名与 `DetectFn` 类型不匹配，pipeline 集成需适配
+### TODO-003: CLI 入口接线 `createProductionStages()` 工厂函数
 
-- **来源**: Story 3-1 CR round 1-2 (2026-03-25)
+- **来源**: Story 3-3 CR evaluation round 1-2 (2026-03-25)
 - **优先级**: P2
 - **类别**: tech-debt
-- **描述**: `detectTools(repo, args, reporter, pathResolver)` 有 4 个参数，而 `pipeline.ts` 中 `DetectFn = (repo, args, reporter) => Promise<DetectedEnv>` 只有 3 个参数（缺少 `pathResolver`）。将 detect 阶段接入 pipeline 时需决定：修改 `DetectFn` 类型签名加入 `pathResolver`，或通过闭包/偏函数在接入层适配。此问题在 Round 1 评估中首次发现，Round 2 CR 和评估中均确认保留为观察项。
-- **涉及文件**: `src/stages/detect-tools.ts`, `src/pipeline.ts`
-- **建议时机**: Epic 3/4 中负责 pipeline 阶段接入的 Story
+- **描述**: `src/index.ts:49` 调用 `runPipeline(args, reporter)` 未传入第三参数 `stages`，因此使用 `DEFAULT_STAGES`（全占位）。`createProductionStages(pathResolver)` 工厂函数已就绪（`pipeline.ts:166-184`），但 resolve/auth/clone 阶段仍为占位，接线需等 Epic 2 实现前序阶段后一并完成。届时改为 `runPipeline(args, reporter, createProductionStages(new UnixPathResolver()))`。
+- **涉及文件**: `src/index.ts`, `src/pipeline.ts`
+- **建议时机**: Epic 2 中实现 resolve/auth/clone 真实阶段的 Story
+- **状态**: open
+- **解决记录**:
+
+### TODO-004: flatten 目标路径精度回补（dry-run 预览需体现重命名语义）
+
+- **来源**: Story 3-3 CR evaluation round 2 (2026-03-25)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: 当前 `reporter.ts` 的 `resolveFileTarget()` 对 flatten 类型使用 `join(targetPath, basename(srcFile))`，输出为 `~/.cursor/rules/code-review`（目录名），但 PRD 定义 flatten 应提取主文件并重命名为 `code-review.md`。精确输出需要 `InstallRule` 类型引入 `mainFile` 字段并实现主文件提取逻辑——这属于 Epic 4 Story 4.3 的核心能力。待 4.3 实现后，reporter 层需同步更新 flatten 的目标路径计算，并补充对应测试断言。
+- **涉及文件**: `src/core/reporter.ts`, `src/core/types.ts`, `tests/stages/report.test.ts`
+- **建议时机**: Epic 4 Story 4.3（符号链接与 flatten 模式）完成后
 - **状态**: open
 - **解决记录**:
 
@@ -45,7 +56,16 @@
 
 <!-- 已解决事项归档于此，保留用于回顾 -->
 
-_当前无已解决事项。_
+### TODO-002: `detectTools` 函数签名与 `DetectFn` 类型不匹配，pipeline 集成需适配
+
+- **来源**: Story 3-1 CR round 1-2 (2026-03-25)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: `detectTools(repo, args, reporter, pathResolver)` 有 4 个参数，而 `pipeline.ts` 中 `DetectFn = (repo, args, reporter) => Promise<DetectedEnv>` 只有 3 个参数（缺少 `pathResolver`）。将 detect 阶段接入 pipeline 时需决定：修改 `DetectFn` 类型签名加入 `pathResolver`，或通过闭包/偏函数在接入层适配。
+- **涉及文件**: `src/stages/detect-tools.ts`, `src/pipeline.ts`
+- **建议时机**: Epic 3/4 中负责 pipeline 阶段接入的 Story
+- **状态**: resolved
+- **解决记录**: Story 3-3 中通过 `createProductionStages(pathResolver)` 工厂函数解决，使用闭包适配 3 参数 `DetectFn` → 4 参数 `detectTools` 调用（`pipeline.ts:179`）。
 
 ---
 

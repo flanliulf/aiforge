@@ -57,11 +57,11 @@ development_status:
   epic-2-retrospective: done
 
   # Epic 3: 智能检测与安装规划
-  epic-3: in-progress
+  epic-3: done
   3-1-ai-tool-auto-detection: done
   3-2-rule-matching-engine: done
-  3-3-dry-run-preview-and-install-plan: ready-for-dev
-  epic-3-retrospective: optional
+  3-3-dry-run-preview-and-install-plan: done
+  epic-3-retrospective: done
 
   # Epic 4: 安装执行与冲突保护
   epic-4: backlog

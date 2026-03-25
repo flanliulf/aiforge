@@ -1,7 +1,7 @@
 /**
  * match-rules — Match 管道阶段
  *
- * 来源: Story 3.2 — 规则匹配引擎
+ * 来源: Story 3.2 — 规则匹配引擎 / Story 3.3 — dry-run 预览与安装计划
  * 架构: architecture/03-core-decisions.md#D2, D6
  *
  * 逻辑：
@@ -10,7 +10,8 @@
  *   3. 对每条规则扫描 repoDir 下的源文件（files/directories/flatten 三种类型）
  *   4. 应用 DEFAULT_EXCLUDES 过滤
  *   5. 使用 PathResolver 解析目标路径
- *   6. 构建 MatchedPlan 返回
+ *   6. 推导安装模式（copy/symlink）— Story 3.3 新增
+ *   7. 构建 MatchedPlan 返回
  */
 
 import { join } from 'node:path'
@@ -19,11 +20,38 @@ import type { LocalRepo, ParsedArgs, DetectedEnv, MatchedPlan, InstallRule } fro
 import { InstallType } from '../core/types.js'
 import type { Reporter } from '../core/reporter.js'
 import type { PathResolver } from '../core/path-resolver.js'
+import { AiforgeError } from '../core/errors.js'
+import { EXIT_ARG_ERROR } from '../core/errors.js'
 import { RULE_INDEX } from '../data/install-rules.js'
 import { DEFAULT_EXCLUDES } from '../data/excludes.js'
 import { MESSAGES } from '../data/messages.js'
 
-// ── 目标路径解析 ─────────────────────────────────────────────────
+// ── 安装模式推导 ─────────────────────────────────────────────────────────────
+
+/**
+ * 推导安装模式（copy 或 symlink）
+ *
+ * 规则（来源: Story 3.3 Dev Notes + FR-021 + project-context.md）：
+ * - scope === 'project' && args.link → 抛出 LINK_PROJECT_REJECTED（fatal）
+ * - scope === 'global' && args.link → symlink
+ * - 否则 → copy
+ */
+function getInstallMode(args: ParsedArgs, scope: 'global' | 'project'): 'copy' | 'symlink' {
+  if (args.link && scope === 'project') {
+    throw new AiforgeError(
+      '符号链接模式不支持项目级安装',
+      'LINK_PROJECT_REJECTED',
+      EXIT_ARG_ERROR,
+      'fatal',
+      '-l/--link 仅支持全局安装模式（-g）',
+      ['npx aiforge -g -l <repo>  # 全局 + 符号链接'],
+    )
+  }
+  if (args.link && scope === 'global') return 'symlink'
+  return 'copy'
+}
+
+// ── 目标路径解析 ─────────────────────────────────────────────────────────────
 
 /**
  * 解析 rule.targetDir 中的路径模板
@@ -48,7 +76,7 @@ function resolveTargetDir(
   return join(process.cwd(), rule.targetDir)
 }
 
-// ── 源文件扫描 ───────────────────────────────────────────────────
+// ── 源文件扫描 ───────────────────────────────────────────────────────────────
 
 /**
  * 扫描规则对应的源文件列表
@@ -99,14 +127,14 @@ async function scanSourceFiles(repoDir: string, rule: InstallRule): Promise<stri
   }
 }
 
-// ── 主入口 ───────────────────────────────────────────────────────
+// ── 主入口 ───────────────────────────────────────────────────────────────────
 
 /**
  * matchRules — Match 管道阶段主函数
  *
  * @param repo - 上一阶段传入的本地仓库信息（含 repoDir）
  * @param env - 检测到的工具和安装 scope
- * @param args - 解析后的 CLI 参数（读取 dirs）
+ * @param args - 解析后的 CLI 参数（读取 dirs、link）
  * @param reporter - 输出报告器
  * @param pathResolver - 路径解析器（可注入 mock，便于测试）
  */
@@ -118,6 +146,10 @@ export async function matchRules(
   pathResolver: PathResolver,
 ): Promise<MatchedPlan> {
   reporter.startPhase(MESSAGES.phases.match)
+
+  // 推导安装模式（在循环外推导，同一次调用的所有规则使用相同模式）
+  // LINK_PROJECT_REJECTED 校验在此提前执行，尽早发现参数错误
+  const mode = getInstallMode(args, env.scope)
 
   const items: MatchedPlan['items'] = []
 
@@ -138,7 +170,7 @@ export async function matchRules(
       // 解析目标路径
       const targetPath = resolveTargetDir(rule, env.scope, pathResolver)
 
-      items.push({ rule, sourceFiles, targetPath })
+      items.push({ rule, sourceFiles, targetPath, mode })
     }
   }
 
