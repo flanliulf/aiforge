@@ -51,7 +51,7 @@ current_activity:
   completed_epics:
     - epic-1: "done"  # 项目基础设施与核心框架 — 5/5 Stories 完成（2026-03-23）
     - epic-2: "done"  # 知识仓库获取与认证 — 5/5 Stories 完成（2026-03-25）
-  notes: "Epic 3 进行中，Story 3.1 经 2 轮跨 LLM CR 收敛后 Approved（GPT-5.4 审查 × Claude Opus 4.6 评估），16 测试 / 346 全仓"
+  notes: "Epic 3 进行中，Story 3.2 经 2 轮跨 LLM CR 收敛后 Approved（GPT-5.4 审查 × Claude Sonnet 4 评估），20 测试 / 366 全仓。已知遗留：matchRules() 签名与 MatchFn 契约不一致，延迟至 Story 4.6a 修复"
   next_steps:
-    - "继续 Epic 3：Story 3.2 Rule Matching Engine"
+    - "继续 Epic 3：Story 3.3 Dry-Run Preview and Install Plan"
     - "按 Epic 顺序推进：Epic 3 → 4 → 5"
