@@ -51,7 +51,7 @@ current_activity:
   completed_epics:
     - epic-1: "done"  # 项目基础设施与核心框架 — 5/5 Stories 完成（2026-03-23）
     - epic-2: "done"  # 知识仓库获取与认证 — 5/5 Stories 完成（2026-03-25）
-  notes: "Epic 1 + Epic 2 已全部完成，Story 2.5 经 3 轮跨 LLM CR 收敛后 Approved（GPT-5.4 审查 × Claude Sonnet 4 评估+修复），13 测试 / 330 全仓"
+  notes: "Epic 3 进行中，Story 3.1 经 2 轮跨 LLM CR 收敛后 Approved（GPT-5.4 审查 × Claude Opus 4.6 评估），16 测试 / 346 全仓"
   next_steps:
-    - "Epic 2 Retrospective（可选）"
+    - "继续 Epic 3：Story 3.2 Rule Matching Engine"
     - "按 Epic 顺序推进：Epic 3 → 4 → 5"

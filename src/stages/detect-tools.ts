@@ -1,0 +1,188 @@
+/**
+ * detect-tools — Detect 管道阶段
+ *
+ * 来源: Story 3.1 — AI 工具自动检测
+ * 架构: architecture/03-core-decisions.md#D5
+ *
+ * 逻辑：
+ *   1. 手动指定模式（args.tools 非空）：按 ID 查注册表，无效 ID → UNKNOWN_TOOL 错误
+ *   2. 自动检测模式：同时扫描全局（home()）和项目（cwd()）两侧标志路径，任一侧命中即视为已安装
+ *   3. 无工具检测到 → 诊断输出 + NO_TOOLS 错误（fatal）
+ *   4. scope 由 args.global 决定（不影响检测范围，只影响后续安装范围）
+ */
+
+import { join } from 'node:path'
+import { access } from 'node:fs/promises'
+import type { LocalRepo, ParsedArgs, DetectedEnv } from '../core/types.js'
+import type { Reporter } from '../core/reporter.js'
+import type { PathResolver } from '../core/path-resolver.js'
+import { AiforgeError } from '../core/errors.js'
+import { EXIT_ARG_ERROR, EXIT_INSTALL_FAILURE } from '../core/errors.js'
+import { TOOL_DEFINITIONS } from '../data/tool-registry.js'
+import { MESSAGES } from '../data/messages.js'
+
+// ── fs 存在性检查（ENOENT/ENOTDIR 白名单降级）──────────────────
+
+/**
+ * 检查路径是否存在
+ *
+ * 规则：仅对 ENOENT（不存在）和 ENOTDIR（路径组件非目录）降级为 false，
+ * 其他错误（EACCES 权限拒绝、EIO I/O 错误等）向上抛出。
+ * 来源: project-context.md — fs 存在性检查必须使用 ENOENT/ENOTDIR 白名单降级
+ */
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await access(p)
+    return true
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === 'ENOENT' || code === 'ENOTDIR') {
+      return false
+    }
+    // 权限错误、I/O 错误等向上抛出
+    throw error
+  }
+}
+
+// ── 单工具检测 ──────────────────────────────────────────────────
+
+/**
+ * 检测单个工具是否存在
+ * 同时扫描全局（home() 基准）和项目（cwd() 基准）两侧标志路径
+ * 任一侧命中即返回 true
+ *
+ * 注意：TOOL_DEFINITIONS 中 global 路径带 `~` 前缀（如 `~/.copilot`），
+ * 检测时去掉 `~` 使用 pathResolver.home() 拼接真实路径
+ */
+async function detectSingleTool(
+  tool: { detect: { global: string[]; project: string[] } },
+  pathResolver: PathResolver,
+): Promise<boolean> {
+  const globalBase = pathResolver.home()
+  const projectBase = process.cwd()
+
+  // 扫描全局侧
+  for (const flagPath of tool.detect.global) {
+    // 去掉 `~` 前缀（如 `~/.copilot` → `.copilot`），拼接 home 目录
+    const normalizedFlag = flagPath.replace(/^~[/\\]?/, '')
+    const fullPath = join(globalBase, normalizedFlag)
+    if (await pathExists(fullPath)) {
+      return true
+    }
+  }
+
+  // 扫描项目侧
+  for (const flagPath of tool.detect.project) {
+    const fullPath = join(projectBase, flagPath)
+    if (await pathExists(fullPath)) {
+      return true
+    }
+  }
+
+  return false
+}
+
+// ── 诊断输出 ────────────────────────────────────────────────────
+
+/**
+ * 输出诊断信息：扫描路径 + 每个工具检测标志 + 建议
+ * 来源: Story 3.1 Task 2 — 诊断输出格式（FR-015）
+ */
+function emitDiagnostics(reporter: Reporter, pathResolver: PathResolver): void {
+  const globalBase = pathResolver.home()
+  const projectBase = process.cwd()
+
+  const lines: string[] = ['❌ 未检测到任何 AI 编码工具', '', '扫描路径：']
+
+  // 列出每个工具的全局侧标志路径
+  const globalFlags = TOOL_DEFINITIONS.flatMap((t) =>
+    t.detect.global.map((f) => {
+      const normalized = f.replace(/^~[/\\]?/, '')
+      return `  全局: ${join(globalBase, normalized)} (不存在)`
+    }),
+  )
+  // 列出每个工具的项目侧标志路径
+  const projectFlags = TOOL_DEFINITIONS.flatMap((t) =>
+    t.detect.project.map((f) => `  项目: ${join(projectBase, f)} (不存在)`),
+  )
+
+  lines.push(...globalFlags, ...projectFlags)
+  lines.push('', '建议：')
+  lines.push('  1. 安装 GitHub Copilot、Claude Code、Cursor 或 VS Code')
+  lines.push(`  2. 使用 --tools ${TOOL_DEFINITIONS.map((t) => t.id).join(' ')} 手动指定工具`)
+
+  reporter.warn(lines.join('\n'))
+}
+
+// ── 主入口 ──────────────────────────────────────────────────────
+
+/**
+ * detectTools — Detect 管道阶段主函数
+ *
+ * @param repo - 上一阶段传入的本地仓库信息（透传到 DetectedEnv，供下游使用）
+ * @param args - 解析后的 CLI 参数（读取 tools / global）
+ * @param reporter - 输出报告器
+ * @param pathResolver - 路径解析器（可注入 mock，便于测试）
+ */
+export async function detectTools(
+  _repo: LocalRepo,
+  args: ParsedArgs,
+  reporter: Reporter,
+  pathResolver: PathResolver,
+): Promise<DetectedEnv> {
+  reporter.startPhase(MESSAGES.phases.detect)
+
+  const scope: 'global' | 'project' = args.global ? 'global' : 'project'
+
+  // ── 手动指定模式 ────────────────────────────────────────────
+  if (args.tools && args.tools.length > 0) {
+    const tools = args.tools.map((id) => {
+      const def = TOOL_DEFINITIONS.find((t) => t.id === id)
+      if (!def) {
+        throw new AiforgeError(
+          `未知的工具 ID: ${id}`,
+          'UNKNOWN_TOOL',
+          EXIT_ARG_ERROR,
+          'fatal',
+          `工具 ID "${id}" 在注册表中不存在`,
+          [
+            `支持的工具: ${TOOL_DEFINITIONS.map((t) => t.id).join(', ')}`,
+            `npx aiforge --tools ${TOOL_DEFINITIONS.map((t) => t.id).join(' ')}`,
+          ],
+        )
+      }
+      return def.id
+    })
+
+    reporter.completePhase()
+    return { tools, scope }
+  }
+
+  // ── 自动检测模式 ────────────────────────────────────────────
+  const detectedTools: string[] = []
+
+  for (const toolDef of TOOL_DEFINITIONS) {
+    if (await detectSingleTool(toolDef, pathResolver)) {
+      detectedTools.push(toolDef.id)
+    }
+  }
+
+  // ── 无工具处理 ──────────────────────────────────────────────
+  if (detectedTools.length === 0) {
+    emitDiagnostics(reporter, pathResolver)
+    throw new AiforgeError(
+      '未检测到任何 AI 编码工具',
+      'NO_TOOLS',
+      EXIT_INSTALL_FAILURE,
+      'fatal',
+      '在全局目录和项目目录中均未找到支持工具的标志文件',
+      [
+        '安装 GitHub Copilot、Claude Code、Cursor 或 VS Code',
+        `使用 --tools <id> 手动指定工具，支持: ${TOOL_DEFINITIONS.map((t) => t.id).join(', ')}`,
+      ],
+    )
+  }
+
+  reporter.completePhase()
+  return { tools: detectedTools, scope }
+}

@@ -1,6 +1,6 @@
 # Story 3.1: AI 工具自动检测
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -19,23 +19,23 @@ So that 不需要手动指定就能为所有工具安装配置。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建 `src/stages/detect-tools.ts` — Detect 管道阶段 (AC: #1-6)
-  - [ ] 1.1 实现 `detectTools(repo: LocalRepo, args: ParsedArgs, reporter: Reporter): Promise<DetectedEnv>`
-  - [ ] 1.2 手动指定模式：`args.tools` 非空时，按 ID 在 `TOOL_DEFINITIONS` 中查找，无效 ID → `AiforgeError(code: 'UNKNOWN_TOOL', severity: 'fatal')`
-  - [ ] 1.3 自动检测模式：遍历 `TOOL_DEFINITIONS`，对每个工具同时检查全局和项目两侧的标志路径，任一侧命中即视为已安装
-  - [ ] 1.4 全局侧检测：使用 `pathResolver.home()` 作为基准路径，拼接 `detect.global[]` 中的标志路径检查存在性（注意：`pathResolver.toolGlobalDir()` 是 aiforge 自身的安装目标目录，不是真实工具目录，检测阶段不使用）
-  - [ ] 1.5 项目侧检测：使用 `process.cwd()` 作为基准路径，拼接 `detect.project[]` 中的标志路径检查存在性
-  - [ ] 1.6 确定安装范围 `scope`：`args.global` → 'global'，否则 → 'project'（scope 决定安装范围，不决定检测范围——检测始终扫描两侧）
-  - [ ] 1.7 无工具检测到 → 诊断输出 + `AiforgeError(code: 'NO_TOOLS', severity: 'fatal')`
-  - [ ] 1.8 调用 `reporter.startPhase('检测 AI 工具...')` 输出进度
-- [ ] Task 2: 实现诊断输出 (AC: #4)
-  - [ ] 2.1 列出所有扫描的路径（全局 + 项目）
-  - [ ] 2.2 列出每个工具的标志文件及检测结果
-  - [ ] 2.3 建议用户安装工具或使用 `--tools` 手动指定
-- [ ] Task 3: 编写单元测试 (AC: #1-6)
-  - [ ] 3.1 `tests/stages/detect-tools.test.ts`
-  - [ ] 3.2 测试用例：单工具检测、多工具检测、手动指定、无效 ID 报错、无工具诊断、性能 < 500ms
-  - [ ] 3.3 Mock `fs.access`/`fs.stat` 模拟标志路径存在/不存在，注入 mock PathResolver
+- [x] Task 1: 创建 `src/stages/detect-tools.ts` — Detect 管道阶段 (AC: #1-6)
+  - [x] 1.1 实现 `detectTools(repo: LocalRepo, args: ParsedArgs, reporter: Reporter): Promise<DetectedEnv>`
+  - [x] 1.2 手动指定模式：`args.tools` 非空时，按 ID 在 `TOOL_DEFINITIONS` 中查找，无效 ID → `AiforgeError(code: 'UNKNOWN_TOOL', severity: 'fatal')`
+  - [x] 1.3 自动检测模式：遍历 `TOOL_DEFINITIONS`，对每个工具同时检查全局和项目两侧的标志路径，任一侧命中即视为已安装
+  - [x] 1.4 全局侧检测：使用 `pathResolver.home()` 作为基准路径，拼接 `detect.global[]` 中的标志路径检查存在性（注意：`pathResolver.toolGlobalDir()` 是 aiforge 自身的安装目标目录，不是真实工具目录，检测阶段不使用）
+  - [x] 1.5 项目侧检测：使用 `process.cwd()` 作为基准路径，拼接 `detect.project[]` 中的标志路径检查存在性
+  - [x] 1.6 确定安装范围 `scope`：`args.global` → 'global'，否则 → 'project'（scope 决定安装范围，不决定检测范围——检测始终扫描两侧）
+  - [x] 1.7 无工具检测到 → 诊断输出 + `AiforgeError(code: 'NO_TOOLS', severity: 'fatal')`
+  - [x] 1.8 调用 `reporter.startPhase('检测 AI 工具...')` 输出进度
+- [x] Task 2: 实现诊断输出 (AC: #4)
+  - [x] 2.1 列出所有扫描的路径（全局 + 项目）
+  - [x] 2.2 列出每个工具的标志文件及检测结果
+  - [x] 2.3 建议用户安装工具或使用 `--tools` 手动指定
+- [x] Task 3: 编写单元测试 (AC: #1-6)
+  - [x] 3.1 `tests/stages/detect-tools.test.ts`
+  - [x] 3.2 测试用例：单工具检测、多工具检测、手动指定、无效 ID 报错、无工具诊断、性能 < 500ms
+  - [x] 3.3 Mock `fs.access`/`fs.stat` 模拟标志路径存在/不存在，注入 mock PathResolver
 
 ## Dev Notes
 
@@ -157,8 +157,28 @@ if (args.tools && args.tools.length > 0) {
 
 ### Agent Model Used
 
+claude-sonnet-4.6
+
 ### Debug Log References
+
+无阻塞问题。关键实现决策：
+- `DetectedEnv.tools` 实际类型为 `string[]`（工具 ID），以 `src/core/types.ts` 已定义代码为准（Story Dev Notes 中的 `ToolDefinition[]` 为示意）
+- `TOOL_DEFINITIONS` global 路径带 `~` 前缀（如 `~/.copilot`），检测时通过 `replace(/^~[/\\]?/, '')` 去掉 `~`，再用 `pathResolver.home()` 拼接
+- `pathResolver` 作为第 4 个参数注入（依赖注入），便于测试 mock
+- fs 存在性检查遵循 ENOENT/ENOTDIR 白名单降级规则（project-context.md）
 
 ### Completion Notes List
 
+- 实现 `src/stages/detect-tools.ts`：detectTools 主函数 + detectSingleTool 单工具检测 + emitDiagnostics 诊断输出 + pathExists ENOENT/ENOTDIR 白名单降级
+- 创建 `tests/stages/detect-tools.test.ts`：16 个测试用例，覆盖全部 AC（#1-6）
+- 测试结果：本 Story 16 个测试，全仓 346 个测试全部通过
+- Lint: 零报错
+
 ### File List
+
+- `src/stages/detect-tools.ts` (新增)
+- `tests/stages/detect-tools.test.ts` (新增)
+
+## Change Log
+
+- 2026-03-25: Story 3.1 实现完成。新增 detect-tools 管道阶段及 16 个单元测试，覆盖手动指定、自动检测、多工具、无工具诊断、性能、fs 错误白名单降级等全部验收标准。
