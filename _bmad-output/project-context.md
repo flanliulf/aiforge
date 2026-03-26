@@ -111,6 +111,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - **catch 降级必须逐码白名单：** 禁止创建辅助函数（如 `isConfigError()`）将多个错误码归类后批量降级。每个被降级的错误码必须逐个 `error.code === 'XXX'` 匹配，并在注释中单独说明降级理由。如需对新错误码降级，逐码新增 `||` 条件并附带独立注释。（来源：Story 2-3 CR — `isConfigError()` 将 `CONFIG_NOT_FOUND`/`CONFIG_CORRUPT`/`CONFIG_READ_FAILED` 统一降级，掩盖了配置损坏的真实根因）
 - **fs 存在性检查必须使用 ENOENT/ENOTDIR 白名单降级：** 使用 `fs.access()` / `fs.stat()` 判断文件/目录是否存在时，禁止 `catch { return false }` 无差别降级。仅对 `error.code === 'ENOENT'`（不存在）和 `error.code === 'ENOTDIR'`（路径组件非目录）降级为 `false`，其他错误（`EACCES` 权限拒绝、`EIO` I/O 错误等）必须向上抛出。否则权限问题会被误判为"不存在"，导致后续逻辑走错分支。（来源：Story 2-4 CR — `hasLocalRepo()` 和 `dirExists()` 各出现一次同样问题，共 3 轮 CR 才彻底收敛）
 - **CR 修复引入的新函数/新代码必须贯彻同等规则标准：** 修复 A 函数的问题时若新增了 B 辅助函数，B 必须遵循与 A 相同的规则。修复者提交前应自查：新增的每个函数/分支是否与项目规则一致。（来源：Story 2-4 CR — 修复 `hasLocalRepo()` 的 catch 问题时新增 `dirExists()`，但 `dirExists()` 重复了同样的 `catch {}` 错误，被下一轮 CR 发现）
+- **CR 修复必须审查同一函数中所有并行分支：** 修复某个函数的特定分支时，必须审查同一函数中所有并行分支是否存在同类问题，并在修复记录中逐分支列出审查结论（"该分支是否需要同等修复？"→ 是/否 + 理由）。禁止只修复被 CR 指出的具体分支而不审查并行分支——这是导致"修复引入对称性回归"的主要原因。（来源：Story 4-1 CR — Round 3 修复 symlink 逃逸仅在 `targetStat === null` 分支添加 realpath 校验，遗漏 `isSymbolicLink()` 和 `isDirectory()` 分支，导致 P0 安全问题延续到 Round 4 才关闭）
 - **新增 AiforgeError 错误码必须同步补负向测试：** 新增 `try/catch` + `throw new AiforgeError(NEW_CODE)` 的错误处理分支时，必须同步补至少 1 条负向测试，强制触发该分支并断言 `code` 和 `severity`。否则回归保护为零，后续重构可能无感知地回退为 raw Error。（来源：Story 2-4 CR — Round 1 修复新增 `SANITIZE_REMOTE_FAILED`/`SCAN_FAILED` 但无测试，Round 2 发现）
 - **InstallResult status 只有三种：** `'new'` | `'updated'` | `'skipped'`（无 `'failed'`——I/O 错误直接抛 fatal，hash 相同或用户选择跳过为 `'skipped'`）
 
@@ -139,6 +140,8 @@ index.ts → pipeline.ts → stages/* → services/*
 - All logs/errors use `sanitizeToken()` from `core/sanitize.ts`
 - config.json file permissions: `0o600` (user-only read/write)
 - Token display format: `glpat-ab****mnop` (first 8 + `****` + last 4 chars); short tokens (<= 12 chars): first 4 + `****` (no tail)
+- **symlink 感知的文件系统 API 选用规则：** 当代码路径链中涉及"判断文件系统条目类型"和"对同一路径执行操作"两步时，必须确保两步的 symlink 跟随语义一致。`lstat()` 不跟随 symlink（用于识别 symlink 本身）；`stat()` 跟随 symlink（用于获取最终目标类型）；`access()` 跟随 symlink（对 broken symlink 返回 ENOENT，不是权限错误）；`realpath()` 解析 symlink 返回物理路径（用于路径安全校验）。引入这些 API 时必须自查：(1) 后续对同一路径的操作是否跟随 symlink？若是，前面的判断也应使用 `stat`；(2) 使用 `lstat` 判断类型时，是否需要对 `isSymbolicLink()` 单独分支处理？(3) 路径安全校验是否使用了 `realpath()` 而非 `resolve()`？（来源：Story 4-1 CR — `lstat + isDirectory` 未处理 symlink→directory 祖先导致 3 轮回归）
+- **路径安全校验必须使用 `realpath()` 双边比较：** 路径安全边界校验（如 `startsWith` 前缀检查防止路径遍历）必须对被校验路径和安全根路径分别执行 `realpath()`，然后对物理路径做比较。禁止使用 `resolve()` 做安全校验——`resolve()` 是纯字符串操作，不解析 symlink，无法防止 symlink 逃逸。对不存在的路径，应对路径链中已存在的最深祖先目录执行 `realpath()`，拼接不存在的尾部部分后做前缀比较。（来源：Story 4-1 CR — `validatePathSecurity` 使用 `resolve()` 做字符串前缀匹配，symlink 指向外部的路径绕过安全检查，2 轮 CR 才完全修复）
 - **sanitizeToken 边界验证：** 实现脱敏逻辑时，必须验证阈值边界处（token 长度恰好等于阈值）脱敏后不可逆推原文
 - **sanitizeUrl 必须处理 `oauth2:token@host` 格式：** GitLab 标准 token URL 为 `https://oauth2:${token}@host/repo.git`，脱敏时只处理冒号后的凭据部分，保留 `oauth2:` 前缀
 - **脱敏函数必须覆盖边界形态输入：** sanitizeToken/sanitizeUrl 的正则/匹配逻辑必须覆盖用户可能构造的边界形态输入（如不完整 URL、缺少 host 的 URL、尾部截断的 token）。新增任何 `AiforgeError` 的 `why` 字段时，检查是否包含用户原始输入——如果是，必须通过 sanitizeUrl/sanitizeToken 处理，不能有"漏调"

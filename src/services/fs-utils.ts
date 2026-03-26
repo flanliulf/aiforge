@@ -1,0 +1,469 @@
+/**
+ * services/fs-utils.ts
+ *
+ * 文件操作工具集与预检查逻辑
+ * - 依赖 core/（AiforgeError、MatchedPlan、PathResolver）和 Node.js 内置模块
+ * - 不依赖 stages/、data/、commands/
+ */
+
+import {
+  copyFile as fsCopyFile,
+  mkdir,
+  cp,
+  symlink,
+  unlink,
+  lstat,
+  stat,
+  access,
+  constants,
+  realpath,
+} from 'node:fs/promises'
+import { createReadStream } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { join, resolve, dirname } from 'node:path'
+
+import { AiforgeError, EXIT_INSTALL_FAILURE } from '../core/errors.js'
+import type { MatchedPlan } from '../core/types.js'
+import type { PathResolver } from '../core/path-resolver.js'
+
+// ── PreflightResult ──────────────────────────────────────────────────────────
+
+export interface PreflightResult {
+  ok: true
+  dirsToCreate: string[]
+}
+
+// ── copyFile ─────────────────────────────────────────────────────────────────
+
+/**
+ * 复制单个文件到目标路径。
+ * 自动创建目标父目录（如不存在）。
+ */
+export async function copyFile(src: string, dest: string): Promise<void> {
+  try {
+    await mkdir(dirname(dest), { recursive: true })
+    await fsCopyFile(src, dest)
+  } catch (error) {
+    throw new AiforgeError(
+      `无法复制文件: ${src} → ${dest}`,
+      'FILE_COPY_FAILED',
+      EXIT_INSTALL_FAILURE,
+      'fatal',
+      `复制文件时出错: ${errorMessage(error)}`,
+      [`检查源文件是否存在: ${src}`, `检查目标目录是否可写: ${dirname(dest)}`],
+    )
+  }
+}
+
+// ── copyDir ──────────────────────────────────────────────────────────────────
+
+/**
+ * 递归复制整个目录到目标路径。
+ */
+export async function copyDir(src: string, dest: string): Promise<void> {
+  try {
+    await cp(src, dest, { recursive: true })
+  } catch (error) {
+    throw new AiforgeError(
+      `无法复制目录: ${src} → ${dest}`,
+      'DIR_COPY_FAILED',
+      EXIT_INSTALL_FAILURE,
+      'fatal',
+      `复制目录时出错: ${errorMessage(error)}`,
+      [`检查源目录是否存在: ${src}`, `检查目标目录是否可写: ${dirname(dest)}`],
+    )
+  }
+}
+
+// ── createSymlink ────────────────────────────────────────────────────────────
+
+/**
+ * 创建符号链接。如果 linkPath 已存在（文件或链接），先删除再创建。
+ * 自动创建父目录（如不存在）。
+ */
+export async function createSymlink(target: string, linkPath: string): Promise<void> {
+  try {
+    await mkdir(dirname(linkPath), { recursive: true })
+    // 如果已存在旧链接/文件，先删除
+    try {
+      await lstat(linkPath)
+      await unlink(linkPath)
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw e
+      }
+    }
+    await symlink(target, linkPath)
+  } catch (error) {
+    if (error instanceof AiforgeError) throw error
+    throw new AiforgeError(
+      `无法创建符号链接: ${target} → ${linkPath}`,
+      'SYMLINK_CREATE_FAILED',
+      EXIT_INSTALL_FAILURE,
+      'fatal',
+      `创建符号链接时出错: ${errorMessage(error)}`,
+      [`检查 linkPath 的父目录是否可写`, `检查 target 路径是否有效: ${target}`],
+    )
+  }
+}
+
+// ── backupFile ───────────────────────────────────────────────────────────────
+
+/**
+ * 备份文件，返回备份路径。
+ * 备份文件命名规则: `<原路径>.aiforge-backup-YYYYMMDD`
+ */
+export async function backupFile(filePath: string): Promise<string> {
+  try {
+    const backupPath = getBackupPath(filePath)
+    await fsCopyFile(filePath, backupPath)
+    return backupPath
+  } catch (error) {
+    throw new AiforgeError(
+      `无法备份文件: ${filePath}`,
+      'BACKUP_FAILED',
+      EXIT_INSTALL_FAILURE,
+      'fatal',
+      `备份文件时出错: ${errorMessage(error)}`,
+      [`检查源文件是否存在: ${filePath}`, `检查目录是否可写: ${dirname(filePath)}`],
+    )
+  }
+}
+
+function getBackupPath(filePath: string): string {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  return `${filePath}.aiforge-backup-${date}`
+}
+
+// ── ensureDir ────────────────────────────────────────────────────────────────
+
+/**
+ * 确保目录存在（递归创建）。幂等操作，目录已存在不报错。
+ */
+export async function ensureDir(dirPath: string): Promise<void> {
+  try {
+    await mkdir(dirPath, { recursive: true })
+  } catch (error) {
+    throw new AiforgeError(
+      `无法创建目录: ${dirPath}`,
+      'ENSURE_DIR_FAILED',
+      EXIT_INSTALL_FAILURE,
+      'fatal',
+      `创建目录时出错: ${errorMessage(error)}`,
+      [`检查父目录是否可写: ${dirname(dirPath)}`, `检查路径是否与已存在的文件冲突`],
+    )
+  }
+}
+
+// ── isWritable ───────────────────────────────────────────────────────────────
+
+/**
+ * 检查目录是否可写且可遍历（W_OK | X_OK）。
+ * 目录不存在返回 false；其他 I/O 错误向上抛出。
+ * 使用 W_OK | X_OK 而非仅 W_OK，以正确处理 `0o222`（有写权限但无执行/遍历权限）
+ * 等边界情况，确保实际文件写入不会在 preflight 之后意外失败（POSIX 精确性）。
+ */
+export async function isWritable(dirPath: string): Promise<boolean> {
+  try {
+    await access(dirPath, constants.W_OK | constants.X_OK)
+    return true
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === 'ENOENT' || code === 'ENOTDIR') {
+      return false
+    }
+    if (code === 'EACCES') {
+      return false
+    }
+    throw error
+  }
+}
+
+// ── fileHash ─────────────────────────────────────────────────────────────────
+
+/**
+ * 计算文件的 SHA256 hash，返回十六进制字符串（64 chars）。
+ */
+export async function fileHash(filePath: string): Promise<string> {
+  try {
+    return await new Promise<string>((resolveP, rejectP) => {
+      const hash = createHash('sha256')
+      const stream = createReadStream(filePath)
+      stream.on('data', (data) => hash.update(data))
+      stream.on('end', () => resolveP(hash.digest('hex')))
+      stream.on('error', rejectP)
+    })
+  } catch (error) {
+    throw new AiforgeError(
+      `无法计算文件 hash: ${filePath}`,
+      'FILE_HASH_FAILED',
+      EXIT_INSTALL_FAILURE,
+      'fatal',
+      `计算 SHA256 hash 时出错: ${errorMessage(error)}`,
+      [`检查文件是否存在: ${filePath}`, `检查文件是否可读`],
+    )
+  }
+}
+
+// ── preflight ────────────────────────────────────────────────────────────────
+
+/**
+ * 安装预检查：验证所有目标路径的父目录可写性和路径安全性。
+ *
+ * - 路径遍历检测：目标路径 resolve() 后必须在 allowedRoot 下
+ * - 可写性检查：对每个目标路径的父目录执行 W_OK 检查
+ * - 不存在目录标记：记录需要创建的目录列表
+ * - fail-fast：首个不可写路径即抛出 PERMISSION_DENIED
+ *
+ * allowedRoot 由 pathResolver + plan item scope 自动推导：
+ *   - scope='global' → pathResolver.home()
+ *   - scope='project' → process.cwd()
+ *
+ * @param plan         匹配的安装计划
+ * @param pathResolver PathResolver 实例，用于推导 allowedRoot
+ */
+export async function preflight(
+  plan: MatchedPlan,
+  pathResolver: PathResolver,
+): Promise<PreflightResult> {
+  const dirsToCreate: string[] = []
+
+  for (const item of plan.items) {
+    const targetPath = item.targetPath
+    // 根据 scope 推导 allowedRoot（全局 → home，项目 → cwd）
+    const allowedRoot = item.rule.scope === 'global' ? pathResolver.home() : process.cwd()
+
+    // 1. 路径遍历检测（NFR-S5）
+    validatePathSecurity(targetPath, allowedRoot)
+
+    // 2. 判断目标路径的状态并检查可写性
+    await checkTargetWritability(targetPath, dirsToCreate, allowedRoot)
+  }
+
+  return { ok: true, dirsToCreate }
+}
+
+/**
+ * 验证 targetPath 在 allowedRoot 范围内（防路径遍历）。
+ * 使用 resolve() 做字符串层面的基础检查（排除 `..` 等路径穿越）。
+ * 注意：此函数不跟随 symlink，symlink 逃逸由 validateAncestorRealpath() 处理。
+ */
+function validatePathSecurity(targetPath: string, allowedRoot: string): void {
+  const resolved = resolve(targetPath)
+  const root = resolve(allowedRoot)
+  if (!resolved.startsWith(join(root, '/')) && resolved !== root) {
+    throw new AiforgeError(
+      '检测到路径遍历攻击',
+      'PATH_TRAVERSAL',
+      EXIT_INSTALL_FAILURE,
+      'fatal',
+      `目标路径 ${targetPath} 超出允许范围 ${allowedRoot}`,
+      ['检查安装规则中的 targetDir 配置'],
+    )
+  }
+}
+
+/**
+ * 对已存在的祖先目录进行 realpath 验证，防止 symlink 逃逸绕过 allowedRoot。
+ *
+ * resolve() 不跟随 symlink，仅做纯字符串规范化。若路径链中存在指向 allowedRoot
+ * 之外的 symlink，validatePathSecurity() 无法发现。此函数通过 realpath() 获取
+ * 祖先目录和 allowedRoot 的真实物理路径，然后重新做 startsWith 检查。
+ *
+ * @param ancestorDir  findExistingAncestor() 返回的已存在祖先目录（用于 realpath）
+ * @param allowedRoot  preflight 推导的安全根目录
+ * @throws AiforgeError(PATH_TRAVERSAL) 当真实路径逃逸 allowedRoot 时
+ */
+async function validateAncestorRealpath(ancestorDir: string, allowedRoot: string): Promise<void> {
+  const realAncestor = await realpath(ancestorDir)
+  const realRoot = await realpath(allowedRoot)
+  if (!realAncestor.startsWith(join(realRoot, '/')) && realAncestor !== realRoot) {
+    throw new AiforgeError(
+      '检测到 symlink 逃逸路径遍历攻击',
+      'PATH_TRAVERSAL',
+      EXIT_INSTALL_FAILURE,
+      'fatal',
+      `目标路径祖先 ${ancestorDir} 经 symlink 解析后真实路径 ${realAncestor} 超出允许范围 ${allowedRoot}（真实根：${realRoot}）`,
+      ['检查路径链中是否存在指向 allowedRoot 之外的符号链接', '检查安装规则中的 targetDir 配置'],
+    )
+  }
+}
+
+/**
+ * 向上遍历路径，找到第一个实际存在的祖先目录。
+ * 用于处理嵌套不存在目录（如 /tmp/a/b/c，a/b/c 都不存在时，返回 /tmp）。
+ *
+ * @throws AiforgeError(PATH_NOT_DIRECTORY) 当路径链中某段存在但不是目录时
+ */
+async function findExistingAncestor(targetPath: string): Promise<string> {
+  let current = dirname(resolve(targetPath))
+  while (true) {
+    try {
+      const entryStat = await lstat(current)
+      if (entryStat.isSymbolicLink()) {
+        // symlink：跟随链接确认目标类型
+        let linkTargetStat
+        try {
+          linkTargetStat = await stat(current)
+        } catch {
+          // broken symlink（目标不存在）：无法在其下创建子路径
+          throw new AiforgeError(
+            `路径链中存在损坏的符号链接: ${current}`,
+            'PATH_NOT_DIRECTORY',
+            EXIT_INSTALL_FAILURE,
+            'fatal',
+            `${current} 是损坏的符号链接（目标不存在），无法在其下创建子路径`,
+            [`检查路径配置，确保安装目标路径的父级均为目录`],
+          )
+        }
+        if (!linkTargetStat.isDirectory()) {
+          // symlink 指向非目录（如文件），无法在其下创建子路径
+          throw new AiforgeError(
+            `路径链中存在指向非目录的符号链接: ${current}`,
+            'PATH_NOT_DIRECTORY',
+            EXIT_INSTALL_FAILURE,
+            'fatal',
+            `${current} 是符号链接但目标不是目录，无法在其下创建子路径`,
+            [`检查路径配置，确保安装目标路径的父级均为目录`],
+          )
+        }
+      } else if (!entryStat.isDirectory()) {
+        // 路径链中存在一个非目录条目（如文件），无法在其下创建子路径
+        throw new AiforgeError(
+          `路径链中存在非目录条目: ${current}`,
+          'PATH_NOT_DIRECTORY',
+          EXIT_INSTALL_FAILURE,
+          'fatal',
+          `${current} 存在但不是目录，无法在其下创建子路径`,
+          [`检查路径配置，确保安装目标路径的父级均为目录`],
+        )
+      }
+      return current
+    } catch (e) {
+      if (e instanceof AiforgeError) throw e
+      const code = (e as NodeJS.ErrnoException).code
+      if (code === 'ENOENT' || code === 'ENOTDIR') {
+        const parent = dirname(current)
+        if (parent === current) {
+          // 已到根目录仍不存在（不应发生）
+          return current
+        }
+        current = parent
+      } else {
+        throw e
+      }
+    }
+  }
+}
+
+/**
+ * 检查目标路径的可写性：
+ * - 目标不存在 → 找到已存在祖先目录，做 realpath 安全校验 + 可写性检查，标记需创建
+ * - 目标为目录 → 做 realpath 安全校验（防路径链祖先 symlink 逃逸），通过后交 4.4/4.5
+ * - 目标为 symlink → 做 realpath 安全校验（防 symlink 本身指向外部），通过后允许覆盖
+ * - 目标为文件 → 检查目标本身可写性
+ *
+ * fail-fast：不可写或 realpath 逃逸时立即抛出对应错误
+ */
+async function checkTargetWritability(
+  targetPath: string,
+  dirsToCreate: string[],
+  allowedRoot: string,
+): Promise<void> {
+  // lstat the target to determine its existence and type
+  type TargetStat = Awaited<ReturnType<typeof lstat>>
+  let targetStat: TargetStat | null
+
+  try {
+    targetStat = await lstat(targetPath)
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code
+    if (code === 'ENOENT' || code === 'ENOTDIR') {
+      targetStat = null
+    } else if (code === 'EACCES') {
+      // 父目录不可读时 lstat 报 EACCES，当作目标不存在处理
+      // (可写性检查会在 findExistingAncestor + isWritable 流程中发现权限问题)
+      targetStat = null
+    } else {
+      throw e
+    }
+  }
+
+  if (targetStat === null) {
+    // 目标不存在 → 向上遍历找到第一个存在的祖先目录，检查其可写性
+    const ancestorDir = await findExistingAncestor(targetPath)
+    // symlink 逃逸校验：对已存在的祖先目录做 realpath 验证（NFR-S5 深度防护）
+    await validateAncestorRealpath(ancestorDir, allowedRoot)
+    const parentWritable = await isWritable(ancestorDir)
+    if (!parentWritable) {
+      throw new AiforgeError(
+        `目标路径父目录不可写: ${ancestorDir}`,
+        'PERMISSION_DENIED',
+        EXIT_INSTALL_FAILURE,
+        'fatal',
+        `无法在 ${ancestorDir} 中创建文件，权限不足`,
+        [
+          `检查目录权限: ls -la ${dirname(ancestorDir)}`,
+          `尝试以 sudo 运行，或联系系统管理员修复权限`,
+        ],
+      )
+    }
+    // 标记需要创建
+    dirsToCreate.push(targetPath)
+  } else if (targetStat.isDirectory()) {
+    // 目录类型 → 做 realpath 安全校验防止路径链中祖先 symlink 逃逸（NFR-S5）
+    await validateAncestorRealpath(targetPath, allowedRoot)
+    // 通过后交 4.4/4.5 处理冲突检测
+  } else if (targetStat.isSymbolicLink()) {
+    // 符号链接 → 需区分 broken symlink 和有效 symlink：
+    // - broken symlink（目标不存在）：无法 realpath，但 symlink 模式会先删除再创建，直接通过
+    // - 有效 symlink（目标存在）：做 realpath 安全校验，防止 symlink 本身指向 allowedRoot 外部（NFR-S5）
+    let symlinkTargetExists = true
+    try {
+      await stat(targetPath) // 跟随 symlink 检查目标是否存在
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
+        symlinkTargetExists = false
+      } else {
+        throw e
+      }
+    }
+    if (symlinkTargetExists) {
+      await validateAncestorRealpath(targetPath, allowedRoot)
+    }
+    // broken symlink 直接通过（symlink 模式会先 unlink 再创建）
+  } else {
+    // 普通文件 → 检查目标本身可写
+    let writable: boolean
+    try {
+      await access(targetPath, constants.W_OK)
+      writable = true
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code
+      if (code === 'EACCES') {
+        writable = false
+      } else if (code === 'ENOENT' || code === 'ENOTDIR') {
+        writable = false
+      } else {
+        throw e
+      }
+    }
+    if (!writable) {
+      throw new AiforgeError(
+        `目标文件不可写: ${targetPath}`,
+        'PERMISSION_DENIED',
+        EXIT_INSTALL_FAILURE,
+        'fatal',
+        `无法写入文件 ${targetPath}，权限不足`,
+        [`检查文件权限: ls -la ${targetPath}`, `尝试以 sudo 运行，或联系系统管理员修复权限`],
+      )
+    }
+  }
+}
+
+// ── internal helpers ─────────────────────────────────────────────────────────
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  return String(error)
+}

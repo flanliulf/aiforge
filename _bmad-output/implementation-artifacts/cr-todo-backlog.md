@@ -7,7 +7,7 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 3 |
+| 🔴 open | 4 |
 | 🟡 in-progress | 0 |
 | ✅ resolved | 1 |
 
@@ -50,9 +50,18 @@
 - **状态**: open
 - **解决记录**:
 
----
+### TODO-005: 质量门禁验证的完整执行流程规则增强
 
-## Resolved Items
+- **来源**: Story 4-1 CR round 1-5 (2026-03-25 ~ 2026-03-26)
+- **优先级**: P2
+- **类别**: other
+- **描述**: 现有 "CR 修复后必须同步更新 Story Dev Agent Record" 规则已覆盖意图，但执行不到位，需增强为具体操作流程。CR 修复完成后，必须按以下顺序执行完整验证并将每项结果逐行更新到 Story Dev Agent Record：(1) `npm test` — 记录通过数（含新增测试的增量说明）；(2) `npm run lint` — 记录 error/warning 数（含 Prettier 格式检查）；(3) `npm run build` — 记录构建状态。禁止：只执行部分验证（如只跑 test 不跑 lint）；复用上轮的验证结果（每次修复后必须重新执行）；在验证未全部通过时更新 Story 记录为"通过"。Story 4-1 CR 中该问题出现 3 次：Round 1 lint error 漏报、Round 2 Prettier 问题漏报、Round 3 测试计数过期。
+- **涉及文件**: `_bmad-output/project-context.md`, `_bmad-output/planning-artifacts/architecture/04-implementation-patterns.md`
+- **建议时机**: 下一次 Sprint 规划或规则文档专项维护时
+- **状态**: open
+- **解决记录**:
+
+---
 
 <!-- 已解决事项归档于此，保留用于回顾 -->
 

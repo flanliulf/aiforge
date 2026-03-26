@@ -1,6 +1,6 @@
 # Story 4.1: 文件操作工具与预检查
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -18,25 +18,25 @@ So that 不会在安装过程中因权限问题半途失败。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建 `src/services/fs-utils.ts` — 文件操作工具集 (AC: #1)
-  - [ ] 1.1 实现 `copyFile(src: string, dest: string): Promise<void>` — 单文件复制
-  - [ ] 1.2 实现 `copyDir(src: string, dest: string): Promise<void>` — 递归目录复制
-  - [ ] 1.3 实现 `createSymlink(target: string, linkPath: string): Promise<void>` — 符号链接创建
-  - [ ] 1.4 实现 `backupFile(filePath: string): Promise<string>` — 备份文件，返回备份路径
-  - [ ] 1.5 实现 `ensureDir(dirPath: string): Promise<void>` — 确保目录存在（递归创建）
-  - [ ] 1.6 实现 `isWritable(dirPath: string): Promise<boolean>` — 检查目录可写性
-  - [ ] 1.7 实现 `fileHash(filePath: string): Promise<string>` — 计算文件 SHA256 hash
-  - [ ] 1.8 所有路径操作使用 `path.join()`，不拼接字符串
-- [ ] Task 2: 实现预检查逻辑 (AC: #2-5)
-  - [ ] 2.1 实现 `preflight(plan: MatchedPlan, pathResolver: PathResolver): Promise<PreflightResult>`
-  - [ ] 2.2 路径遍历检测：目标路径 `resolve()` 后必须在预期根目录下
-  - [ ] 2.3 可写性检查：对每个目标路径的父目录执行 `fs.access(dir, fs.constants.W_OK)`
-  - [ ] 2.4 不存在目录标记：记录需要创建的目录列表
-  - [ ] 2.5 fail-fast：首个不可写路径即抛出 `AiforgeError(code: 'PERMISSION_DENIED', severity: 'fatal')`
-- [ ] Task 3: 编写单元测试 (AC: #1-5)
-  - [ ] 3.1 `tests/services/fs-utils.test.ts` — 各工具函数的正常和异常路径
-  - [ ] 3.2 预检查测试：可写路径通过、不可写路径 fail-fast、路径遍历拒绝、不存在目录标记
-  - [ ] 3.3 使用临时目录（`os.tmpdir()`）进行真实文件操作测试
+- [x] Task 1: 创建 `src/services/fs-utils.ts` — 文件操作工具集 (AC: #1)
+  - [x] 1.1 实现 `copyFile(src: string, dest: string): Promise<void>` — 单文件复制
+  - [x] 1.2 实现 `copyDir(src: string, dest: string): Promise<void>` — 递归目录复制
+  - [x] 1.3 实现 `createSymlink(target: string, linkPath: string): Promise<void>` — 符号链接创建
+  - [x] 1.4 实现 `backupFile(filePath: string): Promise<string>` — 备份文件，返回备份路径
+  - [x] 1.5 实现 `ensureDir(dirPath: string): Promise<void>` — 确保目录存在（递归创建）
+  - [x] 1.6 实现 `isWritable(dirPath: string): Promise<boolean>` — 检查目录可写性
+  - [x] 1.7 实现 `fileHash(filePath: string): Promise<string>` — 计算文件 SHA256 hash
+  - [x] 1.8 所有路径操作使用 `path.join()`，不拼接字符串
+- [x] Task 2: 实现预检查逻辑 (AC: #2-5)
+  - [x] 2.1 实现 `preflight(plan: MatchedPlan, pathResolver: PathResolver): Promise<PreflightResult>`
+  - [x] 2.2 路径遍历检测：目标路径 `resolve()` 后必须在预期根目录下
+  - [x] 2.3 可写性检查：对每个目标路径的父目录执行 `fs.access(dir, fs.constants.W_OK)`
+  - [x] 2.4 不存在目录标记：记录需要创建的目录列表
+  - [x] 2.5 fail-fast：首个不可写路径即抛出 `AiforgeError(code: 'PERMISSION_DENIED', severity: 'fatal')`
+- [x] Task 3: 编写单元测试 (AC: #1-5)
+  - [x] 3.1 `tests/services/fs-utils.test.ts` — 各工具函数的正常和异常路径
+  - [x] 3.2 预检查测试：可写路径通过、不可写路径 fail-fast、路径遍历拒绝、不存在目录标记
+  - [x] 3.3 使用临时目录（`os.tmpdir()`）进行真实文件操作测试
 
 ## Dev Notes
 
@@ -150,8 +150,50 @@ async function fileHash(filePath: string): Promise<string> {
 
 ### Agent Model Used
 
+claude-sonnet-4-6 (2026-03-25)
+
 ### Debug Log References
+
+- `fileHash` 使用 `node:fs` 的 `createReadStream`（同步模块），不用 `node:fs/promises` — ESM 中流式读取需要同步 API
+- `checkTargetWritability` 对 EACCES 降级为 null（而非抛出）：macOS 上对只读目录下的子路径调用 `lstat` 也会报 EACCES，按 ENOENT 处理更符合"目标不存在"语义，可写性问题会在后续 `isWritable` 检查中被发现
+- `findExistingAncestor` 向上遍历找到第一个存在的祖先目录，解决嵌套不存在目录（如 `/a/b/c` 全不存在）时无法直接对父目录调 `isWritable` 的问题
 
 ### Completion Notes List
 
+- 实现 `src/services/fs-utils.ts`，包含：`copyFile`、`copyDir`、`createSymlink`、`backupFile`、`ensureDir`、`isWritable`、`fileHash`、`preflight` 及 `PreflightResult` 接口
+- 所有路径操作使用 `path.join()`/`path.dirname()`/`path.resolve()`，无字符串拼接（AC #1）
+- `preflight` 实现路径遍历检测（NFR-S5）、父目录可写性检查（FR-030）、不存在目录标记（NFR-R2）、fail-fast PERMISSION_DENIED（AC #4）
+- 测试文件 `tests/services/fs-utils.test.ts`：30 个测试用例，覆盖所有 AC（正常路径 + 负向路径）
+- 全仓测试：431 passed（原 401 + 新增 30）
+- Lint：0 errors，0 warnings
+- **CR Round-1 修复（2026-03-25）**：
+  - `findExistingAncestor` 增加 `isDirectory()` 检查，非目录条目抛 `PATH_NOT_DIRECTORY`
+  - `ensureDir` 包裹 `AiforgeError(ENSURE_DIR_FAILED)`
+  - `preflight` 恢复双参签名，内部由 `pathResolver.home()` / `process.cwd()` 推导 `allowedRoot`
+  - 测试文件清理 5 个 lint 未使用符号；新增 2 个负向测试（`ENSURE_DIR_FAILED`、`PATH_NOT_DIRECTORY`）；`pathResolver` 改为 stub 注入
+  - 全仓测试：433 passed（原 431 + 新增 2）；Lint：0 errors
+- **CR Round-2/3 修复（2026-03-26）**：
+  - **P0 symlink 逃逸修复**：新增 `validateAncestorRealpath()` 函数，对 `findExistingAncestor()` 返回的已存在祖先目录和 `allowedRoot` 分别做 `realpath()`，然后做双边 `startsWith` 比较，防止路径链中的 symlink 将实际落点引到 `allowedRoot` 之外（NFR-S5 深度防护）
+  - **P1 POSIX 精确性修复**：`isWritable()` 由 `W_OK` 改为 `W_OK | X_OK`，正确检测"有写权限但无遍历权限（如 `0o222`）"的目录，避免 preflight 误报
+  - `checkTargetWritability()` 函数签名增加 `allowedRoot` 参数，以便传递给 `validateAncestorRealpath()`
+  - 从 `node:fs/promises` 新增 import `realpath`
+  - 新增 3 条测试：`isWritable` P1 (`0o222` 目录返回 false)、`preflight` P0-A（targetPath 是指向外部的 symlink 抛 PATH_TRAVERSAL）、`preflight` P0-B（路径链祖先是指向外部的 symlink 抛 PATH_TRAVERSAL）
+  - 全仓测试：**439 passed**（原 436 + 新增 3）；Lint：0 errors；Build：success
+- **CR Round-4 修复（2026-03-26）**：
+  - **P0 完整性补丁**：`checkTargetWritability()` 的 `isSymbolicLink()` 分支和 `isDirectory()` 分支均增加 `validateAncestorRealpath(targetPath, allowedRoot)` 调用，修复"目标已存在"路径无 realpath 校验的逃逸漏洞
+  - `isSymbolicLink()` 分支特殊处理 broken symlink（先 `stat()` 检查目标存在性，broken symlink 跳过 realpath 直接通过）
+  - 更新 `checkTargetWritability()` JSDoc，精确描述各分支处理逻辑
+  - 新增 1 条回归测试：`targetPath` 本身是现存 symlink 指向外部 → 抛 `PATH_TRAVERSAL`（覆盖 `isSymbolicLink()` 分支逃逸场景）
+  - 全仓测试：**440 passed**（原 439 + 新增 1）；Lint：0 errors；Build：success
+
 ### File List
+
+- `src/services/fs-utils.ts` — 新增
+- `tests/services/fs-utils.test.ts` — 新增
+
+## Change Log
+
+- 2026-03-25: Story 4-1 实现完成。新增 `src/services/fs-utils.ts`（文件操作工具集 + preflight 预检查逻辑），新增 `tests/services/fs-utils.test.ts`（30 个测试用例）。全仓 431 个测试全部通过，Lint 无报错。
+- 2026-03-25: CR Round-1 修复。`findExistingAncestor` 增加 isDirectory 检查，`ensureDir` 包裹 AiforgeError，`preflight` 恢复双参签名，清理测试 lint。全仓 433 个测试全部通过，Lint 0 error。
+- 2026-03-26: CR Round-2/3 修复（P0+P1+P2）。新增 `validateAncestorRealpath()` 修复 symlink 逃逸安全漏洞；`isWritable()` 改为 `W_OK | X_OK` 提升 POSIX 精确性；新增 3 条测试覆盖新修复点。全仓 439 个测试全部通过，Lint 0 error，Build success。
+- 2026-03-26: CR Round-4 修复（P0 完整性补丁）。扩展 `checkTargetWritability()` 的 `isSymbolicLink()` 和 `isDirectory()` 分支，对现存目标路径调用 `validateAncestorRealpath()` 做 realpath 安全校验，修复 Round 3 P0 修复遗漏的"目标已存在"逃逸路径；`isSymbolicLink()` 分支特殊处理 broken symlink（跳过 realpath，直接通过）；新增 1 条回归测试（targetPath 本身是现存 symlink 指向外部 → 抛 PATH_TRAVERSAL）。全仓 **440 passed**，Lint 0 error，Build success。

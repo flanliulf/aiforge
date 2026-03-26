@@ -179,6 +179,22 @@ export type { ResolvedSource, InstallResult, MatchedPlan } from './types.js';
 
 > 来源：Story 2-4 CR Round 2 — 修复 `hasLocalRepo()` 时新增 `dirExists()`，重复了同样的 `catch {}` 错误。
 
+**CR 修复必须审查同一函数中所有并行分支：**
+
+修复某个函数的特定分支时，必须审查同一函数中所有并行分支是否存在同类问题，并在修复记录中逐分支列出审查结论（"该分支是否需要同等修复？"→ 是/否 + 理由）。禁止只修复被 CR 指出的具体分支而不审查并行分支——这是导致"修复引入对称性回归"的主要原因。
+
+```typescript
+✅ // 修复 targetStat === null 分支的 realpath 校验后，审查所有并行分支：
+   // - isDirectory() 分支：需要同等修复 → 已补 validateAncestorRealpath()
+   // - isSymbolicLink() 分支：需要同等修复 → 已补 validateAncestorRealpath()
+   // - else (普通文件) 分支：不需要 → 普通文件无 symlink 跟随问题
+
+❌ // 只修复被 CR 指出的 targetStat === null 分支
+   // → 下一轮 CR 发现 isSymbolicLink() 分支同样缺少校验，P0 问题延续
+```
+
+> 来源：Story 4-1 CR — Round 3 修复 symlink 逃逸仅在 `targetStat === null` 分支添加 realpath 校验，遗漏 `isSymbolicLink()` 和 `isDirectory()` 分支，导致 P0 安全问题延续到 Round 4 才关闭。
+
 **新增 AiforgeError 错误码必须同步补负向测试：**
 
 新增 `try/catch` + `throw new AiforgeError(NEW_CODE)` 的错误处理分支时，必须同步补至少 1 条负向测试。
@@ -314,6 +330,55 @@ export type { ResolvedSource, InstallResult, MatchedPlan } from './types.js';
 ❌ // why 字段直接拼接原始 URL
    `仓库地址缺少仓库路径: ${url}`
 ```
+
+**symlink 感知的文件系统 API 选用规则：**
+
+当代码路径链中涉及"判断文件系统条目类型"和"对同一路径执行操作"两步时，必须确保两步的 symlink 跟随语义一致：
+
+| API | symlink 行为 | 适用场景 |
+|-----|-------------|---------|
+| `lstat()` | **不跟随** symlink，返回条目本身信息 | 需要识别 symlink 本身 |
+| `stat()` | **跟随** symlink，返回目标信息 | 需要知道最终目标类型 |
+| `access()` | **跟随** symlink | 对 broken symlink 返回 ENOENT（不是权限错误） |
+| `realpath()` | **解析** symlink，返回物理路径 | 路径安全校验 |
+
+```typescript
+✅ // 需要判断祖先是否为目录（含 symlink→目录 的合法场景）
+   const entryStat = await lstat(current)
+   if (entryStat.isSymbolicLink()) {
+     const targetStat = await stat(current)  // 跟随 symlink 确认目标类型
+     if (!targetStat.isDirectory()) { throw ... }
+   } else if (!entryStat.isDirectory()) {
+     throw ...
+   }
+
+❌ // lstat 不跟随 symlink，symlink→directory 会被误判为非目录
+   const entryStat = await lstat(current)
+   if (!entryStat.isDirectory()) { throw ... }  // symlink→dir 误判！
+```
+
+> 来源：Story 4-1 CR — `lstat + isDirectory` 未处理 symlink→directory 祖先导致 3 轮回归。
+
+**路径安全校验必须使用 `realpath()` 双边比较：**
+
+路径安全边界校验（如 `startsWith` 前缀检查防止路径遍历）必须对被校验路径和安全根路径分别执行 `realpath()`，然后对物理路径做比较。禁止使用 `resolve()` 做安全校验——`resolve()` 是纯字符串操作，不解析 symlink，无法防止 symlink 逃逸。
+
+```typescript
+✅ // realpath 双边比较
+   const realTarget = await realpath(ancestorDir)
+   const realRoot = await realpath(allowedRoot)
+   if (!realTarget.startsWith(realRoot + '/') && realTarget !== realRoot) {
+     throw new AiforgeError('PATH_TRAVERSAL', ...)
+   }
+
+❌ // resolve() 不跟随 symlink，symlink 指向外部的路径会绕过安全检查
+   const resolved = resolve(targetPath)
+   if (!resolved.startsWith(resolve(allowedRoot) + '/')) { ... }
+```
+
+对不存在的路径，`realpath()` 会抛 ENOENT。此时应对路径链中已存在的最深祖先目录执行 `realpath()`，拼接不存在的尾部部分后做前缀比较。
+
+> 来源：Story 4-1 CR — `validatePathSecurity` 使用 `resolve()` 做字符串前缀匹配，symlink 指向外部的路径绕过安全检查，2 轮 CR 才完全修复。
 
 ### Testing Patterns
 

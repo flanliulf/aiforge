@@ -52,8 +52,7 @@ current_activity:
     - epic-1: "done"  # 项目基础设施与核心框架 — 5/5 Stories 完成（2026-03-23）
     - epic-2: "done"  # 知识仓库获取与认证 — 5/5 Stories 完成（2026-03-25）
     - epic-3: "done"  # 智能检测与安装规划 — 3/3 Stories 完成（2026-03-25）
-  notes: "Epic 3 全部完成。Story 3.3 经 2 轮跨 LLM CR（GPT-5.4 审查 × Claude Sonnet 4 评估）后 Approved，401 全仓测试通过。已知遗留：matchRules 签名适配已解决（TODO-002 resolved），CLI 接线（TODO-003）和 flatten 路径精度（TODO-004）延迟至后续 Epic。"
+  notes: "Epic 3 全部完成。Story 3.3 经 2 轮跨 LLM CR（GPT-5.4 审查 × Claude Sonnet 4 评估）后 Approved，401 全仓测试通过。已知遗留：matchRules 签名适配已解决（TODO-002 resolved），CLI 接线（TODO-003）和 flatten 路径精度（TODO-004）延迟至后续 Epic。Story 4.1 经 5 轮跨 LLM CR（GPT-5.4 审查 × Claude Sonnet 4 评估）后 Approved，440 全仓测试通过。核心修复：symlink 逃逸安全漏洞（NFR-S5）× 3 轮迭代收敛、isWritable W_OK|X_OK POSIX 精确性修复。"
   next_steps:
-    - "可选：执行 Epic 3 Retrospective"
-    - "开始 Epic 4：安装执行与冲突保护（Story 4.1 起）"
+    - "继续 Epic 4：Story 4.2 copy-mode-install（ready-for-dev）"
     - "按 Epic 顺序推进：Epic 4 → 5"
