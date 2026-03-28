@@ -1,6 +1,6 @@
 # Story 4.2: 复制模式安装执行
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -19,25 +19,25 @@ So that 各工具能读取到正确的配置内容。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建 `src/stages/execute-install.ts` — Install 管道阶段 (AC: #1-6)
-  - [ ] 1.1 实现 `executeInstall(plan: MatchedPlan, args: ParsedArgs, reporter: Reporter): Promise<InstallResult[]>`
-  - [ ] 1.2 Step 1: 调用 `preflight(plan)` 预检查（Story 4.1）
-  - [ ] 1.3 Step 2: 遍历 `plan.items`，按规则类型分发执行
-  - [ ] 1.4 `files` 类型：对每个 sourceFile 调用 `copyFile(src, join(targetDir, filename))`
-  - [ ] 1.5 `directories` 类型：对每个 sourceFile（目录）调用 `copyDir(src, join(targetDir, dirname))`
-  - [ ] 1.6 目标目录不存在时调用 `ensureDir(targetDir)`
-  - [ ] 1.7 每个文件操作后构建 `InstallResult` 记录（status: 'new'|'updated'|'skipped'）
-  - [ ] 1.8 fail-fast：文件操作异常时停止后续安装，返回已完成的结果列表
-  - [ ] 1.9 调用 `reporter.startPhase('执行安装...')` 输出进度
-- [ ] Task 2: 实现安装状态判定 (AC: #1)
-  - [ ] 2.1 目标文件不存在 → status: 'new'
-  - [ ] 2.2 目标文件存在且 hash 不同 → status: 'updated'
-  - [ ] 2.3 目标文件存在且 hash 相同 → status: 'skipped'
-  - [ ] 2.4 使用 `fileHash()` 对比源文件和目标文件
-- [ ] Task 3: 编写单元测试 (AC: #1-6)
-  - [ ] 3.1 `tests/stages/execute-install.test.ts`
-  - [ ] 3.2 测试用例：files 类型复制、directories 类型复制、目录自动创建、new/updated/skipped 状态判定、fail-fast 行为
-  - [ ] 3.3 使用临时目录和 fixture 文件进行真实文件操作测试
+- [x] Task 1: 创建 `src/stages/execute-install.ts` — Install 管道阶段 (AC: #1-6)
+  - [x] 1.1 实现 `executeInstall(plan: MatchedPlan, args: ParsedArgs, reporter: Reporter): Promise<InstallResult[]>`
+  - [x] 1.2 Step 1: 调用 `preflight(plan)` 预检查（Story 4.1）
+  - [x] 1.3 Step 2: 遍历 `plan.items`，按规则类型分发执行
+  - [x] 1.4 `files` 类型：对每个 sourceFile 调用 `copyFile(src, join(targetDir, filename))`
+  - [x] 1.5 `directories` 类型：对每个 sourceFile（目录）调用 `copyDir(src, join(targetDir, dirname))`
+  - [x] 1.6 目标目录不存在时调用 `ensureDir(targetDir)`
+  - [x] 1.7 每个文件操作后构建 `InstallResult` 记录（status: 'new'|'updated'|'skipped'）
+  - [x] 1.8 fail-fast：文件操作异常时停止后续安装，返回已完成的结果列表
+  - [x] 1.9 调用 `reporter.startPhase('执行安装...')` 输出进度
+- [x] Task 2: 实现安装状态判定 (AC: #1)
+  - [x] 2.1 目标文件不存在 → status: 'new'
+  - [x] 2.2 目标文件存在且 hash 不同 → status: 'updated'
+  - [x] 2.3 目标文件存在且 hash 相同 → status: 'skipped'
+  - [x] 2.4 使用 `fileHash()` 对比源文件和目标文件
+- [x] Task 3: 编写单元测试 (AC: #1-6)
+  - [x] 3.1 `tests/stages/execute-install.test.ts`
+  - [x] 3.2 测试用例：files 类型复制、directories 类型复制、目录自动创建、new/updated/skipped 状态判定、fail-fast 行为
+  - [x] 3.3 使用临时目录和 fixture 文件进行真实文件操作测试
 
 ## Dev Notes
 
@@ -140,8 +140,29 @@ async function determineStatus(srcPath: string, destPath: string): Promise<'new'
 
 ### Agent Model Used
 
+claude-sonnet-4-6
+
 ### Debug Log References
+
+无阻塞问题。关键实现决策：
+- `InstallResult` 使用 `core/types.ts` 中的实际结构（`items: Array<{status, sourcePath, targetPath}>`），而非 Dev Notes 中的扁平结构（按 project-context.md 规定，以架构文档为准）
+- `executeInstall` 签名增加 `pathResolver: PathResolver` 参数（preflight 需要），与管道类型签名 `InstallFn` 不完全一致（InstallFn 不含 pathResolver）；Story 4.3/4.6 接入管道时需通过闭包注入
 
 ### Completion Notes List
 
+- ✅ 实现 `src/stages/execute-install.ts`：`executeInstall()` 函数，支持 files/directories 两种 copy 模式
+- ✅ 实现 `determineStatus()`：通过 `access()` + `fileHash()` 判断 new/updated/skipped
+- ✅ 实现 `determineDirStatus()`：目录级安装状态判断（new/updated）
+- ✅ fail-fast：`copyFile`/`copyDir` 异常直接向上透传，管道立即终止
+- ✅ skipped 文件不调用 `reporter.updatePhase`（只有实际 I/O 操作才上报进度）
+- ✅ 全仓测试：本 Story 15 个测试 + 全仓 455 个测试全部通过
+- ✅ Lint：零报错
+
 ### File List
+
+- `src/stages/execute-install.ts` (新建)
+- `tests/stages/execute-install.test.ts` (新建)
+
+## Change Log
+
+- 2026-03-26: Story 4.2 实现完成，状态更新为 review（agent: claude-sonnet-4-6）

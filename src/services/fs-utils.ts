@@ -17,6 +17,7 @@ import {
   access,
   constants,
   realpath,
+  readlink,
 } from 'node:fs/promises'
 import { createReadStream } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -456,6 +457,117 @@ async function checkTargetWritability(
         'fatal',
         `无法写入文件 ${targetPath}，权限不足`,
         [`检查文件权限: ls -la ${targetPath}`, `尝试以 sudo 运行，或联系系统管理员修复权限`],
+      )
+    }
+  }
+}
+
+// ── validateDestPathSecurity ──────────────────────────────────────────────────
+
+/**
+ * 校验文件级目标路径（destPath）在 allowedRoot 范围内，防止 symlink 逃逸。
+ *
+ * preflight() 仅校验 item.targetPath（目录级）。execute-install 在循环中计算
+ * destPath = join(targetPath, basename(src))，若 targetPath 下已预置同名 symlink
+ * 指向 allowedRoot 外，copyFile/copyDir 会跟随 symlink 写到外部，绕过安全边界。
+ *
+ * 策略：
+ * - destPath 已存在（普通文件/目录/symlink）→ 对 destPath 本身执行 realpath，校验在 allowedRoot 内
+ * - destPath 不存在 → 找到最深已存在祖先目录，对祖先执行 validateAncestorRealpath
+ *
+ * @param destPath    最终文件写入路径（join(targetDir, basename(src)) 的结果）
+ * @param allowedRoot 安全根目录（scope=global → home()，scope=project → cwd()）
+ * @throws AiforgeError(PATH_TRAVERSAL) 当真实路径逃逸 allowedRoot 时
+ */
+export async function validateDestPathSecurity(
+  destPath: string,
+  allowedRoot: string,
+): Promise<void> {
+  // 先用 resolve() 做字符串层面基础检查（排除 `..` 等路径穿越）
+  validatePathSecurity(destPath, allowedRoot)
+
+  // 再做 realpath 级 symlink 逃逸校验：先用 lstat 获取条目类型
+  let entryStat: Awaited<ReturnType<typeof lstat>>
+  try {
+    entryStat = await lstat(destPath)
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code
+    if (code !== 'ENOENT' && code !== 'ENOTDIR') {
+      throw e
+    }
+    // destPath 不存在，校验其最深已存在祖先
+    const ancestorDir = await findExistingAncestor(destPath)
+    await validateAncestorRealpath(ancestorDir, allowedRoot)
+    return
+  }
+
+  if (entryStat.isSymbolicLink()) {
+    // destPath 是 symlink（无论是否 broken）：
+    // 对 broken symlink，realpath 会 ENOENT；对有效 symlink，realpath 返回真实路径。
+    // 两种情况都需要拒绝指向 allowedRoot 外的 symlink：
+    // - 有效 symlink：使用 realpath 校验真实目标路径
+    // - broken symlink：无法跟随，但 symlink 目标路径本身超出 allowedRoot 也应拒绝
+    let realDest: string
+    try {
+      realDest = await realpath(destPath)
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code
+      if (code === 'ENOENT' || code === 'ENOTDIR') {
+        // broken symlink：读取 symlink 目标路径，做字符串层面校验
+        // readlink 返回 symlink 存储的目标路径（可能是绝对路径或相对路径）
+        const linkTarget = await readlink(destPath)
+        // 将 symlink 目标路径规范化为绝对路径
+        const resolvedTarget = resolve(dirname(destPath), linkTarget)
+        validatePathSecurity(resolvedTarget, allowedRoot)
+        // 字符串层面通过后，由于无法 realpath，抛出 PATH_TRAVERSAL 以拒绝 broken symlink
+        // broken symlink 在安装场景中没有合法用途：安装写入会跟随 symlink，
+        // 当目标路径后来被创建时可能指向 allowedRoot 外部，属于潜在安全隐患
+        throw new AiforgeError(
+          '目标路径是损坏的符号链接，拒绝安装',
+          'PATH_TRAVERSAL',
+          EXIT_INSTALL_FAILURE,
+          'fatal',
+          `${destPath} 是损坏的符号链接（目标 ${linkTarget} 不存在），无法安全校验写入路径`,
+          [`删除 ${destPath} 后重试`, '检查目标目录中是否存在预置的符号链接'],
+        )
+      }
+      throw e
+    }
+    const realRoot = await realpath(allowedRoot)
+    if (!realDest.startsWith(join(realRoot, '/')) && realDest !== realRoot) {
+      throw new AiforgeError(
+        '检测到 symlink 逃逸路径遍历攻击',
+        'PATH_TRAVERSAL',
+        EXIT_INSTALL_FAILURE,
+        'fatal',
+        `目标文件 ${destPath} 经 symlink 解析后真实路径 ${realDest} 超出允许范围 ${allowedRoot}（真实根：${realRoot}）`,
+        ['检查目标目录中是否存在指向允许范围之外的符号链接', '检查安装规则中的 targetDir 配置'],
+      )
+    }
+  } else {
+    // 普通文件或目录：做 realpath 安全校验（防止路径链中祖先存在 symlink 逃逸）
+    let realDest: string
+    try {
+      realDest = await realpath(destPath)
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code
+      if (code === 'ENOENT' || code === 'ENOTDIR') {
+        // destPath 存在（lstat 成功）但 realpath 失败，退化为祖先校验
+        const ancestorDir = await findExistingAncestor(destPath)
+        await validateAncestorRealpath(ancestorDir, allowedRoot)
+        return
+      }
+      throw e
+    }
+    const realRoot = await realpath(allowedRoot)
+    if (!realDest.startsWith(join(realRoot, '/')) && realDest !== realRoot) {
+      throw new AiforgeError(
+        '检测到 symlink 逃逸路径遍历攻击',
+        'PATH_TRAVERSAL',
+        EXIT_INSTALL_FAILURE,
+        'fatal',
+        `目标文件 ${destPath} 经 symlink 解析后真实路径 ${realDest} 超出允许范围 ${allowedRoot}（真实根：${realRoot}）`,
+        ['检查目标目录中是否存在指向允许范围之外的符号链接', '检查安装规则中的 targetDir 配置'],
       )
     }
   }

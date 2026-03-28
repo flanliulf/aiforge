@@ -7,9 +7,9 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 4 |
+| 🔴 open | 6 |
 | 🟡 in-progress | 0 |
-| ✅ resolved | 1 |
+| ✅ resolved | 2 |
 
 ---
 
@@ -50,6 +50,43 @@
 - **状态**: open
 - **解决记录**:
 
+### TODO-006: `targetPath` 为普通文件时 preflight 未提前拒绝
+
+- **来源**: Story 4-2 CR round 1 (2026-03-26)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: `checkTargetWritability()` (fs-utils.ts) 对 `targetPath` 是普通文件的情况只检查 `W_OK` 可写性，不会抛出"不是目录"的错误。随后 `executeInstall()` 调用 `ensureDir(item.targetPath)` 时才因 `ENOTDIR` 失败，被包装为 `ENSURE_DIR_FAILED`。虽然安装最终仍会失败（非安全问题），但错误时机延迟且报错信息不够精确。改进方案：在 `checkTargetWritability()` 中增加 `targetStat.isFile()` 分支，提前抛出更精确的 `PATH_NOT_DIRECTORY` 错误，提升 fail-fast 诊断体验。
+- **涉及文件**: `src/services/fs-utils.ts`
+- **建议时机**: 下次触及 `checkTargetWritability` 时
+- **状态**: open
+- **解决记录**:
+
+### TODO-007: `allowedRoot` 内部 broken symlink 被保守拒绝
+
+- **来源**: Story 4-2 CR round 2 (2026-03-26)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: `validateDestPathSecurity()` (fs-utils.ts) 对 broken symlink 采用"一律拒绝"的保守策略——即使 symlink 的目标路径完全在 `allowedRoot` 内部（只是目标文件尚未创建），也会被误判为 `PATH_TRAVERSAL`。当前设计基于安全优先原则：broken symlink 目标不存在意味着后续可能被外部操作创建为指向不安全位置的文件。错误信息已提示"删除该 symlink 后重试"，有清晰的 recovery 路径。场景罕见且不影响正常安装流程。如后续有真实用户反馈，可在安全增强 Story 中细化对 broken symlink 的边界校验后选择性放行。
+- **涉及文件**: `src/services/fs-utils.ts`
+- **建议时机**: 安全策略专项优化时
+- **状态**: open
+- **解决记录**:
+
+### TODO-008: fail-fast 后无法返回已完成操作清单
+
+- **来源**: Story 4-2 CR round 3 (2026-03-27)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: `executeInstall()` 将结果累积在本地变量 `resultItems` 中，异常抛出时该变量不会返回给调用方。`AiforgeError` 也不包含 `completedItems` 等附加 payload 字段。AC #6 要求"返回已完成的操作清单（FR-031）"，但当前 throw 模式下无法通过函数返回值传递 partial results。这是跨模块架构变更（影响 `core/errors.ts`、`stages/execute-install.ts`、`pipeline.ts`、`core/reporter.ts`），应由 Story 4-6a（管道编排与错误流控制）在编排层统一设计 partial results 传递方案，而非在 Story 4-2 中局部修补。
+- **涉及文件**: `src/stages/execute-install.ts`, `src/core/errors.ts`, `src/pipeline.ts`
+- **建议时机**: Story 4-6a（管道编排与错误流控制）
+- **状态**: open
+- **解决记录**:
+
+---
+
+<!-- 已解决事项归档于此，保留用于回顾 -->
+
 ### TODO-005: 质量门禁验证的完整执行流程规则增强
 
 - **来源**: Story 4-1 CR round 1-5 (2026-03-25 ~ 2026-03-26)
@@ -58,12 +95,8 @@
 - **描述**: 现有 "CR 修复后必须同步更新 Story Dev Agent Record" 规则已覆盖意图，但执行不到位，需增强为具体操作流程。CR 修复完成后，必须按以下顺序执行完整验证并将每项结果逐行更新到 Story Dev Agent Record：(1) `npm test` — 记录通过数（含新增测试的增量说明）；(2) `npm run lint` — 记录 error/warning 数（含 Prettier 格式检查）；(3) `npm run build` — 记录构建状态。禁止：只执行部分验证（如只跑 test 不跑 lint）；复用上轮的验证结果（每次修复后必须重新执行）；在验证未全部通过时更新 Story 记录为"通过"。Story 4-1 CR 中该问题出现 3 次：Round 1 lint error 漏报、Round 2 Prettier 问题漏报、Round 3 测试计数过期。
 - **涉及文件**: `_bmad-output/project-context.md`, `_bmad-output/planning-artifacts/architecture/04-implementation-patterns.md`
 - **建议时机**: 下一次 Sprint 规划或规则文档专项维护时
-- **状态**: open
-- **解决记录**:
-
----
-
-<!-- 已解决事项归档于此，保留用于回顾 -->
+- **状态**: resolved
+- **解决记录**: Story 4-2 CR 规则提炼中正式化为全局规则"CR 修复后必须执行完整质量门禁三件套"，已同步写入 `project-context.md` (CR Workflow Rules) 和 `04-implementation-patterns.md` (CR Workflow Patterns)。
 
 ### TODO-002: `detectTools` 函数签名与 `DetectFn` 类型不匹配，pipeline 集成需适配
 

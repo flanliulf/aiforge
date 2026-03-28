@@ -4,7 +4,7 @@ user_name: 'chunxiao'
 date: '2026-03-12'
 sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 41
+rule_count: 45
 optimized_for_llm: true
 ---
 
@@ -70,6 +70,8 @@ Resolve → Auth → Clone → Detect → Match → [Install(含preflight)] → 
 - Each stage has explicit input/output TypeScript types
 - Pipeline orchestrator chains stages; `dryRun` flag skips Install stage
 - **dry-run consistency is guaranteed by architecture** (same Match output feeds both Install and Report)
+- **新 stage 必须遵循 Reporter 生命周期契约：** 每个管道 stage 必须完成 `reporter.startPhase()` → `reporter.completePhase()` 的配对调用。实现新 stage 时，必须对照至少一个已有 stage（如 `detect-tools.ts`、`match-rules.ts`）确认 Reporter 调用模式一致性：(1) 成功路径必须调用 `completePhase()`；(2) 异常路径由管道编排层处理，stage 不需自行调用 `completePhase()`。`TtyReporter.startPhase()` 启动 ora spinner，`completePhase()` 调用 `succeed()` 并清空 spinner——漏调 `completePhase()` 会导致 spinner 状态泄漏。（来源：Story 4-2 CR R4 — `executeInstall()` 成功路径未调用 `completePhase()`，而其他 3 个 stage 均已正确配对）
+- **跨阶段数据契约边界值必须显式处理：** 当上游 stage 的输出可能包含边界值（如 `matchRules` 产出 `sourceFiles = []` 的 item）时，下游 stage 必须显式处理该边界值并在注释中说明语义（如 `// 空 sourceFiles = 源目录不存在，静默跳过`）。禁止假设上游输出"总是非空"——如果需要非空保证，应在上游 stage 中添加过滤而非在下游隐式依赖。（来源：Story 4-2 CR R4 — `matchRules` 产出 `sourceFiles = []` 的 item，`executeInstall` 未跳过，导致空 item 创建无用目录甚至 fail-fast）
 
 ### Architecture Rules — Module Boundaries
 
@@ -145,6 +147,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - **sanitizeToken 边界验证：** 实现脱敏逻辑时，必须验证阈值边界处（token 长度恰好等于阈值）脱敏后不可逆推原文
 - **sanitizeUrl 必须处理 `oauth2:token@host` 格式：** GitLab 标准 token URL 为 `https://oauth2:${token}@host/repo.git`，脱敏时只处理冒号后的凭据部分，保留 `oauth2:` 前缀
 - **脱敏函数必须覆盖边界形态输入：** sanitizeToken/sanitizeUrl 的正则/匹配逻辑必须覆盖用户可能构造的边界形态输入（如不完整 URL、缺少 host 的 URL、尾部截断的 token）。新增任何 `AiforgeError` 的 `why` 字段时，检查是否包含用户原始输入——如果是，必须通过 sanitizeUrl/sanitizeToken 处理，不能有"漏调"
+- **安全校验必须在最终 I/O 操作路径上执行：** 当预检阶段的校验路径（如 `targetPath` = 目录）与实际 I/O 操作路径（如 `destPath` = `join(targetPath, basename(srcPath))`）不同时，必须在实际操作前对最终路径再次执行安全校验。"preflight 通过 ≠ 操作安全"——中间路径合法不代表最终路径合法（合法目录下可能存在指向外部的 symlink 文件）。此规则适用于所有涉及"先校验目录、再操作目录下文件"的场景。（来源：Story 4-2 CR R1 — `preflight()` 校验 `targetPath` 通过，但 `copyFile()` 操作的 `destPath` 可被预置 symlink 重定向到 `allowedRoot` 外部，导致 P0 安全漏洞）
 
 ### Data Format Rules
 
@@ -167,6 +170,7 @@ index.ts → pipeline.ts → stages/* → services/*
 ### CR Workflow Rules
 
 - **CR 修复后必须同步更新 Story Dev Agent Record：** CR 修复涉及新增/删除测试用例或代码变更导致全仓测试数变化时，修复完毕后必须同步更新 Story 的 Completion Notes：(1) 当前 Story 测试用例数；(2) 全仓测试通过数；(3) Lint 状态。更新时应标注变更原因（如"原 18 + CR Round-1 修复新增 3"）。（来源：Story 2-3 CR — 修复新增 3 个测试后 Story 记录仍写"18 个测试"，延续一整轮 CR 才关闭）
+- **CR 修复后必须执行完整质量门禁三件套：** 每次 CR 修复完成后，必须按顺序执行 `npm test` → `npm run lint` → `npm run build`，并将每项结果逐行记录到修复记录中。禁止：(1) 只执行部分验证（如只跑 test 不跑 lint）；(2) 复用上轮验证结果（每次修复后必须重新执行）；(3) 在验证未全部通过时声称"通过"。Prettier 格式化应作为修复的最后一步自动执行：`npx prettier --write <修改过的文件>`。（来源：Story 4-2 CR — R2 和 R5 各出现一次 Prettier 格式未通过；Story 4-1 CR 也出现同类问题，共 3 次重复）
 
 ### Install Rules Data Architecture
 
@@ -204,4 +208,4 @@ index.ts → pipeline.ts → stages/* → services/*
 - Update when technology stack or patterns change
 - Remove rules that become obvious over time
 
-Last Updated: 2026-03-24
+Last Updated: 2026-03-28
