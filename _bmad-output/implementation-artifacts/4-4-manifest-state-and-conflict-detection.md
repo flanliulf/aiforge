@@ -1,6 +1,6 @@
 # Story 4.4: manifest 状态管理与冲突检测
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -17,23 +17,23 @@ So that 能区分"aiforge 安装的"和"我手写的"文件，避免意外覆盖
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建 `src/services/manifest.ts` — manifest 读写服务 (AC: #1, #2, #4)
-  - [ ] 1.1 实现 `loadManifest(pathResolver: PathResolver): Promise<ManifestEntry[]>` — 读取并解析 manifest.json
-  - [ ] 1.2 实现 `saveManifest(entries: ManifestEntry[], pathResolver: PathResolver): Promise<void>` — 原子写入
-  - [ ] 1.3 损坏降级：JSON 解析失败或文件不存在 → 返回空数组（不抛错）
-  - [ ] 1.4 原子写入：`writeFile(tmpPath)` → `rename(tmpPath, manifestPath)`
-- [ ] Task 2: 实现冲突检测逻辑 (AC: #3, #4)
-  - [ ] 2.1 实现 `checkConflict(targetPath: string, sourceHash: string, manifest: ManifestEntry[], manifestDegraded: boolean): Promise<ConflictType>`
-  - [ ] 2.2 `ConflictType`: `'none'`（目标不存在）| `'aiforge-current'`（目标hash=manifest hash 且 源hash=manifest hash）| `'aiforge-outdated'`（目标hash=manifest hash 且 源hash≠manifest hash）| `'user-modified'`（在 manifest 但目标hash≠manifest hash）| `'user-file'`（不在 manifest，manifest 正常）| `'unknown-origin'`（不在 manifest，manifest 降级）
-  - [ ] 2.3 在 `executeInstall` 中每个文件安装前调用冲突检测
-- [ ] Task 3: 提供 manifest 服务供 pipeline 层调用 (AC: #1)
-  - [ ] 3.1 导出 `buildManifestEntries(results: InstallResult[]): ManifestEntry[]`，从安装结果构建 manifest 条目
-  - [ ] 3.2 导出 `mergeManifest(existing, newEntries): ManifestEntry[]`，合并已有条目
-  - [ ] 3.3 manifest 持久化由 pipeline 层（Story 4.6a）调用 `saveManifest()`，本 Story 只提供服务函数
-- [ ] Task 4: 编写单元测试 (AC: #1-4)
-  - [ ] 4.1 `tests/services/manifest.test.ts`
-  - [ ] 4.2 测试用例：正常读写、原子写入验证、损坏降级、冲突检测四种类型、manifest 合并逻辑
-  - [ ] 4.3 Mock fs 操作，注入 mock PathResolver
+- [x] Task 1: 创建 `src/services/manifest.ts` — manifest 读写服务 (AC: #1, #2, #4)
+  - [x] 1.1 实现 `loadManifest(pathResolver: PathResolver): Promise<ManifestEntry[]>` — 读取并解析 manifest.json
+  - [x] 1.2 实现 `saveManifest(entries: ManifestEntry[], pathResolver: PathResolver): Promise<void>` — 原子写入
+  - [x] 1.3 损坏降级：JSON 解析失败或文件不存在 → 返回空数组（不抛错）
+  - [x] 1.4 原子写入：`writeFile(tmpPath)` → `rename(tmpPath, manifestPath)`
+- [x] Task 2: 实现冲突检测逻辑 (AC: #3, #4)
+  - [x] 2.1 实现 `checkConflict(targetPath: string, sourceHash: string, manifest: ManifestEntry[], manifestDegraded: boolean): Promise<ConflictType>`
+  - [x] 2.2 `ConflictType`: `'none'`（目标不存在）| `'aiforge-current'`（目标hash=manifest hash 且 源hash=manifest hash）| `'aiforge-outdated'`（目标hash=manifest hash 且 源hash≠manifest hash）| `'user-modified'`（在 manifest 但目标hash≠manifest hash）| `'user-file'`（不在 manifest，manifest 正常）| `'unknown-origin'`（不在 manifest，manifest 降级）
+  - [x] 2.3 在 `executeInstall` 中每个文件安装前调用冲突检测
+- [x] Task 3: 提供 manifest 服务供 pipeline 层调用 (AC: #1)
+  - [x] 3.1 导出 `buildManifestEntries(results: InstallResult[]): ManifestEntry[]`，从安装结果构建 manifest 条目
+  - [x] 3.2 导出 `mergeManifest(existing, newEntries): ManifestEntry[]`，合并已有条目
+  - [x] 3.3 manifest 持久化由 pipeline 层（Story 4.6a）调用 `saveManifest()`，本 Story 只提供服务函数
+- [x] Task 4: 编写单元测试 (AC: #1-4)
+  - [x] 4.1 `tests/services/manifest.test.ts`
+  - [x] 4.2 测试用例：正常读写、原子写入验证、损坏降级、冲突检测四种类型、manifest 合并逻辑
+  - [x] 4.3 Mock fs 操作，注入 mock PathResolver
 
 ## Dev Notes
 
@@ -142,8 +142,56 @@ function mergeManifest(existing: ManifestEntry[], newEntries: ManifestEntry[]): 
 
 ### Agent Model Used
 
+Claude Sonnet 4 (via Claude Code)
+
 ### Debug Log References
+
+无异常。全量 494 tests 通过，lint 通过，build 通过。
 
 ### Completion Notes List
 
+**Story 4.4 实现完成 — manifest 状态管理与冲突检测**
+
+1. **`src/services/manifest.ts`** — 新建 manifest 服务模块
+   - `loadManifest()`: 读取 `~/.aiforge/manifest.json`，返回 `{ entries, degraded }` 结构；损坏/丢失时降级为空数组 + `degraded=true`（NFR-R5）
+   - `saveManifest()`: 原子写入（`writeFile(tmp)` → `rename(tmp, manifest)`），确保 configDir 存在
+   - `checkConflict()`: 6 种冲突类型判定（`none` / `aiforge-current` / `aiforge-outdated` / `user-modified` / `user-file` / `unknown-origin`），完全对齐 AC #3/#4 冲突矩阵
+   - `buildManifestEntries()`: 从 InstallResult 构建 ManifestEntry[]，跳过 skipped 项
+   - `mergeManifest()`: 按 target 路径合并，新条目覆盖旧条目
+   - `ConflictType` 和 `LoadManifestResult` 类型导出
+
+2. **`src/stages/execute-install.ts`** — 集成冲突检测（Task 2.3）
+   - 新增可选参数 `manifestContext?: ManifestContext`（向后兼容）
+   - 在 files 和 flatten 类型每个文件安装前调用 `detectConflict()`
+   - `aiforge-current` 时自动跳过安装（hash 完全一致）
+   - directories 类型暂不做文件级冲突检测（留给 Story 4.5）
+   - 导入 `checkConflict` / `ConflictType` / `ManifestEntry`
+
+3. **`tests/services/manifest.test.ts`** — 19 个测试用例
+   - loadManifest: 正常读写、ENOENT 降级、JSON 损坏降级、EACCES 降级、非数组内容降级
+   - saveManifest: 原子写入验证（tmp→rename）、2-space 缩进、configDir 创建顺序
+   - checkConflict: none/user-file/unknown-origin/aiforge-current/aiforge-outdated/user-modified 六种类型 + I/O 错误透传
+   - buildManifestEntries: 正常构建 + skipped 项过滤
+   - mergeManifest: 覆盖合并 + 新增合并
+
+4. **测试统计:**
+   - Story 4.4 新增测试: 19 个
+   - 全仓通过: 494 个（含新增 19 个）
+   - Lint: 通过
+   - Build: 通过
+
+5. **设计决策:**
+   - `loadManifest` 返回 `{ entries, degraded }` 结构而非单纯数组，携带降级标志使冲突检测可区分 `user-file` vs `unknown-origin`
+   - `checkConflict` 对非 ENOENT/ENOTDIR 的 I/O 错误向上抛出（遵循 project-context 的 fs 错误处理规则）
+   - `executeInstall` 的 manifest 参数设为可选，不破坏现有 25 个 execute-install 测试
+   - 冲突交互式处理不实现（遵循 Story 边界，留给 Story 4.5）
+
 ### File List
+
+- `src/services/manifest.ts` — 新建：manifest 读写服务 + 冲突检测 + 条目构建/合并
+- `src/stages/execute-install.ts` — 修改：集成冲突检测（新增 ManifestContext 接口、detectConflict 辅助函数、每文件安装前调用）
+- `tests/services/manifest.test.ts` — 新建：19 个测试用例覆盖全部 AC
+
+### Change Log
+
+- 2026-03-29: Story 4.4 实现完成 — manifest 状态管理与冲突检测服务，含 6 种冲突类型判定、原子写入、损坏降级、executeInstall 集成

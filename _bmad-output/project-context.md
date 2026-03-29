@@ -115,6 +115,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - **CR 修复引入的新函数/新代码必须贯彻同等规则标准：** 修复 A 函数的问题时若新增了 B 辅助函数，B 必须遵循与 A 相同的规则。修复者提交前应自查：新增的每个函数/分支是否与项目规则一致。（来源：Story 2-4 CR — 修复 `hasLocalRepo()` 的 catch 问题时新增 `dirExists()`，但 `dirExists()` 重复了同样的 `catch {}` 错误，被下一轮 CR 发现）
 - **CR 修复必须审查同一函数中所有并行分支：** 修复某个函数的特定分支时，必须审查同一函数中所有并行分支是否存在同类问题，并在修复记录中逐分支列出审查结论（"该分支是否需要同等修复？"→ 是/否 + 理由）。禁止只修复被 CR 指出的具体分支而不审查并行分支——这是导致"修复引入对称性回归"的主要原因。（来源：Story 4-1 CR — Round 3 修复 symlink 逃逸仅在 `targetStat === null` 分支添加 realpath 校验，遗漏 `isSymbolicLink()` 和 `isDirectory()` 分支，导致 P0 安全问题延续到 Round 4 才关闭）
 - **新增 AiforgeError 错误码必须同步补负向测试：** 新增 `try/catch` + `throw new AiforgeError(NEW_CODE)` 的错误处理分支时，必须同步补至少 1 条负向测试，强制触发该分支并断言 `code` 和 `severity`。否则回归保护为零，后续重构可能无感知地回退为 raw Error。（来源：Story 2-4 CR — Round 1 修复新增 `SANITIZE_REMOTE_FAILED`/`SCAN_FAILED` 但无测试，Round 2 发现）
+- **禁止对必填数据字段使用空值兜底（`?? ''` / `?? 0` / `?? false`）：** 当从 `Map.get()` 或可选链取值、且该值语义上为必填（如 hash、ID、路径等数据完整性关键字段）时，禁止使用 `?? ''`（或 `?? 0`、`?? false`、`?? []`）兜底。必须显式检查 `undefined` 并抛错，包含足够的上下文信息（如路径、key 值）便于排查。否则"看起来成功、但数据已损坏"，下游逻辑会系统性误判。（来源：Story 4-4 CR R1 — `hashes.get(targetPath) ?? ''` 导致空 hash 写入 manifest，下游冲突检测全面误判）
 - **InstallResult status 只有三种：** `'new'` | `'updated'` | `'skipped'`（无 `'failed'`——I/O 错误直接抛 fatal，hash 相同或用户选择跳过为 `'skipped'`）
 
 ### Input Validation Rules
@@ -155,6 +156,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - **Dates: ISO 8601 strings** — `"2026-03-12T10:30:00Z"`
 - config.json: auth keyed by hostname (`auth: { "gitlab.xxx.com": { method: "ssh" } }`)
 - manifest.json: atomic write via temp file + `fs.rename()`; corrupted → treat as empty
+- **持久化数据字段必须在类型定义中标注路径语义：** 当接口字段的值为文件路径时，必须在 `core/types.ts` 的类型定义中通过 JSDoc 注释明确标注路径语义（绝对路径 / 相对路径 / 相对于哪个根目录）。禁止仅在 Story Dev Notes 中标注而在类型定义中留空 — Dev Agent 实现时优先参考类型定义，语义标注缺失会导致数据契约不一致。（来源：Story 4-4 CR R1 — `ManifestEntry.source` 应为相对路径但实现写入绝对路径，因类型定义未标注语义）
 
 ### Testing Rules
 

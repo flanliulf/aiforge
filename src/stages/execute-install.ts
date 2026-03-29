@@ -1,7 +1,7 @@
 /**
  * stages/execute-install.ts
  *
- * Install 管道阶段 — 安装执行（Story 4.2 + Story 4.3）
+ * Install 管道阶段 — 安装执行（Story 4.2 + Story 4.3 + Story 4.4）
  *
  * 功能：
  * - 执行安装预检查（preflight）
@@ -13,14 +13,16 @@
  * - flatten 类型：从子目录中提取 mainFile，扁平化重命名后 copy/symlink 到目标
  * - 目标目录不存在时自动调用 ensureDir
  * - 通过 fileHash 判断安装状态：new / updated / skipped
+ * - 每个文件安装前调用冲突检测（Story 4.4）
  * - symlink 模式安装完成后执行断链检测（NFR-R6）
  * - fail-fast：文件操作异常时立即抛出 AiforgeError(fatal)
  *
  * 依赖：
- * - core/types.ts (MatchedPlan, ParsedArgs, InstallResult, InstallType)
+ * - core/types.ts (MatchedPlan, ParsedArgs, InstallResult, InstallType, ManifestEntry)
  * - core/reporter.ts (Reporter)
  * - core/path-resolver.ts (PathResolver)
  * - services/fs-utils.ts (preflight, copyFile, copyDir, createSymlink, ensureDir, fileHash)
+ * - services/manifest.ts (checkConflict, ConflictType)
  *
  * 架构: architecture/03-core-decisions.md#D6
  * 模块边界: stages/ → services/, core/
@@ -29,7 +31,7 @@
 import { join, basename } from 'node:path'
 import { access, readlink } from 'node:fs/promises'
 
-import type { MatchedPlan, ParsedArgs, InstallResult } from '../core/types.js'
+import type { MatchedPlan, ParsedArgs, InstallResult, ManifestEntry } from '../core/types.js'
 import { InstallType } from '../core/types.js'
 import type { Reporter } from '../core/reporter.js'
 import type { PathResolver } from '../core/path-resolver.js'
@@ -42,6 +44,8 @@ import {
   fileHash,
   validateDestPathSecurity,
 } from '../services/fs-utils.js'
+import { checkConflict } from '../services/manifest.js'
+import type { ConflictType } from '../services/manifest.js'
 
 // ── 状态判定 ──────────────────────────────────────────────────────────────────
 
@@ -146,16 +150,50 @@ async function checkBrokenLinks(
 /** flatten 模式默认主文件名 */
 const DEFAULT_MAIN_FILE = 'index.md'
 
+// ── 冲突检测辅助 ────────────────────────────────────────────────────────────
+
+/**
+ * 在文件安装前执行冲突检测（Story 4.4 Task 2.3）。
+ *
+ * 当 manifestContext 未提供时跳过检测（向后兼容）。
+ * 返回冲突类型。'aiforge-current' 表示已是最新，调用方应跳过安装。
+ *
+ * 注意：冲突交互式处理由 Story 4.5 实现。当前仅检测冲突类型，
+ * 对 'aiforge-current' 自动跳过，其他类型暂不阻止安装。
+ */
+async function detectConflict(
+  srcPath: string,
+  destPath: string,
+  manifestContext: ManifestContext | undefined,
+): Promise<ConflictType | undefined> {
+  if (!manifestContext) return undefined
+
+  const srcHash = await fileHash(srcPath)
+  return checkConflict(destPath, srcHash, manifestContext.entries, manifestContext.degraded)
+}
+
+// ── manifest 冲突上下文 ─────────────────────────────────────────────────────
+
+/**
+ * 可选的 manifest 上下文，用于冲突检测（Story 4.4）。
+ * 不提供时跳过冲突检测，保持向后兼容。
+ */
+export interface ManifestContext {
+  entries: ManifestEntry[]
+  degraded: boolean
+}
+
 // ── 主入口 ────────────────────────────────────────────────────────────────────
 
 /**
  * executeInstall — Install 管道阶段主函数
  *
- * @param plan         匹配的安装计划
- * @param args         解析后的 CLI 参数
- * @param reporter     输出报告器
- * @param pathResolver 路径解析器（用于 preflight 的 allowedRoot 推导）
- * @returns            安装结果列表
+ * @param plan            匹配的安装计划
+ * @param args            解析后的 CLI 参数
+ * @param reporter        输出报告器
+ * @param pathResolver    路径解析器（用于 preflight 的 allowedRoot 推导）
+ * @param manifestContext 可选 manifest 上下文，用于冲突检测（Story 4.4）
+ * @returns               安装结果列表
  *
  * fail-fast 策略：
  * - 文件/目录 I/O 操作失败时，copyFile/copyDir/createSymlink 内部抛出 AiforgeError(fatal)
@@ -167,6 +205,7 @@ export async function executeInstall(
   _args: ParsedArgs,
   reporter: Reporter,
   pathResolver: PathResolver,
+  manifestContext?: ManifestContext,
 ): Promise<InstallResult> {
   reporter.startPhase('执行安装...')
 
@@ -217,6 +256,13 @@ export async function executeInstall(
         await validateDestPathSecurity(destPath, allowedRoot)
 
         if (item.mode === 'symlink') {
+          // 冲突检测（Story 4.4）：symlink 模式使用 mainPath 作为源
+          const conflict = await detectConflict(mainPath, destPath, manifestContext)
+          if (conflict === 'aiforge-current') {
+            resultItems.push({ status: 'skipped', sourcePath: mainPath, targetPath: destPath })
+            continue
+          }
+
           const status = await determineSymlinkStatus(mainPath, destPath)
           if (status !== 'skipped') {
             await createSymlink(mainPath, destPath)
@@ -225,6 +271,13 @@ export async function executeInstall(
           itemModes.set(destPath, 'symlink')
           resultItems.push({ status, sourcePath: mainPath, targetPath: destPath })
         } else {
+          // 冲突检测（Story 4.4）：copy 模式使用 mainPath 作为源
+          const conflict = await detectConflict(mainPath, destPath, manifestContext)
+          if (conflict === 'aiforge-current') {
+            resultItems.push({ status: 'skipped', sourcePath: mainPath, targetPath: destPath })
+            continue
+          }
+
           const status = await determineStatus(mainPath, destPath)
           if (status !== 'skipped') {
             await copyFile(mainPath, destPath)
@@ -241,6 +294,13 @@ export async function executeInstall(
 
           // 文件级 symlink 逃逸校验（NFR-S5）
           await validateDestPathSecurity(destPath, allowedRoot)
+
+          // 冲突检测（Story 4.4）
+          const conflict = await detectConflict(srcPath, destPath, manifestContext)
+          if (conflict === 'aiforge-current') {
+            resultItems.push({ status: 'skipped', sourcePath: srcPath, targetPath: destPath })
+            continue
+          }
 
           if (item.mode === 'symlink') {
             // symlink 模式（Task 1.3）：创建指向源文件绝对路径的符号链接
@@ -265,6 +325,9 @@ export async function executeInstall(
 
           // 目录级 symlink 逃逸校验（NFR-S5）
           await validateDestPathSecurity(destPath, allowedRoot)
+
+          // 冲突检测（Story 4.4）：目录类型不做文件级 hash 对比，跳过冲突检测
+          // 目录冲突由 Story 4.5 处理交互式决策
 
           if (item.mode === 'symlink') {
             // symlink 模式（Task 1.4）：创建指向源目录绝对路径的符号链接
