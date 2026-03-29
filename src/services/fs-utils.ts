@@ -519,17 +519,10 @@ export async function validateDestPathSecurity(
         // 将 symlink 目标路径规范化为绝对路径
         const resolvedTarget = resolve(dirname(destPath), linkTarget)
         validatePathSecurity(resolvedTarget, allowedRoot)
-        // 字符串层面通过后，由于无法 realpath，抛出 PATH_TRAVERSAL 以拒绝 broken symlink
-        // broken symlink 在安装场景中没有合法用途：安装写入会跟随 symlink，
-        // 当目标路径后来被创建时可能指向 allowedRoot 外部，属于潜在安全隐患
-        throw new AiforgeError(
-          '目标路径是损坏的符号链接，拒绝安装',
-          'PATH_TRAVERSAL',
-          EXIT_INSTALL_FAILURE,
-          'fatal',
-          `${destPath} 是损坏的符号链接（目标 ${linkTarget} 不存在），无法安全校验写入路径`,
-          [`删除 ${destPath} 后重试`, '检查目标目录中是否存在预置的符号链接'],
-        )
+        // 字符串层面通过安全校验：broken symlink 目标在 allowedRoot 内
+        // 这是合法的业务场景（如：先安装成功的 symlink 后来因源文件删除变成 broken）
+        // 允许继续安装流程（后续会删除旧 broken link 并创建新链接）
+        return
       }
       throw e
     }

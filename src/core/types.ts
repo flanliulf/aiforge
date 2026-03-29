@@ -81,6 +81,8 @@ export interface InstallRule {
   sourceDir: string
   type: InstallType
   targetDir: string
+  /** flatten 模式下的主文件名（默认 'index.md'），仅 type=Flatten 时有效 */
+  mainFile?: string
 }
 
 // Data structure: AI tool definition for detection

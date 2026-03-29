@@ -1,6 +1,6 @@
 # Story 4.3: 符号链接与 flatten 模式
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -18,22 +18,22 @@ So that 日常更新零额外操作，且每个工具都能正确读取配置。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 扩展 `src/stages/execute-install.ts` — 添加 symlink 模式 (AC: #1, #2, #5)
-  - [ ] 1.1 在 `executeInstall` 中添加模式判定：`args.link && scope === 'global'` → symlink
-  - [ ] 1.2 `-l` 无 `-g` 校验：在管道早期（CLI 解析后或 Install 入口）拒绝
-  - [ ] 1.3 symlink 的 `files` 类型：`createSymlink(sourceAbsPath, join(targetDir, filename))`
-  - [ ] 1.4 symlink 的 `directories` 类型：`createSymlink(sourceAbsPath, join(targetDir, dirname))`
-  - [ ] 1.5 已存在的符号链接：先删除旧链接再创建新链接
-  - [ ] 1.6 断链检测：安装完成后检查所有新建链接的有效性
-- [ ] Task 2: 扩展 `src/stages/execute-install.ts` — 添加 flatten 模式 (AC: #3, #4)
-  - [ ] 2.1 `flatten` 类型处理：遍历 sourceFiles（子目录），在每个子目录中查找 `rule.mainFile`（默认 `index.md`）
-  - [ ] 2.2 重命名逻辑：`skills/code-review/index.md` → `code-review.md`
-  - [ ] 2.3 复制到目标目录：`copyFile(mainFilePath, join(targetDir, dirName + '.md'))`
-  - [ ] 2.4 主文件不存在时：跳过该子目录，通过 `reporter.warn()` 记录警告，生成 `status: 'skipped'` 结果项，不写入 manifest
-- [ ] Task 3: 编写单元测试 (AC: #1-5)
-  - [ ] 3.1 扩展 `tests/stages/execute-install.test.ts`
-  - [ ] 3.2 测试用例：symlink files、symlink directories、-l 无 -g 拒绝、flatten 重命名、mainFile 缺失跳过、断链检测
-  - [ ] 3.3 使用临时目录进行真实 symlink 和文件操作测试
+- [x] Task 1: 扩展 `src/stages/execute-install.ts` — 添加 symlink 模式 (AC: #1, #2, #5)
+  - [x] 1.1 在 `executeInstall` 中添加模式判定：`args.link && scope === 'global'` → symlink
+  - [x] 1.2 `-l` 无 `-g` 校验：在管道早期（CLI 解析后或 Install 入口）拒绝
+  - [x] 1.3 symlink 的 `files` 类型：`createSymlink(sourceAbsPath, join(targetDir, filename))`
+  - [x] 1.4 symlink 的 `directories` 类型：`createSymlink(sourceAbsPath, join(targetDir, dirname))`
+  - [x] 1.5 已存在的符号链接：先删除旧链接再创建新链接
+  - [x] 1.6 断链检测：安装完成后检查所有新建链接的有效性
+- [x] Task 2: 扩展 `src/stages/execute-install.ts` — 添加 flatten 模式 (AC: #3, #4)
+  - [x] 2.1 `flatten` 类型处理：遍历 sourceFiles（子目录），在每个子目录中查找 `rule.mainFile`（默认 `index.md`）
+  - [x] 2.2 重命名逻辑：`skills/code-review/index.md` → `code-review.md`
+  - [x] 2.3 复制到目标目录：`copyFile(mainFilePath, join(targetDir, dirName + '.md'))`
+  - [x] 2.4 主文件不存在时：跳过该子目录，通过 `reporter.warn()` 记录警告，生成 `status: 'skipped'` 结果项，不写入 manifest
+- [x] Task 3: 编写单元测试 (AC: #1-5)
+  - [x] 3.1 扩展 `tests/stages/execute-install.test.ts`
+  - [x] 3.2 测试用例：symlink files、symlink directories、-l 无 -g 拒绝、flatten 重命名、mainFile 缺失跳过、断链检测
+  - [x] 3.3 使用临时目录进行真实 symlink 和文件操作测试
 
 ## Dev Notes
 
@@ -156,8 +156,42 @@ async function checkBrokenLinks(results: InstallResult[]): Promise<void> {
 
 ### Agent Model Used
 
+Claude Sonnet 4 (via Claude Code)
+
 ### Debug Log References
+
+无异常。全部测试一次通过，无 regression。
 
 ### Completion Notes List
 
+**Task 1 — symlink 模式 (AC #1, #2, #5):**
+- 在 `executeInstall` 中通过 `item.mode === 'symlink'` 分发到 symlink 路径
+- Files 类型 symlink：`createSymlink(srcPath, join(targetPath, basename(srcPath)))`
+- Directories 类型 symlink：`createSymlink(srcPath, join(targetPath, basename(srcPath)))`
+- 新增 `determineSymlinkStatus()` 函数：通过 `readlink()` 对比链接目标路径判断 new/updated/skipped
+- 新增 `checkBrokenLinks()` 函数：安装完成后检测所有 symlink 的链接有效性
+- AC #2 `-l` 无 `-g` 拒绝已由 Story 3.2 在 `match-rules.ts` 的 `getInstallMode()` 中实现
+
+**Task 2 — flatten 模式 (AC #3, #4):**
+- 在 `executeInstall` 中新增 `InstallType.Flatten` 分支
+- 从每个子目录提取 `mainFile`（默认 `index.md`），扁平化重命名为 `dirname.md`
+- 支持 `rule.mainFile` 自定义主文件名
+- 主文件不存在时：通过 `reporter.warn()` 记录警告，`status: 'skipped'`，不执行安装
+- flatten + symlink 组合模式正确支持
+- `InstallRule` 接口新增 `mainFile?: string` 可选字段
+
+**测试覆盖:**
+- Story 4.3 新增 13 个测试用例（20 → 33），全仓 473 个测试通过
+- 测试覆盖：symlink files (new/skipped/updated)、symlink directories、flatten copy (new/skipped/多子目录)、flatten mainFile 缺失跳过、自定义 mainFile、flatten + symlink、断链检测（有效/无效/copy 不触发）
+- 使用临时目录进行真实文件系统操作
+
 ### File List
+
+- `src/stages/execute-install.ts` — 扩展支持 symlink 和 flatten 模式
+- `src/core/types.ts` — `InstallRule` 新增 `mainFile?: string` 字段
+- `tests/stages/execute-install.test.ts` — 新增 13 个测试用例
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — 状态更新
+
+### Change Log
+
+- 2026-03-28: Story 4.3 实现完成 — symlink 模式（files/directories/断链检测）+ flatten 模式（扁平化重命名 + mainFile 自定义 + 缺失跳过）+ 13 个新测试

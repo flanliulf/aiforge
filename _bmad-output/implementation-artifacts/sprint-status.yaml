@@ -66,8 +66,8 @@ development_status:
   # Epic 4: 安装执行与冲突保护
   epic-4: backlog
   4-1-fs-utils-and-preflight-check: done
-  4-2-copy-mode-install: review
-  4-3-symlink-and-flatten-mode: ready-for-dev
+  4-2-copy-mode-install: done
+  4-3-symlink-and-flatten-mode: done
   4-4-manifest-state-and-conflict-detection: ready-for-dev
   4-5-conflict-handling-and-safety: ready-for-dev
   4-6a-pipeline-orchestration-and-error-flow: ready-for-dev

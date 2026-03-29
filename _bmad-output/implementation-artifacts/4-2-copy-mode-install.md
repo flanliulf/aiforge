@@ -1,6 +1,6 @@
 # Story 4.2: 复制模式安装执行
 
-Status: review
+Status: done
 
 ## Story
 
