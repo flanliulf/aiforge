@@ -13,6 +13,7 @@ import {
   loadManifest,
   saveManifest,
   checkConflict,
+  checkDirConflict,
   buildManifestEntries,
   mergeManifest,
 } from '../../src/services/manifest.js'
@@ -249,6 +250,66 @@ describe('services/manifest', () => {
       vi.mocked(access).mockRejectedValue(Object.assign(new Error('EIO'), { code: 'EIO' }))
 
       await expect(checkConflict('/target/file.md', 'hash', [], false)).rejects.toThrow('EIO')
+    })
+  })
+
+  // ── checkDirConflict ──────────────────────────────────────────
+
+  describe('checkDirConflict', () => {
+    it('should return "none" when target directory does not exist', async () => {
+      vi.mocked(access).mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
+
+      const result = await checkDirConflict('/target/my-skill', [], false)
+
+      expect(result).toBe('none')
+    })
+
+    it('should return "user-file" when directory exists but not in manifest (manifest normal)', async () => {
+      vi.mocked(access).mockResolvedValue()
+
+      const result = await checkDirConflict('/target/my-skill', [], false)
+
+      expect(result).toBe('user-file')
+    })
+
+    it('should return "unknown-origin" when directory exists but not in manifest (manifest degraded)', async () => {
+      vi.mocked(access).mockResolvedValue()
+
+      const result = await checkDirConflict('/target/my-skill', [], true)
+
+      expect(result).toBe('unknown-origin')
+    })
+
+    it('should return "aiforge-outdated" when directory exists and is in manifest', async () => {
+      vi.mocked(access).mockResolvedValue()
+
+      const entry: ManifestEntry = {
+        source: 'skills/my-skill',
+        target: '/target/my-skill',
+        tool: 'claude',
+        scope: 'global',
+        mode: 'copy',
+        hash: 'dirhash',
+        installedAt: '2026-03-30T10:00:00Z',
+      }
+
+      const result = await checkDirConflict('/target/my-skill', [entry], false)
+
+      expect(result).toBe('aiforge-outdated')
+    })
+
+    it('should propagate non-ENOENT errors from access() check', async () => {
+      vi.mocked(access).mockRejectedValue(Object.assign(new Error('EIO'), { code: 'EIO' }))
+
+      await expect(checkDirConflict('/target/dir', [], false)).rejects.toThrow('EIO')
+    })
+
+    it('should return "none" for ENOTDIR error (path component is not a directory)', async () => {
+      vi.mocked(access).mockRejectedValue(Object.assign(new Error('ENOTDIR'), { code: 'ENOTDIR' }))
+
+      const result = await checkDirConflict('/target/dir', [], false)
+
+      expect(result).toBe('none')
     })
   })
 

@@ -69,7 +69,7 @@ development_status:
   4-2-copy-mode-install: done
   4-3-symlink-and-flatten-mode: done
   4-4-manifest-state-and-conflict-detection: done
-  4-5-conflict-handling-and-safety: ready-for-dev
+  4-5-conflict-handling-and-safety: done
   4-6a-pipeline-orchestration-and-error-flow: ready-for-dev
   4-6b-install-result-summary-and-output: ready-for-dev
   epic-4-retrospective: optional

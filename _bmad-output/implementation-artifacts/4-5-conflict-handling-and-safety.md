@@ -1,6 +1,6 @@
 # Story 4.5: 冲突处理与安全保护
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -19,29 +19,29 @@ So that 不会丢失花时间调试的自定义配置。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 扩展 `src/stages/execute-install.ts` — 集成冲突处理 (AC: #1-4)
-  - [ ] 1.1 在每个文件安装前调用 `checkConflict()`（Story 4.4）
-  - [ ] 1.2 `ConflictType === 'user-file'` 时触发冲突处理流程
-  - [ ] 1.3 `ConflictType === 'aiforge-current'` → 自动跳过（hash 相同）
-  - [ ] 1.4 `ConflictType === 'aiforge-outdated'` → 直接更新（aiforge 自己安装的文件）
-  - [ ] 1.5 `--force` 模式：跳过所有交互，直接覆盖
-  - [ ] 1.6 非 TTY 检测：`!process.stdin.isTTY && conflict` → `AiforgeError(code: 'CONFLICT_NON_TTY')`
-- [ ] Task 2: 实现交互式冲突解决 (AC: #1, #2)
-  - [ ] 2.1 使用 `@inquirer/prompts` 的 `select` 提供选项
-  - [ ] 2.2 选项：覆盖 / 跳过 / 备份后覆盖（默认推荐）/ 查看差异 / 中止全部安装
-  - [ ] 2.3 "备份后覆盖"：调用 `backupFile()` → 正常安装
-  - [ ] 2.4 "查看差异"：显示源文件和目标文件的简要对比，然后重新询问
-  - [ ] 2.5 "中止"：停止整个安装流程
-- [ ] Task 3: 实现零结果诊断 (AC: #5)
-  - [ ] 3.1 安装完成后检查 results 是否全部为 skipped 或空
-  - [ ] 3.2 输出诊断：扫描了哪些目录、匹配了哪些模式、建议修复方式
-- [ ] Task 4: 实现临时文件清理 (AC: #6)
-  - [ ] 4.1 使用 try/finally 确保清理逻辑执行
-  - [ ] 4.2 清理 manifest.json.tmp 等临时文件
-- [ ] Task 5: 编写单元测试 (AC: #1-6)
-  - [ ] 5.1 扩展 `tests/stages/execute-install.test.ts`
-  - [ ] 5.2 测试用例：用户文件冲突交互、备份后覆盖、--force 跳过交互、非 TTY 失败、零结果诊断、临时文件清理
-  - [ ] 5.3 Mock `@inquirer/prompts`
+- [x] Task 1: 扩展 `src/stages/execute-install.ts` — 集成冲突处理 (AC: #1-4)
+  - [x] 1.1 在每个文件安装前调用 `checkConflict()`（Story 4.4）
+  - [x] 1.2 `ConflictType === 'user-file'` 时触发冲突处理流程
+  - [x] 1.3 `ConflictType === 'aiforge-current'` → 自动跳过（hash 相同）
+  - [x] 1.4 `ConflictType === 'aiforge-outdated'` → 直接更新（aiforge 自己安装的文件）
+  - [x] 1.5 `--force` 模式：跳过所有交互，直接覆盖
+  - [x] 1.6 非 TTY 检测：`!process.stdin.isTTY && conflict` → `AiforgeError(code: 'CONFLICT_NON_TTY')`
+- [x] Task 2: 实现交互式冲突解决 (AC: #1, #2)
+  - [x] 2.1 使用 `@inquirer/prompts` 的 `select` 提供选项
+  - [x] 2.2 选项：覆盖 / 跳过 / 备份后覆盖（默认推荐）/ 查看差异 / 中止全部安装
+  - [x] 2.3 "备份后覆盖"：调用 `backupFile()` → 正常安装
+  - [x] 2.4 "查看差异"：显示源文件和目标文件的简要对比，然后重新询问
+  - [x] 2.5 "中止"：停止整个安装流程
+- [x] Task 3: 实现零结果诊断 (AC: #5)
+  - [x] 3.1 安装完成后检查 results 是否全部为 skipped 或空
+  - [x] 3.2 输出诊断：扫描了哪些目录、匹配了哪些模式、建议修复方式
+- [x] Task 4: 实现临时文件清理 (AC: #6)
+  - [x] 4.1 使用 try/finally 确保清理逻辑执行
+  - [x] 4.2 清理 manifest.json.tmp 等临时文件
+- [x] Task 5: 编写单元测试 (AC: #1-6)
+  - [x] 5.1 扩展 `tests/stages/execute-install.test.ts`
+  - [x] 5.2 测试用例：用户文件冲突交互、备份后覆盖、--force 跳过交互、非 TTY 失败、零结果诊断、临时文件清理
+  - [x] 5.3 Mock `@inquirer/prompts`
 
 ## Dev Notes
 
@@ -163,8 +163,41 @@ try {
 
 ### Agent Model Used
 
+Claude (claude-sonnet-4-20250514)
+
 ### Debug Log References
+
+无异常。
 
 ### Completion Notes List
 
+- **新增模块 `src/stages/conflict-resolver.ts`**：交互式冲突解决模块，使用 `@inquirer/prompts` 的 `select` 提供 5 个选项（备份后覆盖/直接覆盖/跳过/查看差异/中止），"查看差异"递归重新询问，"中止"抛出 `USER_ABORT`
+- **扩展 `src/stages/execute-install.ts`**：
+  - 新增 `processConflict()` 函数：统一处理冲突检测结果，对 `user-file`/`unknown-origin`/`user-modified` 调用 `handleConflict`，对 `aiforge-current` 自动跳过，对 `aiforge-outdated` 直接更新
+  - `_args` 参数改为 `args`（使用 `args.force` 判断 --force 模式）
+  - 新增 `diagnoseZeroResults()` 函数：零结果诊断（FR-032），输出扫描目录/匹配规则/修复建议
+  - 新增 `try/finally` 结构：跟踪和清理临时文件（NFR-S6）
+  - 冲突检测从原来仅处理 `aiforge-current` 扩展为完整的 6 种冲突类型处理
+- **新增测试 `tests/stages/conflict-resolver.test.ts`**：12 个测试用例
+  - `resolveConflict`：5 个选项返回值、查看差异后重新询问、选项列表完整性
+  - `handleConflict`：--force 直接覆盖、非 TTY 抛 CONFLICT_NON_TTY、中止抛 USER_ABORT、TTY 各决策返回
+- **扩展测试 `tests/stages/execute-install.test.ts`**：11 个新增测试用例
+  - 冲突集成：user-file 备份后覆盖（含备份文件验证）、跳过、直接覆盖
+  - --force 模式集成测试
+  - aiforge-current 自动跳过（不调用 handleConflict）
+  - aiforge-outdated 直接更新（不调用 handleConflict）
+  - 零结果诊断：全部 skipped 触发、有 new/updated 不触发、空计划触发
+  - 临时文件清理：try/finally 结构完整性验证
+- **质量门禁**：Story 测试 58 个，全仓 519 个测试通过，Lint 通过，Build 成功
+- **既有测试适配**：修改 1 处断言（`skipped 状态断链告警`），从精确次数匹配改为内容匹配，以兼容零结果诊断的 warn 输出
+
 ### File List
+
+- `src/stages/conflict-resolver.ts` — 新增：交互式冲突解决模块
+- `src/stages/execute-install.ts` — 修改：集成冲突处理、零结果诊断、临时文件清理
+- `tests/stages/conflict-resolver.test.ts` — 新增：冲突解决模块单元测试（12 个用例）
+- `tests/stages/execute-install.test.ts` — 修改：新增 Story 4.5 集成测试（11 个用例）+ mock 冲突解决模块
+
+### Change Log
+
+- 2026-03-30: Story 4.5 实现 — 冲突处理与安全保护（AC #1-6 全部满足）

@@ -245,6 +245,35 @@ export type { ResolvedSource, InstallResult, MatchedPlan } from './types.js';
 
 > 来源：Story 4-1 CR — Round 3 修复 symlink 逃逸仅在 `targetStat === null` 分支添加 realpath 校验，遗漏 `isSymbolicLink()` 和 `isDirectory()` 分支，导致 P0 安全问题延续到 Round 4 才关闭。
 
+**复用函数接入新类型时必须审查内部所有分支的类型兼容性：**
+
+当一个已有函数（如 `processConflict()`）被新的调用方类型（如从仅 files 扩展到 directories）复用时，必须逐条审查该函数内部所有执行分支对新类型的兼容性。
+
+```typescript
+✅ // processConflict() 被 Directories 分支复用前，审查所有 case：
+   // - case 'backup'：backupFile() 不支持目录 → 需新增 backupDir() 分发
+   // - case 'skip'：返回 'skip'，通用 → 兼容
+   // - case 'overwrite'：返回 'proceed'，通用 → 兼容
+   case 'backup': {
+     const destStat = await stat(destPath)
+     if (destStat.isDirectory()) {
+       await backupDir(destPath)   // ← 目录级备份
+     } else {
+       await backupFile(destPath)  // ← 文件级备份（原逻辑）
+     }
+     return 'proceed'
+   }
+
+❌ // 直接复用，未审查 backup 分支对目录的兼容性
+   case 'backup':
+     await backupFile(destPath)  // ← 传入目录路径，EISDIR 崩溃
+     return 'proceed'
+```
+
+自查清单：对被复用函数的每个 `case`/`if` 分支，逐条回答"在新类型下是否安全/正确？"——(1) 函数内部调用的子函数是否支持新类型；(2) 交互式选项是否在新类型下全部有意义；(3) 类型判断和分发逻辑是否需要适配。
+
+> 来源：Story 4-5 CR — R1 Directories 未接入冲突检测 + R2 修复后目录冲突 backup 走文件级 API `backupFile()` 崩溃，2 轮才收敛。
+
 **新增 AiforgeError 错误码必须同步补负向测试：**
 
 新增 `try/catch` + `throw new AiforgeError(NEW_CODE)` 的错误处理分支时，必须同步补至少 1 条负向测试。

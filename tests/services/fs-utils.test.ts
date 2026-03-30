@@ -9,6 +9,7 @@ import {
   copyDir,
   createSymlink,
   backupFile,
+  backupDir,
   ensureDir,
   isWritable,
   fileHash,
@@ -203,6 +204,40 @@ describe('services/fs-utils', () => {
     it('throws AiforgeError when file does not exist', async () => {
       const original = join(tmpDir, 'nonexistent.txt')
       await expect(backupFile(original)).rejects.toMatchObject({
+        code: 'BACKUP_FAILED',
+        severity: 'fatal',
+      })
+    })
+  })
+
+  // ── backupDir ──────────────────────────────────────────────────────────────
+
+  describe('backupDir', () => {
+    it('creates a backup directory with all contents and returns backup path', async () => {
+      const originalDir = join(tmpDir, 'my-skill')
+      await mkdir(originalDir)
+      await writeFile(join(originalDir, 'README.md'), '# skill')
+      await writeFile(join(originalDir, 'config.json'), '{}')
+      const backupPath = await backupDir(originalDir)
+      expect(existsSync(backupPath)).toBe(true)
+      expect(backupPath).toMatch(/\.aiforge-backup-\d{8}$/)
+      const { readFile } = await import('node:fs/promises')
+      expect(await readFile(join(backupPath, 'README.md'), 'utf8')).toBe('# skill')
+      expect(await readFile(join(backupPath, 'config.json'), 'utf8')).toBe('{}')
+    })
+
+    it('original directory remains after backup', async () => {
+      const originalDir = join(tmpDir, 'backup-original')
+      await mkdir(originalDir)
+      await writeFile(join(originalDir, 'file.md'), 'content')
+      await backupDir(originalDir)
+      expect(existsSync(originalDir)).toBe(true)
+      expect(existsSync(join(originalDir, 'file.md'))).toBe(true)
+    })
+
+    it('throws AiforgeError when directory does not exist', async () => {
+      const nonExistentDir = join(tmpDir, 'nonexistent-dir')
+      await expect(backupDir(nonExistentDir)).rejects.toMatchObject({
         code: 'BACKUP_FAILED',
         severity: 'fatal',
       })

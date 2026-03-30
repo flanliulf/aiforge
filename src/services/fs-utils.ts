@@ -131,6 +131,29 @@ export async function backupFile(filePath: string): Promise<string> {
   }
 }
 
+// ── backupDir ────────────────────────────────────────────────────────────────
+
+/**
+ * 备份目录（递归复制），返回备份路径。
+ * 备份目录命名规则: `<原路径>.aiforge-backup-YYYYMMDD`
+ */
+export async function backupDir(dirPath: string): Promise<string> {
+  try {
+    const backupPath = getBackupPath(dirPath)
+    await cp(dirPath, backupPath, { recursive: true })
+    return backupPath
+  } catch (error) {
+    throw new AiforgeError(
+      `无法备份目录: ${dirPath}`,
+      'BACKUP_FAILED',
+      EXIT_INSTALL_FAILURE,
+      'fatal',
+      `备份目录时出错: ${errorMessage(error)}`,
+      [`检查源目录是否存在: ${dirPath}`, `检查父目录是否可写: ${dirname(dirPath)}`],
+    )
+  }
+}
+
 function getBackupPath(filePath: string): string {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
   return `${filePath}.aiforge-backup-${date}`

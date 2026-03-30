@@ -117,6 +117,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - **新增 AiforgeError 错误码必须同步补负向测试：** 新增 `try/catch` + `throw new AiforgeError(NEW_CODE)` 的错误处理分支时，必须同步补至少 1 条负向测试，强制触发该分支并断言 `code` 和 `severity`。否则回归保护为零，后续重构可能无感知地回退为 raw Error。（来源：Story 2-4 CR — Round 1 修复新增 `SANITIZE_REMOTE_FAILED`/`SCAN_FAILED` 但无测试，Round 2 发现）
 - **禁止对必填数据字段使用空值兜底（`?? ''` / `?? 0` / `?? false`）：** 当从 `Map.get()` 或可选链取值、且该值语义上为必填（如 hash、ID、路径等数据完整性关键字段）时，禁止使用 `?? ''`（或 `?? 0`、`?? false`、`?? []`）兜底。必须显式检查 `undefined` 并抛错，包含足够的上下文信息（如路径、key 值）便于排查。否则"看起来成功、但数据已损坏"，下游逻辑会系统性误判。（来源：Story 4-4 CR R1 — `hashes.get(targetPath) ?? ''` 导致空 hash 写入 manifest，下游冲突检测全面误判）
 - **InstallResult status 只有三种：** `'new'` | `'updated'` | `'skipped'`（无 `'failed'`——I/O 错误直接抛 fatal，hash 相同或用户选择跳过为 `'skipped'`）
+- **复用函数接入新类型时必须审查内部所有分支的类型兼容性：** 当一个已有函数（如 `processConflict()`）被新的调用方类型（如从仅 files 扩展到 directories）复用时，必须逐条审查该函数内部所有执行分支（如 `backup` / `skip` / `overwrite`）对新类型的兼容性：(1) 函数内部调用的子函数是否支持新类型（如 `backupFile()` 不支持目录）；(2) 交互式选项是否在新类型下全部有意义；(3) 新增修复代码时自查清单——对被复用函数的每个 `case`/`if` 分支，逐条回答"在新类型下是否安全/正确？"。（来源：Story 4-5 CR — R1 Directories 未接入冲突检测 + R2 修复后目录冲突 backup 走文件级 API `backupFile()` 崩溃，2 轮才收敛）
 
 ### Input Validation Rules
 
@@ -210,4 +211,4 @@ index.ts → pipeline.ts → stages/* → services/*
 - Update when technology stack or patterns change
 - Remove rules that become obvious over time
 
-Last Updated: 2026-03-28
+Last Updated: 2026-03-30

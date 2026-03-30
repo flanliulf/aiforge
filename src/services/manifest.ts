@@ -148,6 +148,49 @@ export async function checkConflict(
   return 'aiforge-outdated'
 }
 
+// ── checkDirConflict ────────────────────────────────────────────────────────
+
+/**
+ * 检测目标目录的冲突类型（目录级简化版本）。
+ *
+ * 目录没有单一 hash，不做文件级对比。
+ * 冲突判定：
+ * - 目标目录不存在 → 'none'
+ * - 目标目录存在 + 在 manifest → 'aiforge-outdated'（aiforge 安装的目录，直接更新）
+ * - 目标目录存在 + 不在 manifest + manifest 正常 → 'user-file'
+ * - 目标目录存在 + 不在 manifest + manifest 降级 → 'unknown-origin'
+ *
+ * @param targetPath       目标目录绝对路径
+ * @param manifest         当前 manifest 条目列表
+ * @param manifestDegraded manifest 是否处于降级状态
+ */
+export async function checkDirConflict(
+  targetPath: string,
+  manifest: ManifestEntry[],
+  manifestDegraded: boolean,
+): Promise<ConflictType> {
+  // 检查目标目录是否存在
+  try {
+    await access(targetPath)
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === 'ENOENT' || code === 'ENOTDIR') {
+      return 'none'
+    }
+    // 其他 I/O 错误（EACCES、EIO 等）向上抛出
+    throw error
+  }
+
+  // 目标目录存在，查找 manifest 条目
+  const entry = manifest.find((e) => e.target === targetPath)
+  if (!entry) {
+    return manifestDegraded ? 'unknown-origin' : 'user-file'
+  }
+
+  // 在 manifest 中 → aiforge 安装的目录，直接更新
+  return 'aiforge-outdated'
+}
+
 // ── buildManifestEntries ────────────────────────────────────────────────────
 
 /**

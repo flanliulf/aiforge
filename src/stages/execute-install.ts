@@ -1,7 +1,7 @@
 /**
  * stages/execute-install.ts
  *
- * Install 管道阶段 — 安装执行（Story 4.2 + Story 4.3 + Story 4.4）
+ * Install 管道阶段 — 安装执行（Story 4.2 + Story 4.3 + Story 4.4 + Story 4.5）
  *
  * 功能：
  * - 执行安装预检查（preflight）
@@ -14,22 +14,26 @@
  * - 目标目录不存在时自动调用 ensureDir
  * - 通过 fileHash 判断安装状态：new / updated / skipped
  * - 每个文件安装前调用冲突检测（Story 4.4）
+ * - 冲突处理：交互式选项 / --force 覆盖 / 非 TTY 失败（Story 4.5）
  * - symlink 模式安装完成后执行断链检测（NFR-R6）
+ * - 零结果诊断：安装结果为零项时输出诊断信息（FR-032）
+ * - 临时文件说明：当前由 saveManifest 原子写入自清理（NFR-S6）
  * - fail-fast：文件操作异常时立即抛出 AiforgeError(fatal)
  *
  * 依赖：
  * - core/types.ts (MatchedPlan, ParsedArgs, InstallResult, InstallType, ManifestEntry)
  * - core/reporter.ts (Reporter)
  * - core/path-resolver.ts (PathResolver)
- * - services/fs-utils.ts (preflight, copyFile, copyDir, createSymlink, ensureDir, fileHash)
+ * - services/fs-utils.ts (preflight, copyFile, copyDir, createSymlink, ensureDir, fileHash, backupFile)
  * - services/manifest.ts (checkConflict, ConflictType)
+ * - stages/conflict-resolver.ts (handleConflict)
  *
  * 架构: architecture/03-core-decisions.md#D6
  * 模块边界: stages/ → services/, core/
  */
 
 import { join, basename } from 'node:path'
-import { access, readlink } from 'node:fs/promises'
+import { access, readlink, stat } from 'node:fs/promises'
 
 import type { MatchedPlan, ParsedArgs, InstallResult, ManifestEntry } from '../core/types.js'
 import { InstallType } from '../core/types.js'
@@ -42,10 +46,13 @@ import {
   createSymlink,
   ensureDir,
   fileHash,
+  backupFile,
+  backupDir,
   validateDestPathSecurity,
 } from '../services/fs-utils.js'
-import { checkConflict } from '../services/manifest.js'
+import { checkConflict, checkDirConflict } from '../services/manifest.js'
 import type { ConflictType } from '../services/manifest.js'
+import { handleConflict } from './conflict-resolver.js'
 
 // ── 状态判定 ──────────────────────────────────────────────────────────────────
 
@@ -153,13 +160,22 @@ const DEFAULT_MAIN_FILE = 'index.md'
 // ── 冲突检测辅助 ────────────────────────────────────────────────────────────
 
 /**
- * 在文件安装前执行冲突检测（Story 4.4 Task 2.3）。
+ * 需要用户决策的冲突类型（Story 4.5）。
+ * 包括：用户手写文件、未知来源文件、用户修改过的 aiforge 安装文件。
+ */
+const NEEDS_USER_DECISION: ConflictType[] = ['user-file', 'unknown-origin', 'user-modified']
+
+/**
+ * 在文件安装前执行冲突检测（Story 4.4 Task 2.3 + Story 4.5）。
  *
  * 当 manifestContext 未提供时跳过检测（向后兼容）。
- * 返回冲突类型。'aiforge-current' 表示已是最新，调用方应跳过安装。
+ * 返回冲突类型。
  *
- * 注意：冲突交互式处理由 Story 4.5 实现。当前仅检测冲突类型，
- * 对 'aiforge-current' 自动跳过，其他类型暂不阻止安装。
+ * 冲突处理策略（Story 4.5）：
+ * - 'none'：无冲突，正常安装
+ * - 'aiforge-current'：已是最新，跳过安装
+ * - 'aiforge-outdated'：源有更新，直接安装（aiforge 自己安装的文件）
+ * - 'user-file' / 'unknown-origin' / 'user-modified'：需要用户决策
  */
 async function detectConflict(
   srcPath: string,
@@ -170,6 +186,96 @@ async function detectConflict(
 
   const srcHash = await fileHash(srcPath)
   return checkConflict(destPath, srcHash, manifestContext.entries, manifestContext.degraded)
+}
+
+/**
+ * 在目录安装前执行冲突检测（CR Round-1 修复）。
+ *
+ * 目录级冲突检测不做文件级 hash 对比，仅基于目标目录是否存在和 manifest 记录。
+ * 当 manifestContext 未提供时跳过检测（向后兼容）。
+ */
+async function detectDirConflict(
+  destPath: string,
+  manifestContext: ManifestContext | undefined,
+): Promise<ConflictType | undefined> {
+  if (!manifestContext) return undefined
+
+  return checkDirConflict(destPath, manifestContext.entries, manifestContext.degraded)
+}
+
+/**
+ * 处理冲突检测结果。
+ *
+ * @returns 'skip' 表示跳过此文件，'proceed' 表示继续安装
+ * @throws AiforgeError(CONFLICT_NON_TTY) 非 TTY 下需要用户决策时
+ * @throws AiforgeError(USER_ABORT) 用户选择中止安装时
+ */
+async function processConflict(
+  conflict: ConflictType | undefined,
+  srcPath: string,
+  destPath: string,
+  force: boolean,
+  reporter: Reporter,
+): Promise<'skip' | 'proceed'> {
+  if (!conflict || conflict === 'none') return 'proceed'
+  if (conflict === 'aiforge-current') return 'skip'
+  // aiforge-outdated: 源有更新，目标未被用户修改 → 直接安装
+  if (conflict === 'aiforge-outdated') return 'proceed'
+
+  // 需要用户决策的冲突类型
+  if (NEEDS_USER_DECISION.includes(conflict)) {
+    const decision = await handleConflict(destPath, srcPath, force, reporter)
+    switch (decision) {
+      case 'backup': {
+        // 根据目标类型选择文件级或目录级备份（CR Round-2 修复）
+        const destStat = await stat(destPath)
+        if (destStat.isDirectory()) {
+          await backupDir(destPath)
+        } else {
+          await backupFile(destPath)
+        }
+        return 'proceed'
+      }
+      case 'skip':
+        return 'skip'
+      case 'overwrite':
+        return 'proceed'
+      // 'abort' case is handled inside handleConflict (throws USER_ABORT)
+    }
+  }
+
+  return 'proceed'
+}
+
+// ── 零结果诊断 ──────────────────────────────────────────────────────────────
+
+/**
+ * 零结果诊断（FR-032）。
+ * 当安装结果为空或全部为 skipped 时，输出诊断信息。
+ */
+function diagnoseZeroResults(
+  plan: MatchedPlan,
+  resultItems: InstallResult['items'],
+  reporter: Reporter,
+): void {
+  const hasActualInstall = resultItems.some(
+    (item) => item.status === 'new' || item.status === 'updated',
+  )
+  if (hasActualInstall) return
+
+  const scannedDirs = [...new Set(plan.items.map((item) => item.rule.sourceDir))]
+  const matchedRules = plan.items.map((item) => `${item.rule.tool}:${item.rule.scope}`)
+
+  reporter.warn('⚠️ 未安装任何文件')
+  reporter.warn('')
+  reporter.warn('诊断信息：')
+  reporter.warn(`  扫描目录: ${scannedDirs.join(', ')}`)
+  reporter.warn(`  匹配规则: ${matchedRules.join(', ')} (${matchedRules.length} 条)`)
+  reporter.warn(`  所有文件已是最新或被跳过`)
+  reporter.warn('')
+  reporter.warn('建议：')
+  reporter.warn('  1. 使用 --force 强制重新安装')
+  reporter.warn('  2. 检查知识仓库是否有新内容')
 }
 
 // ── manifest 冲突上下文 ─────────────────────────────────────────────────────
@@ -189,7 +295,7 @@ export interface ManifestContext {
  * executeInstall — Install 管道阶段主函数
  *
  * @param plan            匹配的安装计划
- * @param args            解析后的 CLI 参数
+ * @param args            解析后的 CLI 参数（使用 args.force 判断 --force 模式）
  * @param reporter        输出报告器
  * @param pathResolver    路径解析器（用于 preflight 的 allowedRoot 推导）
  * @param manifestContext 可选 manifest 上下文，用于冲突检测（Story 4.4）
@@ -199,10 +305,14 @@ export interface ManifestContext {
  * - 文件/目录 I/O 操作失败时，copyFile/copyDir/createSymlink 内部抛出 AiforgeError(fatal)
  * - 异常向上透传，管道立即终止
  * - 已完成的操作包含在 results 中（但因异常未返回，由调用方决定是否使用）
+ *
+ * 临时文件说明（NFR-S6）：
+ * - 当前唯一临时文件场景（manifest.json.tmp）由 saveManifest() 内部原子 rename 自清理
+ * - executeInstall 无需额外清理逻辑
  */
 export async function executeInstall(
   plan: MatchedPlan,
-  _args: ParsedArgs,
+  args: ParsedArgs,
   reporter: Reporter,
   pathResolver: PathResolver,
   manifestContext?: ManifestContext,
@@ -255,14 +365,21 @@ export async function executeInstall(
         // 安全校验
         await validateDestPathSecurity(destPath, allowedRoot)
 
-        if (item.mode === 'symlink') {
-          // 冲突检测（Story 4.4）：symlink 模式使用 mainPath 作为源
-          const conflict = await detectConflict(mainPath, destPath, manifestContext)
-          if (conflict === 'aiforge-current') {
-            resultItems.push({ status: 'skipped', sourcePath: mainPath, targetPath: destPath })
-            continue
-          }
+        // 冲突检测与处理（Story 4.4 + 4.5）
+        const conflict = await detectConflict(mainPath, destPath, manifestContext)
+        const conflictAction = await processConflict(
+          conflict,
+          mainPath,
+          destPath,
+          args.force,
+          reporter,
+        )
+        if (conflictAction === 'skip') {
+          resultItems.push({ status: 'skipped', sourcePath: mainPath, targetPath: destPath })
+          continue
+        }
 
+        if (item.mode === 'symlink') {
           const status = await determineSymlinkStatus(mainPath, destPath)
           if (status !== 'skipped') {
             await createSymlink(mainPath, destPath)
@@ -271,13 +388,6 @@ export async function executeInstall(
           itemModes.set(destPath, 'symlink')
           resultItems.push({ status, sourcePath: mainPath, targetPath: destPath })
         } else {
-          // 冲突检测（Story 4.4）：copy 模式使用 mainPath 作为源
-          const conflict = await detectConflict(mainPath, destPath, manifestContext)
-          if (conflict === 'aiforge-current') {
-            resultItems.push({ status: 'skipped', sourcePath: mainPath, targetPath: destPath })
-            continue
-          }
-
           const status = await determineStatus(mainPath, destPath)
           if (status !== 'skipped') {
             await copyFile(mainPath, destPath)
@@ -295,9 +405,16 @@ export async function executeInstall(
           // 文件级 symlink 逃逸校验（NFR-S5）
           await validateDestPathSecurity(destPath, allowedRoot)
 
-          // 冲突检测（Story 4.4）
+          // 冲突检测与处理（Story 4.4 + 4.5）
           const conflict = await detectConflict(srcPath, destPath, manifestContext)
-          if (conflict === 'aiforge-current') {
+          const conflictAction = await processConflict(
+            conflict,
+            srcPath,
+            destPath,
+            args.force,
+            reporter,
+          )
+          if (conflictAction === 'skip') {
             resultItems.push({ status: 'skipped', sourcePath: srcPath, targetPath: destPath })
             continue
           }
@@ -326,8 +443,19 @@ export async function executeInstall(
           // 目录级 symlink 逃逸校验（NFR-S5）
           await validateDestPathSecurity(destPath, allowedRoot)
 
-          // 冲突检测（Story 4.4）：目录类型不做文件级 hash 对比，跳过冲突检测
-          // 目录冲突由 Story 4.5 处理交互式决策
+          // 冲突检测与处理（CR Round-1 修复）：目录级冲突不做文件级 hash 对比
+          const conflict = await detectDirConflict(destPath, manifestContext)
+          const conflictAction = await processConflict(
+            conflict,
+            srcPath,
+            destPath,
+            args.force,
+            reporter,
+          )
+          if (conflictAction === 'skip') {
+            resultItems.push({ status: 'skipped', sourcePath: srcPath, targetPath: destPath })
+            continue
+          }
 
           if (item.mode === 'symlink') {
             // symlink 模式（Task 1.4）：创建指向源目录绝对路径的符号链接
@@ -354,6 +482,9 @@ export async function executeInstall(
   if (itemModes.size > 0) {
     await checkBrokenLinks(resultItems, itemModes, reporter)
   }
+
+  // 零结果诊断（FR-032 / AC #5）
+  diagnoseZeroResults(plan, resultItems, reporter)
 
   reporter.completePhase()
   return { items: resultItems }

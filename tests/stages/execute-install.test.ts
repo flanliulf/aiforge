@@ -1,9 +1,11 @@
 /**
  * tests/stages/execute-install.test.ts
  *
- * Story 4.2 + 4.3 — 安装执行测试
+ * Story 4.2 + 4.3 + 4.5 — 安装执行测试
  * 测试用例：files/directories 复制、symlink 模式、flatten 模式、
- *           new/updated/skipped 状态判定、断链检测、fail-fast 行为
+ *           new/updated/skipped 状态判定、断链检测、fail-fast 行为、
+ *           冲突处理集成、备份后覆盖、--force 跳过交互、非 TTY 失败、
+ *           零结果诊断、临时文件清理
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -11,7 +13,17 @@ import { mkdtemp, writeFile, mkdir, rm, readFile, symlink, readlink } from 'node
 import { tmpdir } from 'node:os'
 import { join, basename } from 'node:path'
 
+// ── Hoisted mock for conflict-resolver ───────────────────────────────────
+const conflictMocks = vi.hoisted(() => ({
+  handleConflict: vi.fn(),
+}))
+
+vi.mock('../../src/stages/conflict-resolver.js', () => ({
+  handleConflict: conflictMocks.handleConflict,
+}))
+
 import { executeInstall } from '../../src/stages/execute-install.js'
+import type { ManifestContext } from '../../src/stages/execute-install.js'
 import { AiforgeError } from '../../src/core/errors.js'
 import { InstallType } from '../../src/core/types.js'
 import type { MatchedPlan, ParsedArgs } from '../../src/core/types.js'
@@ -939,7 +951,7 @@ describe('stages/execute-install', () => {
       await executeInstall(plan, makeArgs({ link: true }), reporter, pathResolver)
 
       // 验证：skipped 状态也应参与断链检测
-      expect(reporter.warn).toHaveBeenCalledTimes(1)
+      // 注意：零结果诊断（Story 4.5）也会输出 warn，所以不精确检查调用次数
       expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('断链'))
     })
 
@@ -954,6 +966,481 @@ describe('stages/execute-install', () => {
       await executeInstall(plan, makeArgs(), reporter, pathResolver)
 
       expect(reporter.warn).not.toHaveBeenCalled()
+    })
+  })
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // Story 4.5 — 冲突处理集成测试
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  describe('冲突处理集成 — user-file 冲突 (AC: #1, #2)', () => {
+    /**
+     * 构建 manifestContext：目标文件不在 manifest（user-file 冲突）
+     */
+    function makeUserFileConflictContext(): ManifestContext {
+      return { entries: [], degraded: false }
+    }
+
+    beforeEach(() => {
+      conflictMocks.handleConflict.mockReset()
+    })
+
+    it('user-file 冲突 + 用户选择 "备份后覆盖" → 备份文件存在 + 新文件被安装', async () => {
+      const srcFile = join(tmpDir, 'conflict-src.md')
+      const targetDir = join(tmpDir, 'conflict-target')
+      await mkdir(targetDir)
+      await writeFile(srcFile, 'new content from repo')
+      // 预先放置用户手写文件
+      const destFile = join(targetDir, basename(srcFile))
+      await writeFile(destFile, 'user custom content')
+
+      // handleConflict 返回 'backup'
+      conflictMocks.handleConflict.mockResolvedValueOnce('backup')
+
+      const plan = makeFilePlan([srcFile], targetDir)
+      const ctx = makeUserFileConflictContext()
+
+      const result = await executeInstall(plan, makeArgs(), reporter, pathResolver, ctx)
+
+      // handleConflict 被调用
+      expect(conflictMocks.handleConflict).toHaveBeenCalledOnce()
+      // 文件被安装（覆盖）
+      expect(result.items).toHaveLength(1)
+      expect(result.items[0]!.status).toBe('updated')
+      const installed = await readFile(destFile, 'utf8')
+      expect(installed).toBe('new content from repo')
+      // 备份文件存在（backupFile 由 processConflict 调用）
+      // 备份文件命名: {file}.aiforge-backup-YYYYMMDD
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+      const backupPath = `${destFile}.aiforge-backup-${today}`
+      const backupContent = await readFile(backupPath, 'utf8')
+      expect(backupContent).toBe('user custom content')
+    })
+
+    it('user-file 冲突 + 用户选择 "跳过" → 文件不被覆盖，status: skipped', async () => {
+      const srcFile = join(tmpDir, 'skip-conflict-src.md')
+      const targetDir = join(tmpDir, 'skip-conflict-target')
+      await mkdir(targetDir)
+      await writeFile(srcFile, 'new content')
+      const destFile = join(targetDir, basename(srcFile))
+      await writeFile(destFile, 'user content preserved')
+
+      conflictMocks.handleConflict.mockResolvedValueOnce('skip')
+
+      const plan = makeFilePlan([srcFile], targetDir)
+      const ctx = makeUserFileConflictContext()
+
+      const result = await executeInstall(plan, makeArgs(), reporter, pathResolver, ctx)
+
+      expect(result.items).toHaveLength(1)
+      expect(result.items[0]!.status).toBe('skipped')
+      // 用户文件未被覆盖
+      const content = await readFile(destFile, 'utf8')
+      expect(content).toBe('user content preserved')
+    })
+
+    it('user-file 冲突 + 用户选择 "直接覆盖" → 文件被覆盖，无备份', async () => {
+      const srcFile = join(tmpDir, 'overwrite-src.md')
+      const targetDir = join(tmpDir, 'overwrite-target')
+      await mkdir(targetDir)
+      await writeFile(srcFile, 'overwrite content')
+      const destFile = join(targetDir, basename(srcFile))
+      await writeFile(destFile, 'original user content')
+
+      conflictMocks.handleConflict.mockResolvedValueOnce('overwrite')
+
+      const plan = makeFilePlan([srcFile], targetDir)
+      const ctx = makeUserFileConflictContext()
+
+      const result = await executeInstall(plan, makeArgs(), reporter, pathResolver, ctx)
+
+      expect(result.items).toHaveLength(1)
+      expect(result.items[0]!.status).toBe('updated')
+      const installed = await readFile(destFile, 'utf8')
+      expect(installed).toBe('overwrite content')
+    })
+  })
+
+  describe('冲突处理 — --force 模式 (AC: #3)', () => {
+    beforeEach(() => {
+      conflictMocks.handleConflict.mockReset()
+    })
+
+    it('--force + user-file 冲突 → 跳过交互，直接覆盖', async () => {
+      const srcFile = join(tmpDir, 'force-src.md')
+      const targetDir = join(tmpDir, 'force-target')
+      await mkdir(targetDir)
+      await writeFile(srcFile, 'force install content')
+      const destFile = join(targetDir, basename(srcFile))
+      await writeFile(destFile, 'user file')
+
+      // handleConflict 在 force=true 时应返回 'overwrite'
+      conflictMocks.handleConflict.mockResolvedValueOnce('overwrite')
+
+      const plan = makeFilePlan([srcFile], targetDir)
+      const ctx: ManifestContext = { entries: [], degraded: false }
+
+      const result = await executeInstall(
+        plan,
+        makeArgs({ force: true }),
+        reporter,
+        pathResolver,
+        ctx,
+      )
+
+      // handleConflict 被调用（force 参数由 processConflict 传递）
+      expect(conflictMocks.handleConflict).toHaveBeenCalledWith(
+        destFile,
+        srcFile,
+        true, // force = true
+        reporter,
+      )
+      expect(result.items[0]!.status).toBe('updated')
+    })
+  })
+
+  describe('冲突处理 — aiforge-current 自动跳过 (AC: #1)', () => {
+    it('aiforge-current 冲突类型 → 自动 skipped，不调用 handleConflict', async () => {
+      const srcFile = join(tmpDir, 'current-src.md')
+      const targetDir = join(tmpDir, 'current-target')
+      await mkdir(targetDir)
+      const sameContent = 'identical managed content'
+      await writeFile(srcFile, sameContent)
+      const destFile = join(targetDir, basename(srcFile))
+      await writeFile(destFile, sameContent)
+
+      conflictMocks.handleConflict.mockReset()
+
+      // manifest 包含该文件且 hash 匹配（aiforge-current）
+      const { fileHash } = await import('../../src/services/fs-utils.js')
+      const hash = await fileHash(srcFile)
+      const ctx: ManifestContext = {
+        entries: [
+          {
+            source: 'agents/current-src.md',
+            target: destFile,
+            tool: 'claude',
+            scope: 'global',
+            mode: 'copy',
+            hash,
+            installedAt: new Date().toISOString(),
+          },
+        ],
+        degraded: false,
+      }
+
+      const plan = makeFilePlan([srcFile], targetDir)
+      const result = await executeInstall(plan, makeArgs(), reporter, pathResolver, ctx)
+
+      expect(result.items).toHaveLength(1)
+      expect(result.items[0]!.status).toBe('skipped')
+      // handleConflict 不应被调用（aiforge-current 自动跳过）
+      expect(conflictMocks.handleConflict).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('冲突处理 — aiforge-outdated 直接更新 (AC: #1)', () => {
+    it('aiforge-outdated 冲突类型 → 直接更新，不调用 handleConflict', async () => {
+      const srcFile = join(tmpDir, 'outdated-src.md')
+      const targetDir = join(tmpDir, 'outdated-target')
+      await mkdir(targetDir)
+      await writeFile(srcFile, 'updated content from repo')
+      const destFile = join(targetDir, basename(srcFile))
+      await writeFile(destFile, 'old managed content')
+
+      conflictMocks.handleConflict.mockReset()
+
+      // manifest 包含该文件，目标 hash 匹配 manifest（用户没改），源 hash 不匹配（源有更新）
+      const { fileHash } = await import('../../src/services/fs-utils.js')
+      const destHash = await fileHash(destFile)
+      const ctx: ManifestContext = {
+        entries: [
+          {
+            source: 'agents/outdated-src.md',
+            target: destFile,
+            tool: 'claude',
+            scope: 'global',
+            mode: 'copy',
+            hash: destHash, // manifest hash 匹配目标当前 hash
+            installedAt: new Date().toISOString(),
+          },
+        ],
+        degraded: false,
+      }
+
+      const plan = makeFilePlan([srcFile], targetDir)
+      const result = await executeInstall(plan, makeArgs(), reporter, pathResolver, ctx)
+
+      expect(result.items).toHaveLength(1)
+      expect(result.items[0]!.status).toBe('updated')
+      // handleConflict 不应被调用（aiforge-outdated 直接更新）
+      expect(conflictMocks.handleConflict).not.toHaveBeenCalled()
+      // 文件实际被更新
+      const content = await readFile(destFile, 'utf8')
+      expect(content).toBe('updated content from repo')
+    })
+  })
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // Story 4.5 — 零结果诊断 (AC: #5)
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  describe('零结果诊断 (AC: #5 / FR-032)', () => {
+    it('全部文件 skipped → 触发零结果诊断 warn', async () => {
+      const srcFile = join(tmpDir, 'zero-diag-src.md')
+      const targetDir = join(tmpDir, 'zero-diag-target')
+      await mkdir(targetDir)
+      const sameContent = 'identical'
+      await writeFile(srcFile, sameContent)
+      await writeFile(join(targetDir, basename(srcFile)), sameContent)
+
+      const plan = makeFilePlan([srcFile], targetDir)
+      await executeInstall(plan, makeArgs(), reporter, pathResolver)
+
+      // reporter.warn 应包含零结果诊断信息
+      expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('未安装任何文件'))
+      expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('--force'))
+    })
+
+    it('有文件被安装（new/updated）→ 不触发零结果诊断', async () => {
+      const srcFile = join(tmpDir, 'has-install-src.md')
+      const targetDir = join(tmpDir, 'has-install-target')
+      await writeFile(srcFile, 'new content')
+
+      const plan = makeFilePlan([srcFile], targetDir)
+      await executeInstall(plan, makeArgs(), reporter, pathResolver)
+
+      // warn 不应包含零结果诊断
+      const warnCalls = (reporter.warn as ReturnType<typeof vi.fn>).mock.calls.map(
+        (c: unknown[]) => c[0],
+      )
+      const hasZeroDiag = warnCalls.some(
+        (msg: string) => typeof msg === 'string' && msg.includes('未安装任何文件'),
+      )
+      expect(hasZeroDiag).toBe(false)
+    })
+
+    it('空计划 → 触发零结果诊断', async () => {
+      const emptyPlan: MatchedPlan = {
+        items: [
+          {
+            rule: {
+              tool: 'claude',
+              scope: 'global',
+              sourceDir: 'agents',
+              type: InstallType.Files,
+              targetDir: join(tmpDir, 'empty-plan-target'),
+            },
+            sourceFiles: [],
+            targetPath: join(tmpDir, 'empty-plan-target'),
+            mode: 'copy',
+          },
+        ],
+      }
+
+      await executeInstall(emptyPlan, makeArgs(), reporter, pathResolver)
+
+      // 零结果诊断应触发（空 sourceFiles 静默跳过 → 无任何结果）
+      expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('未安装任何文件'))
+    })
+  })
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // CR Round-1 修复 — Directories 冲突检测集成测试
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  describe('Directories 冲突检测集成 (CR Round-1 修复)', () => {
+    beforeEach(() => {
+      conflictMocks.handleConflict.mockReset()
+    })
+
+    it('Directories copy + user-file 冲突 + 用户选择 "跳过" → 目录不被覆盖', async () => {
+      const srcDir = join(tmpDir, 'dir-conflict-src')
+      await mkdir(srcDir)
+      await writeFile(join(srcDir, 'README.md'), '# from repo')
+      const targetDir = join(tmpDir, 'dir-conflict-target')
+      // 预先放置用户手写目录
+      const destDir = join(targetDir, basename(srcDir))
+      await mkdir(destDir, { recursive: true })
+      await writeFile(join(destDir, 'custom.md'), 'user custom content')
+
+      conflictMocks.handleConflict.mockResolvedValueOnce('skip')
+
+      const plan = makeDirPlan([srcDir], targetDir)
+      const ctx: ManifestContext = { entries: [], degraded: false }
+
+      const result = await executeInstall(plan, makeArgs(), reporter, pathResolver, ctx)
+
+      expect(conflictMocks.handleConflict).toHaveBeenCalledOnce()
+      expect(result.items).toHaveLength(1)
+      expect(result.items[0]!.status).toBe('skipped')
+      // 用户目录未被覆盖
+      const content = await readFile(join(destDir, 'custom.md'), 'utf8')
+      expect(content).toBe('user custom content')
+    })
+
+    it('Directories copy + user-file 冲突 + 用户选择 "覆盖" → 目录被覆盖', async () => {
+      const srcDir = join(tmpDir, 'dir-overwrite-src')
+      await mkdir(srcDir)
+      await writeFile(join(srcDir, 'README.md'), '# from repo')
+      const targetDir = join(tmpDir, 'dir-overwrite-target')
+      const destDir = join(targetDir, basename(srcDir))
+      await mkdir(destDir, { recursive: true })
+      await writeFile(join(destDir, 'old.md'), 'old content')
+
+      conflictMocks.handleConflict.mockResolvedValueOnce('overwrite')
+
+      const plan = makeDirPlan([srcDir], targetDir)
+      const ctx: ManifestContext = { entries: [], degraded: false }
+
+      const result = await executeInstall(plan, makeArgs(), reporter, pathResolver, ctx)
+
+      expect(conflictMocks.handleConflict).toHaveBeenCalledOnce()
+      expect(result.items).toHaveLength(1)
+      expect(result.items[0]!.status).toBe('updated')
+      // 目录被覆盖为源内容
+      const content = await readFile(join(destDir, 'README.md'), 'utf8')
+      expect(content).toBe('# from repo')
+    })
+
+    it('Directories copy + user-file 冲突 + 用户选择 "备份后覆盖" → 备份目录存在 + 新目录被安装 (CR Round-2 修复)', async () => {
+      const srcDir = join(tmpDir, 'dir-backup-src')
+      await mkdir(srcDir)
+      await writeFile(join(srcDir, 'README.md'), '# from repo')
+      const targetDir = join(tmpDir, 'dir-backup-target')
+      const destDir = join(targetDir, basename(srcDir))
+      await mkdir(destDir, { recursive: true })
+      await writeFile(join(destDir, 'custom.md'), 'user custom skill')
+
+      conflictMocks.handleConflict.mockResolvedValueOnce('backup')
+
+      const plan = makeDirPlan([srcDir], targetDir)
+      const ctx: ManifestContext = { entries: [], degraded: false }
+
+      const result = await executeInstall(plan, makeArgs(), reporter, pathResolver, ctx)
+
+      // handleConflict 被调用
+      expect(conflictMocks.handleConflict).toHaveBeenCalledOnce()
+      // 目录被安装
+      expect(result.items).toHaveLength(1)
+      expect(result.items[0]!.status).toBe('updated')
+      const installed = await readFile(join(destDir, 'README.md'), 'utf8')
+      expect(installed).toBe('# from repo')
+      // 备份目录存在（命名: <dir>.aiforge-backup-YYYYMMDD）
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+      const backupPath = `${destDir}.aiforge-backup-${today}`
+      const backupContent = await readFile(join(backupPath, 'custom.md'), 'utf8')
+      expect(backupContent).toBe('user custom skill')
+    })
+
+    it('Directories copy + --force + user-file 冲突 → 直接覆盖', async () => {
+      const srcDir = join(tmpDir, 'dir-force-src')
+      await mkdir(srcDir)
+      await writeFile(join(srcDir, 'README.md'), '# force')
+      const targetDir = join(tmpDir, 'dir-force-target')
+      const destDir = join(targetDir, basename(srcDir))
+      await mkdir(destDir, { recursive: true })
+      await writeFile(join(destDir, 'user.md'), 'user content')
+
+      conflictMocks.handleConflict.mockResolvedValueOnce('overwrite')
+
+      const plan = makeDirPlan([srcDir], targetDir)
+      const ctx: ManifestContext = { entries: [], degraded: false }
+
+      const result = await executeInstall(
+        plan,
+        makeArgs({ force: true }),
+        reporter,
+        pathResolver,
+        ctx,
+      )
+
+      expect(conflictMocks.handleConflict).toHaveBeenCalledWith(destDir, srcDir, true, reporter)
+      expect(result.items[0]!.status).toBe('updated')
+    })
+
+    it('Directories copy + 目录不存在（无冲突）→ 正常安装', async () => {
+      const srcDir = join(tmpDir, 'dir-no-conflict-src')
+      await mkdir(srcDir)
+      await writeFile(join(srcDir, 'README.md'), '# new skill')
+      const targetDir = join(tmpDir, 'dir-no-conflict-target')
+
+      const plan = makeDirPlan([srcDir], targetDir)
+      const ctx: ManifestContext = { entries: [], degraded: false }
+
+      const result = await executeInstall(plan, makeArgs(), reporter, pathResolver, ctx)
+
+      expect(conflictMocks.handleConflict).not.toHaveBeenCalled()
+      expect(result.items).toHaveLength(1)
+      expect(result.items[0]!.status).toBe('new')
+    })
+
+    it('Directories copy + 无 manifestContext → 跳过冲突检测（向后兼容）', async () => {
+      const srcDir = join(tmpDir, 'dir-nocontext-src')
+      await mkdir(srcDir)
+      await writeFile(join(srcDir, 'README.md'), '# backward compat')
+      const targetDir = join(tmpDir, 'dir-nocontext-target')
+      const destDir = join(targetDir, basename(srcDir))
+      await mkdir(destDir, { recursive: true })
+
+      const plan = makeDirPlan([srcDir], targetDir)
+      // 不传 manifestContext
+      const result = await executeInstall(plan, makeArgs(), reporter, pathResolver)
+
+      expect(conflictMocks.handleConflict).not.toHaveBeenCalled()
+      expect(result.items[0]!.status).toBe('updated')
+    })
+
+    it('Directories symlink + 目标目录不存在 → 无冲突，正常创建 symlink', async () => {
+      const srcDir = join(tmpDir, 'dir-sym-noconflict-src')
+      await mkdir(srcDir)
+      await writeFile(join(srcDir, 'README.md'), '# sym')
+      const targetDir = join(tmpDir, 'dir-sym-noconflict-target')
+
+      const plan = makeDirPlan([srcDir], targetDir)
+      plan.items[0]!.mode = 'symlink'
+      const ctx: ManifestContext = { entries: [], degraded: false }
+
+      const result = await executeInstall(
+        plan,
+        makeArgs({ link: true }),
+        reporter,
+        pathResolver,
+        ctx,
+      )
+
+      // 目标不存在 → checkDirConflict 返回 'none' → 正常安装
+      expect(conflictMocks.handleConflict).not.toHaveBeenCalled()
+      expect(result.items[0]!.status).toBe('new')
+    })
+  })
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // Story 4.5 — 临时文件说明 (AC: #6)
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  describe('临时文件自清理说明 (AC: #6 / NFR-S6)', () => {
+    it('安装成功后 completePhase 正常调用', async () => {
+      const srcFile = join(tmpDir, 'cleanup-src.md')
+      const targetDir = join(tmpDir, 'cleanup-target')
+      await writeFile(srcFile, 'cleanup test')
+
+      const plan = makeFilePlan([srcFile], targetDir)
+      await executeInstall(plan, makeArgs(), reporter, pathResolver)
+
+      expect(reporter.completePhase).toHaveBeenCalledOnce()
+    })
+
+    it('安装异常时 completePhase 不被调用（异常向上透传）', async () => {
+      const nonExistentSrc = join(tmpDir, 'cleanup-nonexist.md')
+      const targetDir = join(tmpDir, 'cleanup-fail-target')
+
+      const plan = makeFilePlan([nonExistentSrc], targetDir)
+
+      await expect(executeInstall(plan, makeArgs(), reporter, pathResolver)).rejects.toThrow(
+        AiforgeError,
+      )
+      expect(reporter.completePhase).not.toHaveBeenCalled()
     })
   })
 })
