@@ -274,6 +274,39 @@ export type { ResolvedSource, InstallResult, MatchedPlan } from './types.js';
 
 > 来源：Story 4-5 CR — R1 Directories 未接入冲突检测 + R2 修复后目录冲突 backup 走文件级 API `backupFile()` 崩溃，2 轮才收敛。
 
+**跨层共享字段禁止语义扩展——新语义必须用新字段：**
+
+当一个字段（如 `mode`）被多个模块/阶段消费时，禁止通过扩展该字段的值域来承载新语义。新语义必须使用新字段或独立映射。修改字段类型定义前，必须列出该字段的所有消费方（grep 所有引用），逐个回答"新增的值在该消费方是否有意义/安全？"——如果任何一个消费方的分支逻辑不处理新值，则不能扩展原字段。
+
+```typescript
+❌ // MatchedPlan.mode 原本只有 'copy' | 'symlink'，为了 manifest 写入 'flatten' 而直接扩展
+   // → executeInstall() 中 if (mode === 'symlink') 不处理 'flatten'，Flatten + --link 回归
+   mode: 'copy' | 'symlink' | 'flatten'  // 语义冲突：安装方式 vs 规则类型
+
+✅ // mode 只表示安装方式，manifest 写入时通过 rule.type 独立判断
+   // MatchedPlan.mode: 'copy' | 'symlink'  ← 语义不变
+   // pipeline saveManifest: mode = (ruleType === Flatten ? 'flatten' : planInfo.mode)
+```
+
+> 来源：Story 4-6a CR — R1 修复将 `MatchedPlan.mode` 从 `'copy' | 'symlink'` 扩展为三值，导致 `executeInstall()` 的 `if (mode === 'symlink')` 分支不处理 `'flatten'`，Flatten + --link 功能回归；需要 3 轮 CR 才收敛。
+
+**CR 修复变更类型定义或函数签名时，必须全仓 grep 受影响引用并逐个评估：**
+
+CR 修复中如果修改了类型定义（interface/type/enum）或函数签名（参数增减、返回类型变更），修复者必须执行全仓 grep，列出所有受影响的引用点，并在修复记录中逐个标注"该引用是否兼容变更？"→ 是/否 + 理由。这是对"CR 修复必须审查同一函数中所有并行分支"规则的跨模块扩展。
+
+```typescript
+✅ // 修复 getInstallMode() 签名前，grep 全仓 .mode 引用：
+   // - execute-install.ts:382  if (item.mode === 'symlink') → 不处理新值 'flatten' → 回归风险！
+   // - reporter.ts:132  ${item.mode} → 展示 'flatten' 无意义 → 回归风险！
+   // - pipeline.ts:228  planItem.mode → 写入 manifest → 需要评估
+   // 结论：不能直接扩展 mode，需要独立字段
+
+❌ // 只修改了类型定义和 matchRules()，未评估 executeInstall/reporter 中的引用
+   // → 下一轮 CR 发现功能回归
+```
+
+> 来源：Story 4-6a CR — R1 修复变更了 `MatchedPlan.mode` 类型和 `getInstallMode()` 签名，但未评估 `executeInstall()` 和 `reporter` 中的 `.mode` 引用，导致 R2 发现功能回归。
+
 **新增 AiforgeError 错误码必须同步补负向测试：**
 
 新增 `try/catch` + `throw new AiforgeError(NEW_CODE)` 的错误处理分支时，必须同步补至少 1 条负向测试。
@@ -504,6 +537,32 @@ describe('authenticate', () => {
 
 - 单元测试：每个管道阶段独立测试，mock 外部依赖
 - 集成测试：管道端到端测试，使用临时目录和 fixture 仓库
+
+**标记为集成测试的文件必须至少覆盖一条真实闭包/工厂函数路径：**
+
+当测试文件放在 `tests/integration/` 目录且标记为集成测试时，至少有一条测试必须使用真实的工厂函数（如 `createProductionStages()`）而非全部 mock。全 Mock 编排测试只验证调用顺序，不验证阶段内部逻辑——工厂函数返回的闭包、共享状态变量（如 `lastPlan`、`lastRepo`）的读写一致性，只有通过真实路径才能覆盖。如果确有"纯编排"测试的需求，应在文件或 describe 块中显式标注 `(orchestration-only)`，与真实集成测试区分。
+
+```typescript
+✅ // 真实集成测试：使用 createProductionStages() 工厂函数
+   const stages = createProductionStages(mockPathResolver)
+   const plan = await stages.match(env, args, mockReporter)
+   const result = await stages.install(plan, args, mockReporter)
+   await stages.saveManifest(result)
+   // 断言 manifest 文件内容（真实闭包逻辑）
+   const manifest = JSON.parse(await readFile(manifestPath, 'utf-8'))
+   expect(manifest.filter(e => e.mode === 'flatten')).toHaveLength(2)
+
+❌ // 全 Mock "集成测试"：所有阶段都是 vi.fn()，只验证调用顺序
+   const stages = {
+     resolve: vi.fn(async () => mockSource),
+     match: vi.fn(async () => mockPlan),
+     install: vi.fn(async () => mockResult),
+     saveManifest: vi.fn(async () => {}),  // ← 闭包内部逻辑完全绕开
+   }
+   // 553/553 全绿，但 manifest 数据损坏漏过
+```
+
+> 来源：Story 4-6a CR R1 — `tests/integration/pipeline.test.ts` 8 个阶段全部 mock，553/553 全绿但 manifest mode 类型不匹配和空值兜底两个缺陷全部漏过。
 
 **Mock 断言必须验证被测函数的实际调用链：**
 

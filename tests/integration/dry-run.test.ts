@@ -149,6 +149,7 @@ describe('dry-run 管道路径（AC #1, #5）', () => {
           mockPathResolver,
         ),
       install: vi.fn(async () => ({ items: [] })),
+      saveManifest: vi.fn(async () => {}),
       report: vi.fn((result, reporter, mode) => {
         if (mode === 'plan') {
           reporter.reportPlan(result as MatchedPlan)
@@ -203,6 +204,9 @@ describe('dry-run 管道路径（AC #1, #5）', () => {
         callOrder.push('install')
         return { items: [] }
       }),
+      saveManifest: vi.fn(async () => {
+        callOrder.push('saveManifest')
+      }),
       report: vi.fn(() => {
         callOrder.push('report')
       }),
@@ -236,6 +240,7 @@ describe('dry-run 管道路径（AC #1, #5）', () => {
         return capturedPlan
       }),
       install: vi.fn(async () => ({ items: [] })),
+      saveManifest: vi.fn(async () => {}),
       report: vi.fn((result, reporter) => {
         reporter.reportPlan(result as MatchedPlan)
       }),
@@ -389,6 +394,7 @@ describe('dry-run 文件系统无副作用（AC #3）', () => {
       })),
       // install 是占位（不会被调用，因为 dryRun=true）
       install: vi.fn(async () => ({ items: [] })),
+      saveManifest: vi.fn(async () => {}),
       report: vi.fn((_result, reporter) => {
         reporter.reportPlan(_result as MatchedPlan)
       }),

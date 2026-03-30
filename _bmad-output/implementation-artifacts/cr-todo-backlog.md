@@ -7,7 +7,7 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 6 |
+| 🔴 open | 7 |
 | 🟡 in-progress | 0 |
 | ✅ resolved | 2 |
 
@@ -77,9 +77,20 @@
 - **来源**: Story 4-2 CR round 3 (2026-03-27)
 - **优先级**: P2
 - **类别**: tech-debt
-- **描述**: `executeInstall()` 将结果累积在本地变量 `resultItems` 中，异常抛出时该变量不会返回给调用方。`AiforgeError` 也不包含 `completedItems` 等附加 payload 字段。AC #6 要求"返回已完成的操作清单（FR-031）"，但当前 throw 模式下无法通过函数返回值传递 partial results。这是跨模块架构变更（影响 `core/errors.ts`、`stages/execute-install.ts`、`pipeline.ts`、`core/reporter.ts`），应由 Story 4-6a（管道编排与错误流控制）在编排层统一设计 partial results 传递方案，而非在 Story 4-2 中局部修补。
+- **描述**: `executeInstall()` 将结果累积在本地变量 `resultItems` 中，异常抛出时该变量不会返回给调用方。`AiforgeError` 也不包含 `completedItems` 等附加 payload 字段。AC #6 要求"返回已完成的操作清单（FR-031）"，但当前 throw 模式下无法通过函数返回值传递 partial results。这是跨模块架构变更（影响 `core/errors.ts`、`stages/execute-install.ts`、`pipeline.ts`、`core/reporter.ts`），Story 4-6a（管道编排与错误流控制）Task 2.3 明确排除了该需求，定性为"fail-fast 模式，hash 相同跳过是正常结果"。待后续专项优化 Story 中评估是否需要改变错误语义以支持 partial results 传递。
 - **涉及文件**: `src/stages/execute-install.ts`, `src/core/errors.ts`, `src/pipeline.ts`
-- **建议时机**: Story 4-6a（管道编排与错误流控制）
+- **建议时机**: 错误流专项优化 Story（原 Story 4-6a 已决策采用 fail-fast 模式，不实现 partial results）
+- **状态**: open
+- **解决记录**:
+
+### TODO-009: `pipeline.ts` manifest mode 类型断言用函数封装替代
+
+- **来源**: Story 4-6a CR round 3 evaluation (2026-03-30)
+- **优先级**: P3
+- **类别**: refactor
+- **描述**: `pipeline.ts:330` 处通过 `as 'copy' | 'symlink' | 'flatten'` 类型断言确保 manifest mode 类型正确。虽然三元表达式逻辑保证了值域正确（Flatten 规则写 `'flatten'`，其余写 `planInfo.mode`），但 `as` 断言绕过了类型系统的静态验证。可考虑将该映射提取为一个辅助函数（如 `resolveManifestMode(ruleType, installMode): ManifestEntry['mode']`），明确输入输出类型，让 TypeScript 通过类型推断而非断言来保证正确性。CR 评估方明确标注为"代码风格偏好，不构成审查发现"，无功能风险。
+- **涉及文件**: `src/pipeline.ts`
+- **建议时机**: 下次触及 `pipeline.ts` saveManifest 逻辑时，或代码质量专项优化时
 - **状态**: open
 - **解决记录**:
 

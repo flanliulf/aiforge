@@ -86,7 +86,7 @@ interface ManifestEntry {
   target: string;              // 目标绝对路径
   tool: string;                // 工具 ID
   scope: 'global' | 'project';
-  mode: 'copy' | 'symlink';
+  mode: 'copy' | 'symlink' | 'flatten';
   hash: string;                // 文件内容 SHA256
   installedAt: string;         // ISO 时间戳
 }

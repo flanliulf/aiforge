@@ -52,8 +52,7 @@ current_activity:
     - epic-1: "done"  # 项目基础设施与核心框架 — 5/5 Stories 完成（2026-03-23）
     - epic-2: "done"  # 知识仓库获取与认证 — 5/5 Stories 完成（2026-03-25）
     - epic-3: "done"  # 智能检测与安装规划 — 3/3 Stories 完成（2026-03-25）
-  notes: "Story 4.5 经 3 轮跨 LLM CR（GPT-5.4 审查 × Claude Sonnet 4 评估）后 Approved，535 全仓测试通过。核心修复：Directories 分支补齐冲突检测、目录级备份 backupDir()、临时文件空壳清理移除、Prettier 格式修正。"
+  notes: "Story 4.6a 经 3 轮跨 LLM CR（GPT-5.4 审查 × Claude Sonnet 4 评估）后 Approved，557 全仓测试通过。核心修复：manifest mode 类型契约修复、共享 target root Map 策略重构、必填字段空值兜底替换为显式抛错、Flatten+--link 功能回归修复（mode 语义分离）、真实集成测试覆盖。"
   next_steps:
-    - "继续 Epic 4：Story 4.6a pipeline-orchestration-and-error-flow（ready-for-dev）"
     - "继续 Epic 4：Story 4.6b install-result-summary-and-output（ready-for-dev）"
     - "按 Epic 顺序推进：Epic 4 → 5"

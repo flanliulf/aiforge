@@ -118,6 +118,8 @@ index.ts → pipeline.ts → stages/* → services/*
 - **禁止对必填数据字段使用空值兜底（`?? ''` / `?? 0` / `?? false`）：** 当从 `Map.get()` 或可选链取值、且该值语义上为必填（如 hash、ID、路径等数据完整性关键字段）时，禁止使用 `?? ''`（或 `?? 0`、`?? false`、`?? []`）兜底。必须显式检查 `undefined` 并抛错，包含足够的上下文信息（如路径、key 值）便于排查。否则"看起来成功、但数据已损坏"，下游逻辑会系统性误判。（来源：Story 4-4 CR R1 — `hashes.get(targetPath) ?? ''` 导致空 hash 写入 manifest，下游冲突检测全面误判）
 - **InstallResult status 只有三种：** `'new'` | `'updated'` | `'skipped'`（无 `'failed'`——I/O 错误直接抛 fatal，hash 相同或用户选择跳过为 `'skipped'`）
 - **复用函数接入新类型时必须审查内部所有分支的类型兼容性：** 当一个已有函数（如 `processConflict()`）被新的调用方类型（如从仅 files 扩展到 directories）复用时，必须逐条审查该函数内部所有执行分支（如 `backup` / `skip` / `overwrite`）对新类型的兼容性：(1) 函数内部调用的子函数是否支持新类型（如 `backupFile()` 不支持目录）；(2) 交互式选项是否在新类型下全部有意义；(3) 新增修复代码时自查清单——对被复用函数的每个 `case`/`if` 分支，逐条回答"在新类型下是否安全/正确？"。（来源：Story 4-5 CR — R1 Directories 未接入冲突检测 + R2 修复后目录冲突 backup 走文件级 API `backupFile()` 崩溃，2 轮才收敛）
+- **跨层共享字段禁止语义扩展——新语义必须用新字段：** 当一个字段（如 `mode`）被多个模块/阶段消费时，禁止通过扩展该字段的值域来承载新语义。新语义必须使用新字段或独立映射。修改字段类型定义前，必须列出该字段的所有消费方（grep 所有引用），逐个回答"新增的值在该消费方是否有意义/安全？"——如果任何一个消费方的分支逻辑不处理新值，则不能扩展原字段。（来源：Story 4-6a CR — R1 修复将 `MatchedPlan.mode` 从 `'copy' | 'symlink'` 扩展为 `'copy' | 'symlink' | 'flatten'`，导致 `executeInstall()` 的 `if (mode === 'symlink')` 分支不处理 `'flatten'`，Flatten + --link 功能回归；需要 3 轮 CR 才收敛）
+- **CR 修复变更类型定义或函数签名时，必须全仓 grep 受影响引用并逐个评估：** CR 修复中如果修改了类型定义（interface/type/enum）或函数签名（参数增减、返回类型变更），修复者必须执行全仓 grep，列出所有受影响的引用点，并在修复记录中逐个标注"该引用是否兼容变更？"→ 是/否 + 理由。这是对"CR 修复必须审查同一函数中所有并行分支"规则的跨模块扩展。（来源：Story 4-6a CR — R1 修复变更了 `MatchedPlan.mode` 类型和 `getInstallMode()` 签名，但未评估 `executeInstall()` 和 `reporter` 中的 `.mode` 引用，导致 R2 发现功能回归）
 
 ### Input Validation Rules
 
@@ -168,6 +170,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - PathResolver → inject mock with fixed paths in tests
 - Unit tests: each pipeline stage independently, mock external deps
 - Integration tests: end-to-end pipeline with temp dirs and fixture repos
+- **标记为集成测试的文件必须至少覆盖一条真实闭包/工厂函数路径：** 当测试文件放在 `tests/integration/` 目录且标记为集成测试时，至少有一条测试必须使用真实的工厂函数（如 `createProductionStages()`）而非全部 mock。全 Mock 编排测试只验证调用顺序，不验证阶段内部逻辑——工厂函数返回的闭包、共享状态变量的读写一致性，只有通过真实路径才能覆盖。如果确有"纯编排"测试的需求，应在文件或 describe 块中显式标注 `(orchestration-only)`，与真实集成测试区分。（来源：Story 4-6a CR R1 — `tests/integration/pipeline.test.ts` 8 个阶段全部 mock，553/553 全绿但 manifest mode 类型不匹配和空值兜底两个缺陷全部漏过）
 - **Mock 断言必须验证被测函数的实际调用链：** 当测试涉及安全关键行为（如 Token 脱敏、权限检查）时，禁止在测试中直接调用 mock 函数来验证其行为。必须通过被测函数的入口触发 mock，然后断言：(1) mock 函数被调用且参数正确（`toHaveBeenCalledWith`）；(2) 被测函数的输出/副作用中包含 mock 处理结果而非原始输入。（来源：Story 2-3 CR — AC #7 脱敏测试直接调用 mock 的 `sanitizeToken()`，无法守住安全回归）
 
 ### CR Workflow Rules

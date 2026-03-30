@@ -61,6 +61,7 @@ export interface MatchedPlan {
     rule: InstallRule
     sourceFiles: string[]
     targetPath: string
+    /** 安装方式：copy 或 symlink（不表示规则类型；manifest 中 Flatten 规则写入 'flatten' 由 pipeline 层负责） */
     mode: 'copy' | 'symlink'
   }>
 }

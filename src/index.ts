@@ -13,8 +13,9 @@ import { Command } from 'commander'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { createReporter, mapOptsToArgs, runPipeline } from './pipeline.js'
+import { createReporter, mapOptsToArgs, runPipeline, createProductionStages } from './pipeline.js'
 import { registerInitCommand } from './commands/init.js'
+import { UnixPathResolver } from './core/path-resolver.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const pkg = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf-8')) as {
@@ -46,7 +47,9 @@ program
       isTty: process.stdout.isTTY === true,
     })
 
-    await runPipeline(args, reporter)
+    const pathResolver = new UnixPathResolver()
+    const stages = createProductionStages(pathResolver)
+    await runPipeline(args, reporter, stages)
   })
 
 // 注册子命令

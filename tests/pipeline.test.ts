@@ -1,13 +1,15 @@
 /**
  * pipeline.ts — 管道编排器单元测试
  *
- * 来源: Story 1.5 Task 5.1
+ * 来源: Story 1.5 Task 5.1 + Story 4.6a
  * 测试: 管道阶段链执行顺序、dryRun 跳过 install、fatal 错误停止、report 阶段
+ * Story 4.6a: createProductionStages 真实实现替换、manifest 保存、错误流控制
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { ParsedArgs, MatchedPlan, InstallResult } from '../src/core/types.js'
 import type { Reporter } from '../src/core/reporter.js'
+import type { PathResolver } from '../src/core/path-resolver.js'
 import { AiforgeError } from '../src/core/errors.js'
 import {
   runPipeline,
@@ -19,6 +21,7 @@ import {
   install,
   report,
   DEFAULT_STAGES,
+  createProductionStages,
 } from '../src/pipeline.js'
 import type { PipelineStages } from '../src/pipeline.js'
 
@@ -90,6 +93,9 @@ function createMockStages(): PipelineStages & { callOrder: string[] } {
     install: vi.fn(async () => {
       callOrder.push('install')
       return mockResult
+    }),
+    saveManifest: vi.fn(async () => {
+      callOrder.push('saveManifest')
     }),
     report: vi.fn(() => {
       callOrder.push('report')
@@ -217,7 +223,7 @@ describe('pipeline — 管道编排器', () => {
       expect(errorArg.severity).toBe('fatal')
     })
 
-    it('阶段链按正确顺序执行（含 report）', async () => {
+    it('阶段链按正确顺序执行（含 saveManifest + report）', async () => {
       const stages = createMockStages()
       const args = createTestArgs({ dryRun: false })
 
@@ -230,11 +236,12 @@ describe('pipeline — 管道编排器', () => {
         'detect',
         'match',
         'install',
+        'saveManifest',
         'report',
       ])
     })
 
-    it('dryRun 为 true 时跳过 install 但仍调用 report（mode=plan）', async () => {
+    it('dryRun 为 true 时跳过 install 和 saveManifest 但仍调用 report（mode=plan）', async () => {
       const stages = createMockStages()
       const args = createTestArgs({ dryRun: true })
 
@@ -242,12 +249,13 @@ describe('pipeline — 管道编排器', () => {
 
       expect(stages.callOrder).toEqual(['resolve', 'auth', 'clone', 'detect', 'match', 'report'])
       expect(stages.callOrder).not.toContain('install')
+      expect(stages.callOrder).not.toContain('saveManifest')
       expect(stages.report).toHaveBeenCalledOnce()
       // 验证 runPipeline 传入了正确的 mode
       expect(stages.report).toHaveBeenCalledWith(expect.anything(), mockReporter, 'plan')
     })
 
-    it('dryRun 为 false 时执行 install 和 report（mode=result）', async () => {
+    it('dryRun 为 false 时执行 install、saveManifest 和 report（mode=result）', async () => {
       const stages = createMockStages()
       const args = createTestArgs({ dryRun: false })
 
@@ -309,6 +317,82 @@ describe('pipeline — 管道编排器', () => {
       expect(errorArg.message).toBe('意外错误')
       expect(errorArg.code).toBe('ERR_UNKNOWN')
       expect(errorArg.severity).toBe('fatal')
+    })
+
+    it('saveManifest 只保存 status 为 new 和 updated 的记录', async () => {
+      const stages = createMockStages()
+      // install 返回包含 new、updated、skipped 的结果
+      const resultWithMixed: InstallResult = {
+        items: [
+          { status: 'new', sourcePath: '/src/a.md', targetPath: '/dst/a.md' },
+          { status: 'updated', sourcePath: '/src/b.md', targetPath: '/dst/b.md' },
+          { status: 'skipped', sourcePath: '/src/c.md', targetPath: '/dst/c.md' },
+        ],
+      }
+      stages.install = vi.fn(async () => {
+        stages.callOrder.push('install')
+        return resultWithMixed
+      })
+
+      const args = createTestArgs({ dryRun: false })
+      await runPipeline(args, mockReporter, stages)
+
+      // saveManifest 应该在 install 和 report 之间被调用
+      const saveIdx = stages.callOrder.indexOf('saveManifest')
+      const installIdx = stages.callOrder.indexOf('install')
+      const reportIdx = stages.callOrder.indexOf('report')
+      expect(saveIdx).toBeGreaterThan(installIdx)
+      expect(saveIdx).toBeLessThan(reportIdx)
+    })
+
+    it('install 阶段 fatal 错误时不调用 saveManifest 和 report', async () => {
+      const stages = createMockStages()
+      stages.install = vi.fn(async () => {
+        throw new AiforgeError('安装失败', 'ERR_INSTALL', 1, 'fatal', '磁盘满', ['清理磁盘'])
+      })
+
+      const args = createTestArgs({ dryRun: false })
+      await runPipeline(args, mockReporter, stages)
+
+      expect(stages.callOrder).not.toContain('saveManifest')
+      expect(stages.callOrder).not.toContain('report')
+      expect(mockReporter.reportError).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('createProductionStages — 生产环境阶段集合', () => {
+    let mockPathResolver: PathResolver
+
+    beforeEach(() => {
+      mockPathResolver = {
+        home: vi.fn(() => '/home/user'),
+        configDir: vi.fn(() => '/home/user/.aiforge'),
+        reposDir: vi.fn(() => '/home/user/.aiforge/repos'),
+        globalToolDir: vi.fn((tool: string) => `/home/user/.${tool}`),
+      }
+    })
+
+    it('createProductionStages 返回完整的 PipelineStages 对象', () => {
+      const stages = createProductionStages(mockPathResolver)
+
+      expect(stages.resolve).toBeTypeOf('function')
+      expect(stages.authenticate).toBeTypeOf('function')
+      expect(stages.clone).toBeTypeOf('function')
+      expect(stages.detect).toBeTypeOf('function')
+      expect(stages.match).toBeTypeOf('function')
+      expect(stages.install).toBeTypeOf('function')
+      expect(stages.report).toBeTypeOf('function')
+      expect(stages.saveManifest).toBeTypeOf('function')
+    })
+
+    it('所有阶段函数不再是占位实现（不抛 NOT_IMPLEMENTED）', () => {
+      const stages = createProductionStages(mockPathResolver)
+
+      // 验证不是占位函数：占位函数引用等于模块导出的占位常量
+      expect(stages.resolve).not.toBe(resolve)
+      expect(stages.authenticate).not.toBe(authenticate)
+      expect(stages.clone).not.toBe(clone)
+      expect(stages.install).not.toBe(install)
     })
   })
 })

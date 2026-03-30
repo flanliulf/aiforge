@@ -31,10 +31,13 @@ import { MESSAGES } from '../data/messages.js'
 /**
  * 推导安装模式（copy 或 symlink）
  *
- * 规则（来源: Story 3.3 Dev Notes + FR-021 + project-context.md）：
+ * 规则（来源: Story 3.3 Dev Notes + FR-021 + project-context.md + Story 4.6a CR Round 2 修复）：
  * - scope === 'project' && args.link → 抛出 LINK_PROJECT_REJECTED（fatal）
- * - scope === 'global' && args.link → symlink
+ * - scope === 'global' && args.link → symlink（Flatten + --link 也返回 symlink）
  * - 否则 → copy
+ *
+ * 注意：mode 只表示安装方式（copy/symlink），不表示规则类型。
+ * manifest 写入时由 pipeline.ts 通过 rule.type 判断是否输出 'flatten'。
  */
 function getInstallMode(args: ParsedArgs, scope: 'global' | 'project'): 'copy' | 'symlink' {
   if (args.link && scope === 'project') {
@@ -147,9 +150,11 @@ export async function matchRules(
 ): Promise<MatchedPlan> {
   reporter.startPhase(MESSAGES.phases.match)
 
-  // 推导安装模式（在循环外推导，同一次调用的所有规则使用相同模式）
-  // LINK_PROJECT_REJECTED 校验在此提前执行，尽早发现参数错误
-  const mode = getInstallMode(args, env.scope)
+  // LINK_PROJECT_REJECTED 校验提前执行（尽早发现参数错误）
+  // 仅在 args.link 为 true 时才需要校验，getInstallMode 内部会抛出
+  if (args.link && env.scope === 'project') {
+    getInstallMode(args, env.scope) // 触发校验
+  }
 
   const items: MatchedPlan['items'] = []
 
@@ -169,6 +174,10 @@ export async function matchRules(
 
       // 解析目标路径
       const targetPath = resolveTargetDir(rule, env.scope, pathResolver)
+
+      // 按 scope+link 推导安装模式（mode 只表示安装方式：copy/symlink）
+      // Flatten 规则的 mode 在 manifest 写入时由 pipeline.ts 通过 rule.type 判断输出 'flatten'
+      const mode = getInstallMode(args, env.scope)
 
       items.push({ rule, sourceFiles, targetPath, mode })
     }
