@@ -1,6 +1,107 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createReporter } from '../../src/core/reporter.js'
 import type { Reporter } from '../../src/core/reporter.js'
+import type { InstallResult } from '../../src/core/types.js'
+
+// ── 测试 Fixture ──────────────────────────────────────────────────────────────
+
+/** 单工具安装结果 */
+function createSingleToolResult(): InstallResult {
+  return {
+    items: [
+      {
+        status: 'new',
+        tool: 'copilot',
+        toolDisplayName: 'GitHub Copilot',
+        sourcePath: 'agents/coding-agent.md',
+        targetPath: '/home/user/.copilot/agents/coding-agent.md',
+      },
+      {
+        status: 'updated',
+        tool: 'copilot',
+        toolDisplayName: 'GitHub Copilot',
+        sourcePath: 'agents/review-agent.md',
+        targetPath: '/home/user/.copilot/agents/review-agent.md',
+      },
+      {
+        status: 'skipped',
+        tool: 'copilot',
+        toolDisplayName: 'GitHub Copilot',
+        sourcePath: 'skills/refactor/',
+        targetPath: '/home/user/.copilot/skills/refactor/',
+      },
+    ],
+  }
+}
+
+/** 多工具安装结果 */
+function createMultiToolResult(): InstallResult {
+  return {
+    items: [
+      {
+        status: 'new',
+        tool: 'copilot',
+        toolDisplayName: 'GitHub Copilot',
+        sourcePath: 'agents/coding-agent.md',
+        targetPath: '/home/user/.copilot/agents/coding-agent.md',
+      },
+      {
+        status: 'updated',
+        tool: 'copilot',
+        toolDisplayName: 'GitHub Copilot',
+        sourcePath: 'agents/review-agent.md',
+        targetPath: '/home/user/.copilot/agents/review-agent.md',
+      },
+      {
+        status: 'new',
+        tool: 'claude',
+        toolDisplayName: 'Claude Code',
+        sourcePath: 'agents/CLAUDE.md',
+        targetPath: '/home/user/.claude/agents/CLAUDE.md',
+      },
+    ],
+  }
+}
+
+/** 全部成功结果 */
+function createAllNewResult(): InstallResult {
+  return {
+    items: [
+      {
+        status: 'new',
+        tool: 'claude',
+        sourcePath: 'a.md',
+        targetPath: '/home/user/.claude/a.md',
+      },
+      {
+        status: 'new',
+        tool: 'claude',
+        sourcePath: 'b.md',
+        targetPath: '/home/user/.claude/b.md',
+      },
+    ],
+  }
+}
+
+/** 全部跳过结果 */
+function createAllSkippedResult(): InstallResult {
+  return {
+    items: [
+      {
+        status: 'skipped',
+        tool: 'claude',
+        sourcePath: 'a.md',
+        targetPath: '/home/user/.claude/a.md',
+      },
+      {
+        status: 'skipped',
+        tool: 'claude',
+        sourcePath: 'b.md',
+        targetPath: '/home/user/.claude/b.md',
+      },
+    ],
+  }
+}
 
 describe('createReporter', () => {
   it('returns TtyReporter when isTty=true and quiet=false', () => {
@@ -70,9 +171,95 @@ describe('PlainReporter', () => {
 
   it('reportResult writes to stdout', () => {
     reporter.reportResult({
-      items: [{ status: 'new', sourcePath: 'src/foo.ts', targetPath: 'dist/foo.ts' }],
+      items: [
+        { status: 'new', tool: 'copilot', sourcePath: 'src/foo.ts', targetPath: 'dist/foo.ts' },
+      ],
     })
     expect(stdoutSpy).toHaveBeenCalled()
+  })
+
+  it('reportResult: 输出包含状态（new）', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('new')
+  })
+
+  it('reportResult: 输出包含目标路径', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('/home/user/.copilot/agents/coding-agent.md')
+  })
+
+  it('reportResult: 输出包含工具名', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('copilot')
+  })
+
+  it('reportResult: 输出包含 sourcePath（四列格式）', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('agents/coding-agent.md')
+    expect(allOutput).toContain('agents/review-agent.md')
+  })
+
+  it('reportResult: 每行输出四列 tab 分隔格式 status\\ttool\\tsource\\ttarget', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    // 验证四列 tab 分隔格式（sourcePath 为 repo-relative 路径）
+    expect(allOutput).toContain(
+      'new\tcopilot\tagents/coding-agent.md\t/home/user/.copilot/agents/coding-agent.md',
+    )
+    expect(allOutput).toContain(
+      'updated\tcopilot\tagents/review-agent.md\t/home/user/.copilot/agents/review-agent.md',
+    )
+    expect(allOutput).toContain(
+      'skipped\tcopilot\tskills/refactor/\t/home/user/.copilot/skills/refactor/',
+    )
+  })
+
+  it('reportResult: 多工具输出包含所有工具名', () => {
+    reporter.reportResult(createMultiToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('copilot')
+    expect(allOutput).toContain('claude')
+  })
+
+  it('reportResult: 统计行包含正确计数', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    // 1 new, 1 updated, 1 skipped
+    expect(allOutput).toContain('installed: 1')
+    expect(allOutput).toContain('updated: 1')
+    expect(allOutput).toContain('skipped: 1')
+  })
+
+  it('reportResult: 统计行为全部成功时正确', () => {
+    reporter.reportResult(createAllNewResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('installed: 2')
+    expect(allOutput).toContain('updated: 0')
+    expect(allOutput).toContain('skipped: 0')
+  })
+
+  it('reportResult: 全部跳过时统计行正确', () => {
+    reporter.reportResult(createAllSkippedResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('installed: 0')
+    expect(allOutput).toContain('skipped: 2')
+  })
+
+  it('reportResult stdout/stderr 分工：结果到 stdout，无 stderr 输出 (AC #2)', () => {
+    reporter.reportResult(createSingleToolResult())
+    expect(stdoutSpy).toHaveBeenCalled()
+    expect(stderrSpy).not.toHaveBeenCalled()
+  })
+
+  it('reportResult: 无 ANSI 转义码（CI 友好）', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    // eslint-disable-next-line no-control-regex
+    expect(allOutput).not.toMatch(/\x1b\[/)
   })
 
   it('reportPlan writes to stdout', () => {
@@ -127,11 +314,71 @@ describe('TtyReporter', () => {
 
   it('reportResult writes to stdout', () => {
     reporter.reportResult({
-      items: [{ status: 'new', sourcePath: 'src/foo.ts', targetPath: 'dist/foo.ts' }],
+      items: [
+        { status: 'new', tool: 'copilot', sourcePath: 'src/foo.ts', targetPath: 'dist/foo.ts' },
+      ],
     })
     expect(stdoutSpy).toHaveBeenCalled()
-    const output = stdoutSpy.mock.calls[0][0] as string
-    expect(output).toContain('dist/foo.ts')
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('dist/foo.ts')
+  })
+
+  it('reportResult: 按工具分组 — 输出包含工具名 (AC #1)', () => {
+    reporter.reportResult(createMultiToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('copilot')
+    expect(allOutput).toContain('claude')
+  })
+
+  it('reportResult: 标题使用 display name 而非内部 id (AC #1)', () => {
+    reporter.reportResult(createMultiToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('🔧 GitHub Copilot')
+    expect(allOutput).toContain('🔧 Claude Code')
+  })
+
+  it('reportResult: 每行输出 sourcePath → targetPath 格式 (AC #1)', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    // 验证 source → target 格式
+    expect(allOutput).toContain('agents/coding-agent.md')
+    expect(allOutput).toContain('→')
+    expect(allOutput).toContain('/home/user/.copilot/agents/coding-agent.md')
+    // 验证 sourcePath 和 targetPath 在同一行中以 → 连接
+    expect(allOutput).toMatch(
+      /agents\/coding-agent\.md\s+→\s+\/home\/user\/\.copilot\/agents\/coding-agent\.md/,
+    )
+  })
+
+  it('reportResult: 状态图标 ✅ 对应 new (AC #1)', () => {
+    reporter.reportResult(createAllNewResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('✅')
+  })
+
+  it('reportResult: 状态图标 🔄 对应 updated (AC #1)', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('🔄')
+  })
+
+  it('reportResult: 状态图标 ⏭️ 对应 skipped (AC #1)', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('⏭️')
+  })
+
+  it('reportResult: 统计行包含正确计数 (AC #1)', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('安装: 1 项')
+    expect(allOutput).toContain('更新: 1 项')
+    expect(allOutput).toContain('跳过: 1 项')
+  })
+
+  it('reportResult stdout/stderr 分工：结果到 stdout (AC #2)', () => {
+    reporter.reportResult(createSingleToolResult())
+    expect(stdoutSpy).toHaveBeenCalled()
   })
 
   it('reportPlan writes to stdout', () => {
@@ -255,7 +502,7 @@ describe('QuietReporter', () => {
 
   it('reportResult includes explicit success signal', () => {
     reporter.reportResult({
-      items: [{ status: 'new', sourcePath: 'src/a.ts', targetPath: 'dist/a.ts' }],
+      items: [{ status: 'new', tool: 'claude', sourcePath: 'src/a.ts', targetPath: 'dist/a.ts' }],
     })
     const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
     expect(allOutput).toContain('✓')
@@ -264,9 +511,9 @@ describe('QuietReporter', () => {
   it('reportResult includes stats line', () => {
     reporter.reportResult({
       items: [
-        { status: 'new', sourcePath: 'src/a.ts', targetPath: 'dist/a.ts' },
-        { status: 'updated', sourcePath: 'src/b.ts', targetPath: 'dist/b.ts' },
-        { status: 'skipped', sourcePath: 'src/c.ts', targetPath: 'dist/c.ts' },
+        { status: 'new', tool: 'claude', sourcePath: 'src/a.ts', targetPath: 'dist/a.ts' },
+        { status: 'updated', tool: 'claude', sourcePath: 'src/b.ts', targetPath: 'dist/b.ts' },
+        { status: 'skipped', tool: 'claude', sourcePath: 'src/c.ts', targetPath: 'dist/c.ts' },
       ],
     })
     const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')

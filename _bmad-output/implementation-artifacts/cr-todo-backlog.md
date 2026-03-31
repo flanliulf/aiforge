@@ -7,7 +7,7 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 7 |
+| 🔴 open | 8 |
 | 🟡 in-progress | 0 |
 | ✅ resolved | 2 |
 
@@ -80,6 +80,17 @@
 - **描述**: `executeInstall()` 将结果累积在本地变量 `resultItems` 中，异常抛出时该变量不会返回给调用方。`AiforgeError` 也不包含 `completedItems` 等附加 payload 字段。AC #6 要求"返回已完成的操作清单（FR-031）"，但当前 throw 模式下无法通过函数返回值传递 partial results。这是跨模块架构变更（影响 `core/errors.ts`、`stages/execute-install.ts`、`pipeline.ts`、`core/reporter.ts`），Story 4-6a（管道编排与错误流控制）Task 2.3 明确排除了该需求，定性为"fail-fast 模式，hash 相同跳过是正常结果"。待后续专项优化 Story 中评估是否需要改变错误语义以支持 partial results 传递。
 - **涉及文件**: `src/stages/execute-install.ts`, `src/core/errors.ts`, `src/pipeline.ts`
 - **建议时机**: 错误流专项优化 Story（原 Story 4-6a 已决策采用 fail-fast 模式，不实现 partial results）
+- **状态**: open
+- **解决记录**:
+
+### TODO-010: `createProductionStages().report` 闭包的 repo-relative 路径转换缺少直接集成测试覆盖
+
+- **来源**: Story 4-6b CR round 3 evaluation (2026-03-31)
+- **优先级**: P2
+- **类别**: test-gap
+- **描述**: `pipeline.ts:348-360` 中的 `sourcePath` repo-relative 转换逻辑（`report` 闭包内，将绝对 clone 路径裁剪为 repo-relative 路径后再传给 Reporter）没有直接命中它的自动化测试。现有测试覆盖的是 Reporter 组件层（输入已经是 relative path 时的格式化）和 saveManifest（不涉及 report 闭包）。如果该段逻辑被删除或改坏，现有测试仍有较大概率全绿。建议补一条针对 `createProductionStages().report` 的集成测试，断言传给 `reporter.reportResult()` 的 `items[].sourcePath` 已是 repo-relative 路径（不以 `repoDir` 开头）。代码本身仅 12 行、结构简单，当前风险可控。
+- **涉及文件**: `src/pipeline.ts`, `tests/integration/pipeline-production-stages.test.ts`
+- **建议时机**: Epic 5（输出体验优化）或下次触及 `pipeline.ts` report 闭包时
 - **状态**: open
 - **解决记录**:
 

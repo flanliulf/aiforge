@@ -99,16 +99,19 @@ const mockResult: InstallResult = {
       status: 'new',
       sourcePath: '/tmp/test-repo/agents/test.md',
       targetPath: '/home/user/.claude/test.md',
+      tool: 'claude',
     },
     {
       status: 'updated',
       sourcePath: '/tmp/test-repo/agents/old.md',
       targetPath: '/home/user/.claude/old.md',
+      tool: 'claude',
     },
     {
       status: 'skipped',
       sourcePath: '/tmp/test-repo/agents/same.md',
       targetPath: '/home/user/.claude/same.md',
+      tool: 'claude',
     },
   ],
 }

@@ -70,6 +70,10 @@ export interface MatchedPlan {
 export interface InstallResult {
   items: Array<{
     status: 'new' | 'updated' | 'skipped'
+    /** 安装该文件的 AI 工具内部 id，用于按工具分组输出结果 */
+    tool: string
+    /** 工具显示名称（如 'GitHub Copilot'），由上游从 tool-registry 查找填充；TTY 输出标题使用 */
+    toolDisplayName?: string
     sourcePath: string
     targetPath: string
   }>

@@ -171,7 +171,9 @@ describe('pipeline — 管道编排器', () => {
   describe('report 阶段 — 默认实现', () => {
     it('InstallResult 类型输入时调用 reporter.reportResult', () => {
       const result: InstallResult = {
-        items: [{ status: 'new', sourcePath: '/src/a.md', targetPath: '/dst/a.md' }],
+        items: [
+          { status: 'new', tool: 'test-tool', sourcePath: '/src/a.md', targetPath: '/dst/a.md' },
+        ],
       }
       report(result, mockReporter)
       expect(mockReporter.reportResult).toHaveBeenCalledWith(result)
@@ -201,7 +203,9 @@ describe('pipeline — 管道编排器', () => {
 
     it('mode=plan 时始终走 reportPlan 路径', () => {
       const result: InstallResult = {
-        items: [{ status: 'new', sourcePath: '/src/a.md', targetPath: '/dst/a.md' }],
+        items: [
+          { status: 'new', tool: 'test-tool', sourcePath: '/src/a.md', targetPath: '/dst/a.md' },
+        ],
       }
       // 即使传入的是 InstallResult，mode=plan 也走 plan 路径
       report(result, mockReporter, 'plan')
@@ -324,9 +328,19 @@ describe('pipeline — 管道编排器', () => {
       // install 返回包含 new、updated、skipped 的结果
       const resultWithMixed: InstallResult = {
         items: [
-          { status: 'new', sourcePath: '/src/a.md', targetPath: '/dst/a.md' },
-          { status: 'updated', sourcePath: '/src/b.md', targetPath: '/dst/b.md' },
-          { status: 'skipped', sourcePath: '/src/c.md', targetPath: '/dst/c.md' },
+          { status: 'new', tool: 'test-tool', sourcePath: '/src/a.md', targetPath: '/dst/a.md' },
+          {
+            status: 'updated',
+            tool: 'test-tool',
+            sourcePath: '/src/b.md',
+            targetPath: '/dst/b.md',
+          },
+          {
+            status: 'skipped',
+            tool: 'test-tool',
+            sourcePath: '/src/c.md',
+            targetPath: '/dst/c.md',
+          },
         ],
       }
       stages.install = vi.fn(async () => {

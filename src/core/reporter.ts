@@ -61,6 +61,22 @@ function planStatsLine(totalFiles: number, toolCount: number): string {
   return `计划安装: ${totalFiles} 项 (${toolCount} 个工具)`
 }
 
+/**
+ * 安装结果统计行
+ * 格式: 安装: N 项  更新: N 项  跳过: N 项
+ * 内联于 core/ 以维持零外部依赖（core/ 不得引用 data/）
+ */
+function resultStatsLine(installed: number, updated: number, skipped: number): string {
+  return `安装: ${installed} 项  更新: ${updated} 项  跳过: ${skipped} 项`
+}
+
+/** 安装结果状态图标映射（内联常量，与 data/messages.ts ICONS 保持一致） */
+const STATUS_ICONS: Record<string, string> = {
+  new: '✅',
+  updated: '🔄',
+  skipped: '⏭️',
+}
+
 // ── TtyReporter ───────────────────────────────────────────────────────────────
 
 class TtyReporter implements Reporter {
@@ -85,11 +101,50 @@ class TtyReporter implements Reporter {
     }
   }
 
+  /**
+   * TtyReporter.reportResult — 按工具分组输出安装结果（AC #1, #2）
+   *
+   * 格式:
+   *   🔧 GitHub Copilot
+   *     ✅ agents/coding-agent.md     → ~/.copilot/agents/coding-agent.md
+   *     🔄 agents/review-agent.md     → ~/.copilot/agents/review-agent.md
+   *     ⏭️ skills/refactor/           → ~/.copilot/skills/refactor/
+   *
+   *   🔧 Claude Code
+   *     ✅ instructions/CLAUDE.md     → ~/.claude/instructions/CLAUDE.md
+   *
+   *   安装: 2 项  更新: 1 项  跳过: 1 项
+   *
+   * 输出到 stdout（安装结果是数据输出，支持管道消费）
+   * 来源: architecture/03-core-decisions.md#D4 — stdout/stderr 分工
+   */
   reportResult(results: InstallResult): void {
+    // 按工具分组
+    const byTool = new Map<string, typeof results.items>()
     for (const item of results.items) {
-      const icon = item.status === 'new' ? '✅' : item.status === 'updated' ? '🔄' : '⏭️'
-      process.stdout.write(`${icon} ${item.targetPath}\n`)
+      const list = byTool.get(item.tool)
+      if (list) {
+        list.push(item)
+      } else {
+        byTool.set(item.tool, [item])
+      }
     }
+
+    for (const [tool, items] of byTool) {
+      // 优先使用 toolDisplayName（如 'GitHub Copilot'），fallback 到内部 id
+      const displayName = items[0]?.toolDisplayName ?? tool
+      process.stdout.write(chalk.yellow(`\n🔧 ${displayName}\n`))
+      for (const item of items) {
+        const icon = STATUS_ICONS[item.status] ?? '❓'
+        process.stdout.write(`  ${icon} ${item.sourcePath}     → ${item.targetPath}\n`)
+      }
+    }
+
+    // 统计行
+    const installed = results.items.filter((i) => i.status === 'new').length
+    const updated = results.items.filter((i) => i.status === 'updated').length
+    const skipped = results.items.filter((i) => i.status === 'skipped').length
+    process.stdout.write(chalk.bold(`\n${resultStatsLine(installed, updated, skipped)}\n`))
   }
 
   /**
@@ -185,11 +240,43 @@ class PlainReporter implements Reporter {
     process.stderr.write('✓\n')
   }
 
+  /**
+   * PlainReporter.reportResult — 纯文本行输出，CI 友好，可被 grep/awk 解析（AC #1, #2）
+   *
+   * 格式（每行一个文件）:
+   *   new     copilot  ~/.copilot/agents/coding-agent.md
+   *   updated copilot  ~/.copilot/agents/review-agent.md
+   *   skipped copilot  ~/.copilot/skills/refactor/
+   *   new     claude   ~/.claude/agents/CLAUDE.md
+   *   ---
+   *   installed: 2  updated: 1  skipped: 1
+   *
+   * 输出到 stdout（安装结果是数据输出，支持管道消费）
+   * 来源: architecture/03-core-decisions.md#D4 — stdout/stderr 分工
+   */
   reportResult(results: InstallResult): void {
+    // 按工具分组逐行输出
+    const byTool = new Map<string, typeof results.items>()
     for (const item of results.items) {
-      const icon = item.status === 'new' ? '✅' : item.status === 'updated' ? '🔄' : '⏭️'
-      process.stdout.write(`${icon} ${item.targetPath}\n`)
+      const list = byTool.get(item.tool)
+      if (list) {
+        list.push(item)
+      } else {
+        byTool.set(item.tool, [item])
+      }
     }
+
+    for (const [tool, items] of byTool) {
+      for (const item of items) {
+        process.stdout.write(`${item.status}\t${tool}\t${item.sourcePath}\t${item.targetPath}\n`)
+      }
+    }
+
+    // 统计行（---分隔符 + 英文键名，CI 管道友好）
+    const installed = results.items.filter((i) => i.status === 'new').length
+    const updated = results.items.filter((i) => i.status === 'updated').length
+    const skipped = results.items.filter((i) => i.status === 'skipped').length
+    process.stdout.write(`---\ninstalled: ${installed}  updated: ${updated}  skipped: ${skipped}\n`)
   }
 
   /**
@@ -241,12 +328,10 @@ class QuietReporter implements Reporter {
   warn(): void {}
 
   reportResult(results: InstallResult): void {
-    const newCount = results.items.filter((i) => i.status === 'new').length
-    const updatedCount = results.items.filter((i) => i.status === 'updated').length
-    const skippedCount = results.items.filter((i) => i.status === 'skipped').length
-    process.stdout.write(
-      `✓ 安装: ${newCount} 项  更新: ${updatedCount} 项  跳过: ${skippedCount} 项\n`,
-    )
+    const installed = results.items.filter((i) => i.status === 'new').length
+    const updated = results.items.filter((i) => i.status === 'updated').length
+    const skipped = results.items.filter((i) => i.status === 'skipped').length
+    process.stdout.write(`✓ ${resultStatsLine(installed, updated, skipped)}\n`)
   }
 
   /**

@@ -290,22 +290,24 @@ export type { ResolvedSource, InstallResult, MatchedPlan } from './types.js';
 
 > 来源：Story 4-6a CR — R1 修复将 `MatchedPlan.mode` 从 `'copy' | 'symlink'` 扩展为三值，导致 `executeInstall()` 的 `if (mode === 'symlink')` 分支不处理 `'flatten'`，Flatten + --link 功能回归；需要 3 轮 CR 才收敛。
 
-**CR 修复变更类型定义或函数签名时，必须全仓 grep 受影响引用并逐个评估：**
+**CR 修复变更类型定义或函数签名时，必须全仓 grep 受影响引用并逐个评估，且必须在修复记录中提供搜索证据：**
 
-CR 修复中如果修改了类型定义（interface/type/enum）或函数签名（参数增减、返回类型变更），修复者必须执行全仓 grep，列出所有受影响的引用点，并在修复记录中逐个标注"该引用是否兼容变更？"→ 是/否 + 理由。这是对"CR 修复必须审查同一函数中所有并行分支"规则的跨模块扩展。
+CR 修复中如果修改了类型定义（interface/type/enum 的字段增删改）或函数签名（参数增减、返回类型变更），修复者必须执行全仓 grep，列出所有受影响的引用点，并在修复记录中**附上搜索命令及其输出**，逐个标注"该引用是否兼容变更？"→ 是/否 + 理由。禁止只修复 CR 指出的具体文件而不做全仓搜索——这是导致"同类问题跨多轮 CR 反复出现"的直接原因。
 
-```typescript
-✅ // 修复 getInstallMode() 签名前，grep 全仓 .mode 引用：
-   // - execute-install.ts:382  if (item.mode === 'symlink') → 不处理新值 'flatten' → 回归风险！
-   // - reporter.ts:132  ${item.mode} → 展示 'flatten' 无意义 → 回归风险！
-   // - pipeline.ts:228  planItem.mode → 写入 manifest → 需要评估
-   // 结论：不能直接扩展 mode，需要独立字段
+```bash
+✅ # 修复记录中必须包含搜索证据
+   grep -rn "InstallResult" tests/ src/ --include="*.ts"
+   # 结果：
+   # - tests/pipeline.test.ts:174 — ✅ 已包含 tool 字段
+   # - tests/integration/pipeline.test.ts:98 — ❌ 缺失 tool，本次修复
+   # - tests/core/types.test.ts:96 — ❌ 缺失 tool，本次修复
+   # - tests/services/manifest.test.ts:324 — ✅ 不涉及（tool 作为独立参数传入）
 
-❌ // 只修改了类型定义和 matchRules()，未评估 executeInstall/reporter 中的引用
-   // → 下一轮 CR 发现功能回归
+❌ # 只修复 CR 指出的具体文件，不做全仓搜索
+   # → 下一轮 CR 发现其他文件也缺失同样字段
 ```
 
-> 来源：Story 4-6a CR — R1 修复变更了 `MatchedPlan.mode` 类型和 `getInstallMode()` 签名，但未评估 `executeInstall()` 和 `reporter` 中的 `.mode` 引用，导致 R2 发现功能回归。
+> 来源：Story 4-6a CR — R1 修复变更了 `MatchedPlan.mode` 类型，但未评估 `executeInstall()` 和 `reporter` 中的 `.mode` 引用，导致 R2 发现功能回归；Story 4-6b CR — `InstallResult.tool` 字段全仓同步遗漏贯穿 R1→R5 共 4 轮 CR，每轮只修复被指出的文件而非全仓扫清。
 
 **新增 AiforgeError 错误码必须同步补负向测试：**
 
@@ -590,6 +592,22 @@ describe('authenticate', () => {
 
 > 来源：Story 2-3 CR — AC #7 脱敏测试直接调用 mock 的 `sanitizeToken()`，如果被测函数删掉脱敏调用，测试仍然通过，无法守住安全回归。
 
+**测试断言必须基于 Story 契约而非当前实现行为：**
+
+新增或修改测试断言时，断言的期望值必须基于 Story 文档中定义的输出契约（如示例输出格式、字段语义），而非当前实现的实际输出。如果实现与 Story 契约不一致，应先修复实现使其符合契约，再编写断言——禁止"先让测试绿了、再说契约的事"。否则测试会将错误行为固化，后续修正时还需连带修改测试。
+
+```typescript
+✅ // 断言基于 Story 契约（repo-relative 路径）
+   expect(output).toContain('agents/coding-agent.md')
+   expect(output).toContain('agents/coding-agent.md → ~/.copilot/agents/coding-agent.md')
+
+❌ // 断言基于当前实现行为（绝对 clone 路径），将错误行为固化
+   expect(output).toContain('/tmp/aiforge-xxx/agents/coding-agent.md')
+   // → 测试绿了，但锁定了错误的输出格式，下一轮 CR 指出后还需连带改测试
+```
+
+> 来源：Story 4-6b CR R1→R2 — 修复 `reportResult()` 后新增测试直接使用绝对路径作为断言基准，将错误的 `sourcePath` 行为固化，R2 审查发现后才纠正为 Story 约定的 repo-relative 路径。
+
 ### CR Workflow Patterns
 
 **CR 修复后必须同步更新 Story Dev Agent Record：**
@@ -630,6 +648,27 @@ Prettier 格式化应作为修复的最后一步自动执行：
 ```
 
 > 来源：Story 4-2 CR — R2 和 R5 各出现一次 Prettier 格式未通过；Story 4-1 CR 也出现同类问题，共 3 次重复。
+
+**CR 修复验证结论必须可独立复现：**
+
+CR 修复记录中的"验证通过"结论必须附带可独立复现的验证命令和输出摘要（如测试通过数、lint 状态）。禁止只写"✅ npm run lint 通过"而不附带任何证据。后续审查轮次必须能通过重新执行相同命令来验证结论的真实性。修复记录中如果声称验证通过，但下一轮审查独立执行后发现未通过，视为修复记录不合规。
+
+```bash
+✅ # 修复验证记录（可独立复现）
+   ### 修复验证
+   - `npm test` ✅ — 576/576 passed（28 test files）
+   - `npm run lint` ✅ — All matched files use Prettier code style!
+   - `npm run build` ✅ — dist/ 产出正常
+
+❌ # 修复验证记录（不可复现，缺乏证据）
+   ### 修复验证
+   - npm test ✅
+   - npm run lint ✅
+   - npm run build ✅
+   # → 下一轮审查独立执行 lint 发现实际未通过，修复记录不可信
+```
+
+> 来源：Story 4-6b CR R1→R2 — R1 修复记录声称"npm run lint ✅ 通过"，但 R2 审查独立执行后发现 lint 实际未通过，说明 R1 验证结论不可靠。
 
 ### Enforcement Guidelines
 

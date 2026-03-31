@@ -97,6 +97,7 @@ describe('core/types — pipeline data contracts (AC: #1)', () => {
           status: 'new',
           sourcePath: '/tmp/repo/agents/dev.md',
           targetPath: '~/.claude/agents/dev.md',
+          tool: 'claude',
         },
       ],
     }

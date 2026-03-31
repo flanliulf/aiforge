@@ -206,7 +206,10 @@ export function createProductionStages(pathResolver: PathResolver): PipelineStag
     install: async (plan, args, reporter) => {
       // 加载 manifest 上下文供冲突检测使用
       const { entries, degraded } = await loadManifest(pathResolver)
-      return executeInstall(plan, args, reporter, pathResolver, { entries, degraded })
+      return executeInstall(plan, args, reporter, pathResolver, {
+        entries,
+        degraded,
+      })
     },
 
     saveManifest: async (result) => {
@@ -342,7 +345,20 @@ export function createProductionStages(pathResolver: PathResolver): PipelineStag
       await saveManifest(merged, pathResolver)
     },
 
-    report,
+    report: (result, reporter, mode) => {
+      // CR Round-2 修复：report 阶段将 sourcePath 从绝对 clone 路径转为 repo-relative 路径
+      // Story 约定输出 'agents/coding-agent.md'，而非 '/tmp/aiforge-xxx/agents/coding-agent.md'
+      // 放在 report 阶段（saveManifest 之后）以避免影响 manifest 的路径匹配逻辑
+      if (lastRepo.repoDir && 'items' in result && mode !== 'plan') {
+        const prefix = lastRepo.repoDir.endsWith('/') ? lastRepo.repoDir : lastRepo.repoDir + '/'
+        for (const item of (result as InstallResult).items) {
+          if (item.sourcePath.startsWith(prefix)) {
+            item.sourcePath = item.sourcePath.slice(prefix.length)
+          }
+        }
+      }
+      report(result, reporter, mode)
+    },
   }
 }
 

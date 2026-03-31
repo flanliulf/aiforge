@@ -64,14 +64,14 @@ development_status:
   epic-3-retrospective: done
 
   # Epic 4: 安装执行与冲突保护
-  epic-4: in-progress
+  epic-4: done
   4-1-fs-utils-and-preflight-check: done
   4-2-copy-mode-install: done
   4-3-symlink-and-flatten-mode: done
   4-4-manifest-state-and-conflict-detection: done
   4-5-conflict-handling-and-safety: done
   4-6a-pipeline-orchestration-and-error-flow: done
-  4-6b-install-result-summary-and-output: ready-for-dev
+  4-6b-install-result-summary-and-output: done
   epic-4-retrospective: optional
 
   # Epic 5: 端到端体验与发布就绪

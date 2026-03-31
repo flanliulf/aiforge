@@ -290,6 +290,7 @@ describe('createProductionStages — saveManifest 真实闭包集成测试 (CR R
           status: 'new' as const,
           sourcePath: join(tmpDir, 'unrecognized-source.md'), // 不在任何 plan.sourceFiles 中
           targetPath: orphanFile, // 真实文件（fileHash 不会抛错）
+          tool: 'test-tool',
         },
       ],
     }

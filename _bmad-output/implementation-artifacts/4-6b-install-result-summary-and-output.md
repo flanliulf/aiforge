@@ -1,6 +1,6 @@
 # Story 4.6b: 安装结果汇总与输出流分工
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -15,19 +15,19 @@ So that 知道哪些文件是新安装、更新还是跳过。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 实现 `Reporter.reportResult()` 方法 — 最小可用版本 (AC: #1, #2)
-  - [ ] 1.1 实现 `TtyReporter.reportResult()` — 按工具分组逐行输出，状态图标 + 统计行（基础格式，树形美化留给 Epic 5 Story 5.2）
-  - [ ] 1.2 实现 `PlainReporter.reportResult()` — 纯文本行输出（CI 友好，可被管道解析）
-  - [ ] 1.3 实现 `QuietReporter.reportResult()` — 只输出统计行
-  - [ ] 1.4 所有实现：结果 → stdout，错误 → stderr
-- [ ] Task 2: 实现结果格式化 — 基础版本 (AC: #1)
-  - [ ] 2.1 按工具分组：`Map<string, InstallResult[]>`
-  - [ ] 2.2 状态图标映射：使用 `data/messages.ts` 中的 `ICON_NEW`、`ICON_UPDATED`、`ICON_SKIPPED`
-  - [ ] 2.3 统计行计算：按 status 分类计数
-- [ ] Task 3: 编写单元测试 (AC: #1, #2)
-  - [ ] 3.1 `tests/core/reporter.test.ts` — 扩展 reportResult 测试
-  - [ ] 3.2 测试用例：单工具结果、多工具分组、全部成功、全部跳过、统计行正确性
-  - [ ] 3.3 捕获 stdout/stderr 输出验证流分工
+- [x] Task 1: 实现 `Reporter.reportResult()` 方法 — 最小可用版本 (AC: #1, #2)
+  - [x] 1.1 实现 `TtyReporter.reportResult()` — 按工具分组逐行输出，状态图标 + 统计行（基础格式，树形美化留给 Epic 5 Story 5.2）
+  - [x] 1.2 实现 `PlainReporter.reportResult()` — 纯文本行输出（CI 友好，可被管道解析）
+  - [x] 1.3 实现 `QuietReporter.reportResult()` — 只输出统计行
+  - [x] 1.4 所有实现：结果 → stdout，错误 → stderr
+- [x] Task 2: 实现结果格式化 — 基础版本 (AC: #1)
+  - [x] 2.1 按工具分组：`Map<string, InstallResult['items']>`
+  - [x] 2.2 状态图标映射：内联 `STATUS_ICONS` 常量（`core/` 不得引用 `data/`，故未使用 data/messages.ts 的导出，图标值与 `data/messages.ts` ICONS 保持一致）
+  - [x] 2.3 统计行计算：按 status 分类计数
+- [x] Task 3: 编写单元测试 (AC: #1, #2)
+  - [x] 3.1 `tests/core/reporter.test.ts` — 扩展 reportResult 测试
+  - [x] 3.2 测试用例：单工具结果、多工具分组、全部成功、全部跳过、统计行正确性
+  - [x] 3.3 捕获 stdout/stderr 输出验证流分工
 
 ## Dev Notes
 
@@ -121,8 +121,37 @@ const STATUS_ICONS: Record<string, string> = {
 
 ### Agent Model Used
 
+claude-sonnet-4.6
+
 ### Debug Log References
+
+**关键决策记录：**
+1. **`core/` 不得引用 `data/`（架构边界）**：Dev Notes 中建议 import `data/messages.ts` 的 `ICON_NEW` 等，但 `project-context.md` 明确 `core/` 不得引用 `data/`。故在 `reporter.ts` 中内联了 `STATUS_ICONS` 常量和 `resultStatsLine()` 辅助函数，图标值与 `data/messages.ts` 保持一致。
+2. **`InstallResult.items` 缺少 `tool` 字段**：按工具分组输出需要 tool 信息，但原 `InstallResult.items` 只有 `status/sourcePath/targetPath`。在 `core/types.ts` 中添加 `tool: string` 字段，并同步更新 `executeInstall.ts` 中所有 `resultItems.push()` 调用，携带 `item.rule.tool`。
+3. **PlainReporter 统计行格式**：Dev Notes 示例为 `installed: 2  updated: 1  skipped: 1`（英文键名），与 TtyReporter 的 `安装: N 项  更新: N 项  跳过: N 项` 不同——CI 输出采用英文键名更利于 grep 解析。
 
 ### Completion Notes List
 
+**Story 4.6b 已完成，所有 AC 满足：**
+
+- **AC #1 ✅**：三种 Reporter 均按工具分组输出结果：
+  - `TtyReporter.reportResult()`：彩色分组 + 状态图标（✅🔄⏭️）+ 统计行 `安装: N 项  更新: N 项  跳过: N 项`
+  - `PlainReporter.reportResult()`：纯文本 tab 分隔（`status\ttool\ttargetPath`）+ `---` + `installed: N  updated: N  skipped: N`
+  - `QuietReporter.reportResult()`：仅统计行 `✓ 安装: N 项  更新: N 项  跳过: N 项`
+
+- **AC #2 ✅**：`reportResult()` 写 stdout，`reportError()` 写 stderr（已有架构，未变）
+
+- **测试：** `tests/core/reporter.test.ts` 新增 27 个 reportResult 专项测试（原 15 个基础测试保留）；全仓 572 个测试全部通过；Lint + Build 通过
+
+- **变更范围：**
+  - `src/core/types.ts`：`InstallResult.items` 新增 `tool: string` 字段
+  - `src/core/reporter.ts`：重写 TtyReporter/PlainReporter 的 `reportResult()`，重构 QuietReporter 的 `reportResult()` 使用内联辅助函数，新增 `resultStatsLine()` + `STATUS_ICONS`
+  - `src/stages/execute-install.ts`：所有 `resultItems.push()` 调用新增 `tool: item.rule.tool`
+  - `tests/core/reporter.test.ts`：新增 fixture 函数 + reportResult 专项测试用例
+
 ### File List
+
+- `src/core/types.ts`（修改 — InstallResult.items 添加 tool 字段）
+- `src/core/reporter.ts`（修改 — TtyReporter/PlainReporter/QuietReporter.reportResult() 实现）
+- `src/stages/execute-install.ts`（修改 — resultItems.push() 添加 tool 字段）
+- `tests/core/reporter.test.ts`（修改 — 扩展 reportResult 测试，新增 fixture 函数）

@@ -39,6 +39,7 @@ import type { MatchedPlan, ParsedArgs, InstallResult, ManifestEntry } from '../c
 import { InstallType } from '../core/types.js'
 import type { Reporter } from '../core/reporter.js'
 import type { PathResolver } from '../core/path-resolver.js'
+import { TOOL_DEFINITIONS } from '../data/tool-registry.js'
 import {
   preflight,
   copyFile,
@@ -322,6 +323,9 @@ export async function executeInstall(
   // Step 1: 预检查（路径安全性 + 可写性）
   await preflight(plan, pathResolver)
 
+  // 构建 tool id → display name 映射（CR Round-1 修复：supply toolDisplayName to InstallResult）
+  const toolNameMap = new Map(TOOL_DEFINITIONS.map((t) => [t.id, t.name]))
+
   const resultItems: InstallResult['items'] = []
   // 记录每个 targetPath 的安装模式，用于断链检测
   const itemModes = new Map<string, 'copy' | 'symlink'>()
@@ -355,7 +359,13 @@ export async function executeInstall(
           if (code === 'ENOENT' || code === 'ENOTDIR') {
             // 主文件不存在，跳过该子目录，记录警告（AC #4）
             reporter.warn(`⚠️ flatten: ${basename(srcDir)}/ 中未找到 ${mainFile}，跳过`)
-            resultItems.push({ status: 'skipped', sourcePath: srcDir, targetPath: destPath })
+            resultItems.push({
+              status: 'skipped',
+              tool: item.rule.tool,
+              toolDisplayName: toolNameMap.get(item.rule.tool),
+              sourcePath: srcDir,
+              targetPath: destPath,
+            })
             continue
           }
           // 其他 I/O 错误向上抛出
@@ -375,7 +385,13 @@ export async function executeInstall(
           reporter,
         )
         if (conflictAction === 'skip') {
-          resultItems.push({ status: 'skipped', sourcePath: mainPath, targetPath: destPath })
+          resultItems.push({
+            status: 'skipped',
+            tool: item.rule.tool,
+            toolDisplayName: toolNameMap.get(item.rule.tool),
+            sourcePath: mainPath,
+            targetPath: destPath,
+          })
           continue
         }
 
@@ -386,14 +402,26 @@ export async function executeInstall(
             reporter.updatePhase(targetName)
           }
           itemModes.set(destPath, 'symlink')
-          resultItems.push({ status, sourcePath: mainPath, targetPath: destPath })
+          resultItems.push({
+            status,
+            tool: item.rule.tool,
+            toolDisplayName: toolNameMap.get(item.rule.tool),
+            sourcePath: mainPath,
+            targetPath: destPath,
+          })
         } else {
           const status = await determineStatus(mainPath, destPath)
           if (status !== 'skipped') {
             await copyFile(mainPath, destPath)
             reporter.updatePhase(targetName)
           }
-          resultItems.push({ status, sourcePath: mainPath, targetPath: destPath })
+          resultItems.push({
+            status,
+            tool: item.rule.tool,
+            toolDisplayName: toolNameMap.get(item.rule.tool),
+            sourcePath: mainPath,
+            targetPath: destPath,
+          })
         }
       }
     } else {
@@ -415,7 +443,13 @@ export async function executeInstall(
             reporter,
           )
           if (conflictAction === 'skip') {
-            resultItems.push({ status: 'skipped', sourcePath: srcPath, targetPath: destPath })
+            resultItems.push({
+              status: 'skipped',
+              tool: item.rule.tool,
+              toolDisplayName: toolNameMap.get(item.rule.tool),
+              sourcePath: srcPath,
+              targetPath: destPath,
+            })
             continue
           }
 
@@ -427,7 +461,13 @@ export async function executeInstall(
               reporter.updatePhase(basename(srcPath))
             }
             itemModes.set(destPath, 'symlink')
-            resultItems.push({ status, sourcePath: srcPath, targetPath: destPath })
+            resultItems.push({
+              status,
+              tool: item.rule.tool,
+              toolDisplayName: toolNameMap.get(item.rule.tool),
+              sourcePath: srcPath,
+              targetPath: destPath,
+            })
           } else {
             // copy 模式（Story 4.2 原逻辑）
             const status = await determineStatus(srcPath, destPath)
@@ -435,7 +475,13 @@ export async function executeInstall(
               await copyFile(srcPath, destPath)
               reporter.updatePhase(basename(srcPath))
             }
-            resultItems.push({ status, sourcePath: srcPath, targetPath: destPath })
+            resultItems.push({
+              status,
+              tool: item.rule.tool,
+              toolDisplayName: toolNameMap.get(item.rule.tool),
+              sourcePath: srcPath,
+              targetPath: destPath,
+            })
           }
         } else if (item.rule.type === InstallType.Directories) {
           const destPath = join(item.targetPath, basename(srcPath))
@@ -453,7 +499,13 @@ export async function executeInstall(
             reporter,
           )
           if (conflictAction === 'skip') {
-            resultItems.push({ status: 'skipped', sourcePath: srcPath, targetPath: destPath })
+            resultItems.push({
+              status: 'skipped',
+              tool: item.rule.tool,
+              toolDisplayName: toolNameMap.get(item.rule.tool),
+              sourcePath: srcPath,
+              targetPath: destPath,
+            })
             continue
           }
 
@@ -465,13 +517,25 @@ export async function executeInstall(
               reporter.updatePhase(basename(srcPath))
             }
             itemModes.set(destPath, 'symlink')
-            resultItems.push({ status, sourcePath: srcPath, targetPath: destPath })
+            resultItems.push({
+              status,
+              tool: item.rule.tool,
+              toolDisplayName: toolNameMap.get(item.rule.tool),
+              sourcePath: srcPath,
+              targetPath: destPath,
+            })
           } else {
             // copy 模式（Story 4.2 原逻辑）
             const status = await determineDirStatus(destPath)
             await copyDir(srcPath, destPath)
             reporter.updatePhase(basename(srcPath))
-            resultItems.push({ status, sourcePath: srcPath, targetPath: destPath })
+            resultItems.push({
+              status,
+              tool: item.rule.tool,
+              toolDisplayName: toolNameMap.get(item.rule.tool),
+              sourcePath: srcPath,
+              targetPath: destPath,
+            })
           }
         }
       }
