@@ -72,7 +72,7 @@ development_status:
   4-5-conflict-handling-and-safety: done
   4-6a-pipeline-orchestration-and-error-flow: done
   4-6b-install-result-summary-and-output: done
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
 
   # Epic 5: 端到端体验与发布就绪
   epic-5: backlog
