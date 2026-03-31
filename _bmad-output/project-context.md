@@ -135,8 +135,8 @@ index.ts → pipeline.ts → stages/* → services/*
   - Reporter 创建前的语言回退提示：允许 `process.stderr.write()`（此时 Reporter 尚未实例化）
 - Three Reporter implementations: `TtyReporter` (spinner+color), `PlainReporter` (CI/non-TTY), `QuietReporter` (--quiet)
 - Progress phase names: verb + object in Chinese (`"解析仓库地址..."`, `"克隆仓库..."`)
-- Result icons: `✅` new, `🔄` updated, `⏭️` skipped, `❌` failed
-- Stats line: `安装: N 项  更新: N 项  跳过: N 项  失败: N 项`
+- Result icons: `✅` new, `🔄` updated, `⏭️` skipped
+- Stats line: `安装: N 项  更新: N 项  跳过: N 项`
 - Output strings centralized in `data/messages.ts`
 - **进度计数变量的分子/分母必须绑定到同一语义单元：** 实现 `processedCount / totalFiles` 类进度显示时，必须在代码注释中明确"进度单位"语义，并确保所有"已处理的终态"（`new`/`updated`/`skipped`/`conflictAction === 'skip'`/`warn+skip`）统一推进分子计数。若某终态不推进，用户会看到进度停滞后突然结束，误以为还有文件未处理。注意：`processedCount++` 和 `reporter.updatePhase(...)` 必须在 `resultItems.push()` 和 `continue` 之前执行。（来源：Story 5-1 CR R1 — 3 类 skipped 终态均未推进计数，进度显示失真）
 - **输出通道与 TTY 能力判定必须绑定到同一 fd：** 当功能模块将输出定向到特定 fd（如 `process.stderr`）时，判定该 fd 的终端能力（如 `isTTY`、颜色支持）必须使用**同一个 fd** 的属性。具体到 spinner/Reporter 创建场景：spinner 用 `stderr` 输出则 `isTty: process.stderr.isTTY === true`，禁止混用 `process.stdout.isTTY`。否则在 `aiforge ... > result.txt` 或 `aiforge ... | cmd` 场景下，stderr 仍在终端但 spinner 被错误禁用。（来源：Story 5-1 CR R1 — `ora({ stream: process.stderr })` 与入口层 `process.stdout.isTTY` fd 不一致）
@@ -176,12 +176,14 @@ index.ts → pipeline.ts → stages/* → services/*
 - **Mock 断言必须验证被测函数的实际调用链：** 当测试涉及安全关键行为（如 Token 脱敏、权限检查）时，禁止在测试中直接调用 mock 函数来验证其行为。必须通过被测函数的入口触发 mock，然后断言：(1) mock 函数被调用且参数正确（`toHaveBeenCalledWith`）；(2) 被测函数的输出/副作用中包含 mock 处理结果而非原始输入。（来源：Story 2-3 CR — AC #7 脱敏测试直接调用 mock 的 `sanitizeToken()`，无法守住安全回归）
 - **测试断言必须基于 Story 契约而非当前实现行为：** 新增或修改测试断言时，断言的期望值必须基于 Story 文档中定义的输出契约（如示例输出格式、字段语义），而非当前实现的实际输出。如果实现与 Story 契约不一致，应先修复实现使其符合契约，再编写断言——禁止"先让测试绿了、再说契约的事"。否则测试会将错误行为固化，后续修正时还需连带修改测试。（来源：Story 4-6b CR R1→R2 — 修复 `reportResult()` 后新增测试直接使用绝对路径作为断言基准，将错误的 `sourcePath` 行为固化，R2 审查发现后才纠正为 Story 约定的 repo-relative 路径）
 - **CR 修复改变行为后必须同步更新所有与"旧行为"绑定的测试断言：** 当 CR 修复使某个行为发生变化时，必须搜索测试文件中所有基于旧行为编写的断言并将其更新为正确行为的断言。特别注意：原本"通过"的测试若因修复而变为"失败"，禁止为了"让测试重新变绿"而回退修复或注释断言——应更新断言以匹配正确行为，同时在注释中说明语义变更原因（如"skipped 仍是已处理的终态，应推进进度计数"）。（来源：Story 5-1 CR 修复 — 修复进度计数后，2 个旧断言 `not.toHaveBeenCalled()` 需同步更新为正确预期）
+- **Story Dev Notes 的 UI/格式代码示例是实现契约，不是参考风格：** 当 Story Dev Notes 给出具体的输出示例（含颜色方案、图标映射、格式结构）时，该示例为**强制实现契约**：(1) 实现完成后必须逐项比对 Dev Notes 示例与实际输出；(2) 对应测试必须断言格式契约本身（如颜色语义、图标映射），而非仅断言文本内容；(3) 如实现与示例存在合理偏差，必须在代码注释或 Story 中明确记录偏差原因。禁止将 Dev Notes 中的具体着色方案视为"建议风格"而仅部分实现。（来源：Story 5-2 CR R1 — Dev Notes 第 58-65 行给出 `chalk.green/blue/gray` 状态着色示例，实现仅对标题着色，结果行和统计行均未落地；配套测试也只验证文本结构而未验证颜色语义）
 
 ### CR Workflow Rules
 
-- **CR 修复后必须同步更新 Story Dev Agent Record：** CR 修复涉及新增/删除测试用例或代码变更导致全仓测试数变化时，修复完毕后必须同步更新 Story 的 Completion Notes：(1) 当前 Story 测试用例数；(2) 全仓测试通过数；(3) Lint 状态。更新时应标注变更原因（如"原 18 + CR Round-1 修复新增 3"）。（来源：Story 2-3 CR — 修复新增 3 个测试后 Story 记录仍写"18 个测试"，延续一整轮 CR 才关闭）
+- **CR 修复后必须同步更新 Story Dev Agent Record：** CR 修复涉及新增/删除测试用例或代码变更导致全仓测试数变化时，修复完毕后必须同步更新 Story 的 Completion Notes：(1) 当前 Story 测试用例数；(2) 全仓测试通过数；(3) Lint 状态。更新时应标注变更原因（如"原 18 + CR Round-1 修复新增 3"）。**同时必须更新 `File List`，确保列出 CR 修复过程中所有改动文件，包括规则文档**（`project-context.md`、`03-core-decisions.md`、`04-implementation-patterns.md`）——仅列出代码文件而遗漏规则文档是常见遗漏点。（来源：Story 2-3 CR — 修复新增 3 个测试后 Story 记录仍写"18 个测试"，延续一整轮 CR 才关闭；Story 5-2 CR R3 — CR 修复同步了 3 份规则文档但 File List 未追加）
 - **CR 修复后必须执行完整质量门禁三件套：** 每次 CR 修复完成后，必须按顺序执行 `npm test` → `npm run lint` → `npm run build`，并将每项结果逐行记录到修复记录中。禁止：(1) 只执行部分验证（如只跑 test 不跑 lint）；(2) 复用上轮验证结果（每次修复后必须重新执行）；(3) 在验证未全部通过时声称"通过"。Prettier 格式化应作为修复的最后一步自动执行：`npx prettier --write <修改过的文件>`。（来源：Story 4-2 CR — R2 和 R5 各出现一次 Prettier 格式未通过；Story 4-1 CR 也出现同类问题，共 3 次重复）
 - **CR 修复验证结论必须可独立复现：** CR 修复记录中的"验证通过"结论必须附带可独立复现的验证命令和输出摘要（如测试通过数、lint 状态）。禁止只写"✅ npm run lint 通过"而不附带任何证据。后续审查轮次必须能通过重新执行相同命令来验证结论的真实性。修复记录中如果声称验证通过，但下一轮审查独立执行后发现未通过，视为修复记录不合规。（来源：Story 4-6b CR R1→R2 — R1 修复记录声称"npm run lint ✅ 通过"，但 R2 审查独立执行后发现 lint 实际未通过，说明 R1 验证结论不可靠）
+- **Rule Document Registry 同步时必须扫描示例代码块和格式示例，不限于文字规则段落：** 执行 Rule Document Registry 三文档同步时，除更新文字规则段落外，还必须检查：(1) **示例代码块**（`` ``` `` 块内的接口签名、类型定义、枚举值）；(2) **格式示例/图标枚举**（如 Result icons 枚举列表、统计行格式示例）。搜索关键词：同步目标的字段名、枚举值、状态词（如 `failed`、`InstallResult`）。遗漏"非文字规则"内容是多轮 CR 中持续出现的同步缺口。（来源：Story 5-2 CR R1 — `failed` 图标/统计行示例未同步；R2 — `InstallResult[]` 接口示例未同步，均属文字规则已同步但示例内容遗漏的模式）
 
 ### Install Rules Data Architecture
 

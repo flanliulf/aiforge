@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import chalk from 'chalk'
 import { createReporter } from '../../src/core/reporter.js'
 import type { Reporter } from '../../src/core/reporter.js'
 import type { InstallResult } from '../../src/core/types.js'
@@ -381,6 +382,61 @@ describe('TtyReporter', () => {
     expect(stdoutSpy).toHaveBeenCalled()
   })
 
+  // ── 树形输出测试（Story 5-2 新增）────────────────────────────────────────────
+
+  it('reportResult: 工具标题包含项数 (AC #1)', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    // 3 项（2 copilot items... wait, createSingleToolResult has 3 items）
+    expect(allOutput).toContain('(3 项)')
+  })
+
+  it('reportResult: 多工具时各自显示正确项数 (AC #1)', () => {
+    reporter.reportResult(createMultiToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    // copilot 有 2 项，claude 有 1 项
+    expect(allOutput).toContain('(2 项)')
+    expect(allOutput).toContain('(1 项)')
+  })
+
+  it('reportResult: 非最后一项使用 ├── 连接符 (AC #1)', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('├──')
+  })
+
+  it('reportResult: 最后一项使用 └── 连接符 (AC #1)', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('└──')
+  })
+
+  it('reportResult: 单工具单项时只有 └── 无 ├── (AC #1)', () => {
+    reporter.reportResult(createAllNewResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    // claude 下有 2 项（createAllNewResult 有 2 items）：第 1 项 ├──，第 2 项 └──
+    expect(allOutput).toContain('└──')
+    expect(allOutput).toContain('├──')
+  })
+
+  it('reportResult: 单一文件时只有 └── 无 ├── (AC #1)', () => {
+    const singleItem: InstallResult = {
+      items: [
+        {
+          status: 'new',
+          tool: 'claude',
+          toolDisplayName: 'Claude Code',
+          sourcePath: 'agents/CLAUDE.md',
+          targetPath: '/home/user/.claude/agents/CLAUDE.md',
+        },
+      ],
+    }
+    reporter.reportResult(singleItem)
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('└──')
+    expect(allOutput).not.toContain('├──')
+  })
+
   it('reportPlan writes to stdout', () => {
     reporter.reportPlan({
       items: [
@@ -505,6 +561,80 @@ describe('TtyReporter', () => {
     // spinner 激活时 updatePhase 只更新 text 属性，不直接 write stderr
     // 因此 stderrSpy 不应有新的调用（spinner text 变更不触发 write）
     expect(stderrSpy).not.toHaveBeenCalled()
+  })
+
+  // ── 彩色语义测试（Story 5-2 CR 修复新增）─────────────────────────────────────
+  // 测试策略：临时设置 chalk.level=1 强制启用 ANSI 颜色输出（测试环境默认 level=0）
+  // 通过断言输出包含 ANSI 转义码来验证正确的 chalk 函数被调用
+
+  it('reportResult: 工具标题使用 chalk.bold（包含 ANSI bold 码）(CR #1)', () => {
+    const origLevel = chalk.level
+    chalk.level = 1
+    try {
+      reporter.reportResult(createSingleToolResult())
+      const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+      // chalk.bold 产生 \x1b[1m ... \x1b[22m
+      // eslint-disable-next-line no-control-regex
+      expect(allOutput).toMatch(/\x1b\[1m/)
+    } finally {
+      chalk.level = origLevel
+    }
+  })
+
+  it('reportResult: new 状态行使用 chalk.green（包含 ANSI green 码）(CR #1)', () => {
+    const origLevel = chalk.level
+    chalk.level = 1
+    try {
+      reporter.reportResult(createAllNewResult())
+      const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+      // chalk.green 产生 \x1b[32m
+      // eslint-disable-next-line no-control-regex
+      expect(allOutput).toMatch(/\x1b\[32m/)
+    } finally {
+      chalk.level = origLevel
+    }
+  })
+
+  it('reportResult: updated 状态行使用 chalk.blue（包含 ANSI blue 码）(CR #1)', () => {
+    const origLevel = chalk.level
+    chalk.level = 1
+    try {
+      reporter.reportResult(createSingleToolResult())
+      const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+      // chalk.blue 产生 \x1b[34m
+      // eslint-disable-next-line no-control-regex
+      expect(allOutput).toMatch(/\x1b\[34m/)
+    } finally {
+      chalk.level = origLevel
+    }
+  })
+
+  it('reportResult: skipped 状态行使用 chalk.gray（包含 ANSI gray 码）(CR #1)', () => {
+    const origLevel = chalk.level
+    chalk.level = 1
+    try {
+      reporter.reportResult(createSingleToolResult())
+      const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+      // chalk.gray 产生 \x1b[90m（bright black）
+      // eslint-disable-next-line no-control-regex
+      expect(allOutput).toMatch(/\x1b\[90m/)
+    } finally {
+      chalk.level = origLevel
+    }
+  })
+
+  it('reportResult: 统计行安装部分使用 chalk.green（包含 ANSI green 码）(CR #1)', () => {
+    const origLevel = chalk.level
+    chalk.level = 1
+    try {
+      reporter.reportResult(createAllNewResult())
+      const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+      // 统计行 '安装: N 项' 用 chalk.green
+      // eslint-disable-next-line no-control-regex
+      expect(allOutput).toMatch(/\x1b\[32m安装: \d+ 项/)
+    } finally {
+      chalk.level = origLevel
+    }
   })
 })
 

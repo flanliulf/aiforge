@@ -1,6 +1,6 @@
 # Story 5.2: 树形结果汇总与统计
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -16,21 +16,21 @@ So that 一目了然地知道每个工具安装了什么。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 完善 `TtyReporter.reportResult()` — 树形彩色输出 (AC: #1-3)
-  - [ ] 1.1 按工具分组 `InstallResult[]`
-  - [ ] 1.2 每个工具组标题：工具显示名 + 项数（使用 chalk 着色）
-  - [ ] 1.3 树形缩进：`├──` 和 `└──` 连接符
-  - [ ] 1.4 每行：状态图标 + 源路径 → 目标路径
-  - [ ] 1.5 底部统计行使用 chalk 着色
-  - [ ] 1.6 输出到 stdout
-- [ ] Task 2: 完善 `PlainReporter.reportResult()` — 纯文本输出 (AC: #3)
-  - [ ] 2.1 制表符分隔格式：`status\ttool\tsource\ttarget`
-  - [ ] 2.2 底部统计行：`installed: N  updated: N  skipped: N`
-  - [ ] 2.3 无颜色、无树形符号，可被 `grep`/`awk`/`cut` 解析
-- [ ] Task 3: 编写单元测试 (AC: #1-3)
-  - [ ] 3.1 扩展 `tests/core/reporter.test.ts`
-  - [ ] 3.2 测试用例：单工具树形、多工具分组、统计行计算、stdout 输出验证
-  - [ ] 3.3 捕获 stdout 输出进行格式验证
+- [x] Task 1: 完善 `TtyReporter.reportResult()` — 树形彩色输出 (AC: #1-3)
+  - [x] 1.1 按工具分组 `InstallResult[]`
+  - [x] 1.2 每个工具组标题：工具显示名 + 项数（使用 chalk 着色）
+  - [x] 1.3 树形缩进：`├──` 和 `└──` 连接符
+  - [x] 1.4 每行：状态图标 + 源路径 → 目标路径
+  - [x] 1.5 底部统计行使用 chalk 着色
+  - [x] 1.6 输出到 stdout
+- [x] Task 2: 完善 `PlainReporter.reportResult()` — 纯文本输出 (AC: #3)
+  - [x] 2.1 制表符分隔格式：`status\ttool\tsource\ttarget`
+  - [x] 2.2 底部统计行：`installed: N  updated: N  skipped: N`
+  - [x] 2.3 无颜色、无树形符号，可被 `grep`/`awk`/`cut` 解析
+- [x] Task 3: 编写单元测试 (AC: #1-3)
+  - [x] 3.1 扩展 `tests/core/reporter.test.ts`
+  - [x] 3.2 测试用例：单工具树形、多工具分组、统计行计算、stdout 输出验证
+  - [x] 3.3 捕获 stdout 输出进行格式验证
 
 ## Dev Notes
 
@@ -103,8 +103,46 @@ const toolName = TOOL_DEFINITIONS.find(t => t.id === toolId)?.name || toolId;
 
 ### Agent Model Used
 
+claude-sonnet-4.6
+
 ### Debug Log References
+
+无
 
 ### Completion Notes List
 
+- **Task 1 (TtyReporter.reportResult 树形输出)**：
+  - 在 `src/core/reporter.ts` 中增强 `TtyReporter.reportResult()`：工具标题行追加项数 `(N 项)`，每个工具组内文件行使用 `├──`/`└──` 树形连接符
+  - chalk 着色：工具标题用 `chalk.bold`；结果行按状态着色（`new → chalk.green`，`updated → chalk.blue`，`skipped → chalk.gray`）；统计行按段分段着色（安装=green，更新=blue，跳过=gray）
+  - 输出到 stdout，符合 Reporter stdout/stderr 分工规范（architecture/03-core-decisions.md#D4）
+
+- **Task 2 (PlainReporter.reportResult)**：4.6b 已完整实现，本 Story 无需改动
+
+- **Task 3 (单元测试)**：
+  - 在 `tests/core/reporter.test.ts` 中新增 11 个 TtyReporter 测试用例：
+    - **树形结构测试（Story 初始实现，6 个）：**
+      1. 工具标题包含项数 `(N 项)`
+      2. 多工具各自显示正确项数
+      3. 非最后一项使用 `├──`
+      4. 最后一项使用 `└──`
+      5. 多项工具下同时存在 `├──` 和 `└──`
+      6. 单文件时只有 `└──` 无 `├──`
+    - **颜色语义测试（CR 修复新增，5 个）：**
+      7. 工具标题使用 chalk.bold（ANSI bold 码验证）
+      8. new 状态行使用 chalk.green（ANSI green 码验证）
+      9. updated 状态行使用 chalk.blue（ANSI blue 码验证）
+      10. skipped 状态行使用 chalk.gray（ANSI gray 码验证）
+      11. 统计行安装部分使用 chalk.green（ANSI green 码验证）
+
+- **质量门禁验证**：
+  - `npm test`：595 passed，28 test files，零回归 ✅（原 590 + CR 修复新增 5 个颜色语义测试）
+  - `npm run lint`：ESLint + Prettier 全部通过 ✅
+  - `npm run build`：ESM build success ✅
+
 ### File List
+
+- `src/core/reporter.ts` — 增强 `TtyReporter.reportResult()`（树形连接符 + 工具项数标题 + chalk 彩色语义）
+- `tests/core/reporter.test.ts` — 新增 11 个测试用例（6 个树形结构 + 5 个颜色语义）
+- `_bmad-output/project-context.md` — Output Rules：移除 `❌ failed` 图标和统计行 `失败: N 项`（CR 修复）
+- `_bmad-output/planning-artifacts/architecture/04-implementation-patterns.md` — 结果状态图标和统计行：移除 `❌ 失败`（CR 修复）
+- `_bmad-output/planning-artifacts/architecture/03-core-decisions.md` — Reporter 接口和 Stage 类型签名：`InstallResult[]` → `InstallResult`（CR 修复）

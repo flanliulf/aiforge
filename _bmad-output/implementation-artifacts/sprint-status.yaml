@@ -77,7 +77,7 @@ development_status:
   # Epic 5: 端到端体验与发布就绪
   epic-5: backlog
   5-1-phase-progress-and-spinner: done
-  5-2-tree-result-summary-and-stats: ready-for-dev
+  5-2-tree-result-summary-and-stats: done
   5-3-tty-adaptive-and-quiet-mode: ready-for-dev
   5-4-three-part-error-messages: ready-for-dev
   5-5a-i18n-language-selection: ready-for-dev

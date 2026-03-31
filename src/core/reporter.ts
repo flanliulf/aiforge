@@ -133,18 +133,34 @@ class TtyReporter implements Reporter {
     for (const [tool, items] of byTool) {
       // 优先使用 toolDisplayName（如 'GitHub Copilot'），fallback 到内部 id
       const displayName = items[0]?.toolDisplayName ?? tool
-      process.stdout.write(chalk.yellow(`\n🔧 ${displayName}\n`))
-      for (const item of items) {
+      // 工具标题：bold 显示名 + 项数（FR-036，Story 5-2 Dev Notes chalk 示例）
+      process.stdout.write(chalk.bold(`\n🔧 ${displayName} (${items.length} 项)\n`))
+
+      const lastIdx = items.length - 1
+      items.forEach((item, idx) => {
         const icon = STATUS_ICONS[item.status] ?? '❓'
-        process.stdout.write(`  ${icon} ${item.sourcePath}     → ${item.targetPath}\n`)
-      }
+        // 树形连接符：最后一项用 └──，其他用 ├──
+        const connector = idx === lastIdx ? '  └──' : '  ├──'
+        // 按状态着色：new=green, updated=blue, skipped=gray（Story 5-2 Dev Notes chalk 示例）
+        const line = `${connector} ${icon} ${item.sourcePath}     → ${item.targetPath}`
+        let coloredLine: string
+        if (item.status === 'new') {
+          coloredLine = chalk.green(line)
+        } else if (item.status === 'updated') {
+          coloredLine = chalk.blue(line)
+        } else {
+          coloredLine = chalk.gray(line)
+        }
+        process.stdout.write(`${coloredLine}\n`)
+      })
     }
 
-    // 统计行
+    // 统计行：按段分段着色（Story 5-2 Dev Notes chalk 示例）
     const installed = results.items.filter((i) => i.status === 'new').length
     const updated = results.items.filter((i) => i.status === 'updated').length
     const skipped = results.items.filter((i) => i.status === 'skipped').length
-    process.stdout.write(chalk.bold(`\n${resultStatsLine(installed, updated, skipped)}\n`))
+    const statsLine = `${chalk.green(`安装: ${installed} 项`)}  ${chalk.blue(`更新: ${updated} 项`)}  ${chalk.gray(`跳过: ${skipped} 项`)}`
+    process.stdout.write(`\n${statsLine}\n`)
   }
 
   /**

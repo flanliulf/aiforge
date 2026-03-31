@@ -123,7 +123,7 @@ interface Reporter {
   startPhase(name: string): void;
   updatePhase(message: string): void;
   completePhase(): void;
-  reportResult(results: InstallResult[]): void;
+  reportResult(results: InstallResult): void;
   reportPlan(plan: MatchedPlan): void;
   reportError(error: AiforgeError): void;
   warn(message: string): void;
@@ -195,8 +195,8 @@ type AuthStage      = (source: ResolvedSource) => Promise<AuthenticatedSource>;
 type CloneStage     = (source: AuthenticatedSource) => Promise<LocalRepo>;
 type DetectStage    = (repo: LocalRepo, args: ParsedArgs) => Promise<DetectedEnv>;
 type MatchStage     = (env: DetectedEnv, args: ParsedArgs) => Promise<MatchedPlan>;
-type InstallStage   = (plan: MatchedPlan) => Promise<InstallResult[]>;
-type ReportStage    = (results: InstallResult[]) => void;
+type InstallStage   = (plan: MatchedPlan) => Promise<InstallResult>;
+type ReportStage    = (results: InstallResult | MatchedPlan) => void;
 ```
 
 **ParsedArgs 贯穿说明：**
