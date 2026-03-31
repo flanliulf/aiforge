@@ -44,7 +44,7 @@ program
 
     const reporter = createReporter({
       quiet: args.quiet,
-      isTty: process.stdout.isTTY === true,
+      isTty: process.stderr.isTTY === true,
     })
 
     const pathResolver = new UnixPathResolver()

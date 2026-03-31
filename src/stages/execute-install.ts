@@ -330,6 +330,14 @@ export async function executeInstall(
   // 记录每个 targetPath 的安装模式，用于断链检测
   const itemModes = new Map<string, 'copy' | 'symlink'>()
 
+  // 计算总安装项数（AC #2: 进度计数）
+  // 排除空 sourceFiles 的 item（与循环内 continue 逻辑一致）
+  const totalFiles = plan.items.reduce((sum, item) => {
+    if (item.sourceFiles.length === 0) return sum
+    return sum + item.sourceFiles.length
+  }, 0)
+  let processedCount = 0
+
   for (const item of plan.items) {
     // 空 sourceFiles 静默跳过：不创建目录、不产生副作用（CR R4-#1）
     if (item.sourceFiles.length === 0) continue
@@ -366,6 +374,8 @@ export async function executeInstall(
               sourcePath: srcDir,
               targetPath: destPath,
             })
+            processedCount++
+            reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
             continue
           }
           // 其他 I/O 错误向上抛出
@@ -392,6 +402,8 @@ export async function executeInstall(
             sourcePath: mainPath,
             targetPath: destPath,
           })
+          processedCount++
+          reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
           continue
         }
 
@@ -399,8 +411,9 @@ export async function executeInstall(
           const status = await determineSymlinkStatus(mainPath, destPath)
           if (status !== 'skipped') {
             await createSymlink(mainPath, destPath)
-            reporter.updatePhase(targetName)
           }
+          processedCount++
+          reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
           itemModes.set(destPath, 'symlink')
           resultItems.push({
             status,
@@ -413,8 +426,9 @@ export async function executeInstall(
           const status = await determineStatus(mainPath, destPath)
           if (status !== 'skipped') {
             await copyFile(mainPath, destPath)
-            reporter.updatePhase(targetName)
           }
+          processedCount++
+          reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
           resultItems.push({
             status,
             tool: item.rule.tool,
@@ -450,6 +464,8 @@ export async function executeInstall(
               sourcePath: srcPath,
               targetPath: destPath,
             })
+            processedCount++
+            reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
             continue
           }
 
@@ -458,8 +474,9 @@ export async function executeInstall(
             const status = await determineSymlinkStatus(srcPath, destPath)
             if (status !== 'skipped') {
               await createSymlink(srcPath, destPath)
-              reporter.updatePhase(basename(srcPath))
             }
+            processedCount++
+            reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
             itemModes.set(destPath, 'symlink')
             resultItems.push({
               status,
@@ -473,8 +490,9 @@ export async function executeInstall(
             const status = await determineStatus(srcPath, destPath)
             if (status !== 'skipped') {
               await copyFile(srcPath, destPath)
-              reporter.updatePhase(basename(srcPath))
             }
+            processedCount++
+            reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
             resultItems.push({
               status,
               tool: item.rule.tool,
@@ -506,6 +524,8 @@ export async function executeInstall(
               sourcePath: srcPath,
               targetPath: destPath,
             })
+            processedCount++
+            reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
             continue
           }
 
@@ -514,8 +534,9 @@ export async function executeInstall(
             const status = await determineSymlinkStatus(srcPath, destPath)
             if (status !== 'skipped') {
               await createSymlink(srcPath, destPath)
-              reporter.updatePhase(basename(srcPath))
             }
+            processedCount++
+            reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
             itemModes.set(destPath, 'symlink')
             resultItems.push({
               status,
@@ -528,7 +549,8 @@ export async function executeInstall(
             // copy 模式（Story 4.2 原逻辑）
             const status = await determineDirStatus(destPath)
             await copyDir(srcPath, destPath)
-            reporter.updatePhase(basename(srcPath))
+            processedCount++
+            reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
             resultItems.push({
               status,
               tool: item.rule.tool,

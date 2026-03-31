@@ -7,7 +7,7 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 8 |
+| 🔴 open | 9 |
 | 🟡 in-progress | 0 |
 | ✅ resolved | 2 |
 
@@ -91,6 +91,17 @@
 - **描述**: `pipeline.ts:348-360` 中的 `sourcePath` repo-relative 转换逻辑（`report` 闭包内，将绝对 clone 路径裁剪为 repo-relative 路径后再传给 Reporter）没有直接命中它的自动化测试。现有测试覆盖的是 Reporter 组件层（输入已经是 relative path 时的格式化）和 saveManifest（不涉及 report 闭包）。如果该段逻辑被删除或改坏，现有测试仍有较大概率全绿。建议补一条针对 `createProductionStages().report` 的集成测试，断言传给 `reporter.reportResult()` 的 `items[].sourcePath` 已是 repo-relative 路径（不以 `repoDir` 开头）。代码本身仅 12 行、结构简单，当前风险可控。
 - **涉及文件**: `src/pipeline.ts`, `tests/integration/pipeline-production-stages.test.ts`
 - **建议时机**: Epic 5（输出体验优化）或下次触及 `pipeline.ts` report 闭包时
+- **状态**: open
+- **解决记录**:
+
+### TODO-011: 补充 "stdout 非 TTY、stderr 为 TTY" 入口层自动化测试
+
+- **来源**: Story 5-1 CR round 2 evaluation (2026-03-31)
+- **优先级**: P2
+- **类别**: test-gap
+- **描述**: `src/index.ts` 中的 TTY 判定已修正为 `process.stderr.isTTY === true`，但缺少显式覆盖 "stdout 非 TTY、stderr 为 TTY" 组合场景的入口层集成测试。当前测试只验证 `createReporter` 工厂函数在 `isTty` 参数层面的行为（直接 mock 参数），未覆盖 `index.ts` 从 `process.stderr.isTTY` 读取的完整路径。若后续有人将判定改回 `process.stdout.isTTY`，现有测试仍全绿，无法守住回归。建议补一条入口层测试：mock `process.stdout.isTTY = false`、`process.stderr.isTTY = true`，断言 `createReporter` 被以 `isTty: true` 调用，即仍使用 `TtyReporter`。
+- **涉及文件**: `src/index.ts`, `tests/cli-args.test.ts`
+- **建议时机**: Epic 5 内下次触及 `src/index.ts` 时（Story 5-3 tty-adaptive-and-quiet-mode 高度相关）
 - **状态**: open
 - **解决记录**:
 

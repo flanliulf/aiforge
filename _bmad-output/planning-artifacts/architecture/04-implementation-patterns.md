@@ -365,6 +365,51 @@ CR 修复中如果修改了类型定义（interface/type/enum 的字段增删改
 安装: 7 项  更新: 1 项  跳过: 1 项  失败: 0 项
 ```
 
+**进度计数变量的分子/分母必须绑定到同一语义单元：**
+
+实现 `processedCount / totalFiles` 类进度显示时，必须在代码注释中明确"进度单位"语义，并确保所有"已处理的终态"统一推进分子计数。
+
+```typescript
+✅ // 进度单位 = "已处理的 source item 数量"（与 status 值无关）
+   // 所有终态分支（new / updated / skipped / conflictAction==='skip' / warn+skip）均推进计数
+   processedCount++
+   reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
+   resultItems.push({ status: 'skipped', ... })
+   continue  // ← processedCount++ 必须在 continue 之前
+
+❌ // 分子只统计"实际执行 I/O 的项目"，分母却统计"所有计划项"
+   // → skipped 终态不推进，进度永远到不了总数，用户误以为还有文件未处理
+   if (status !== 'skipped') {
+     await copyFile(...)
+     processedCount++  // ← 只在非 skipped 时递增
+   }
+   resultItems.push({ status, ... })
+```
+
+> 来源：Story 5-1 CR R1 — 3 类 skipped 终态（hash 相同/冲突跳过/flatten 主文件缺失）均未推进计数，进度显示在 `(1/3)` 后直接结束，用户体验失真。
+
+**输出通道与 TTY 能力判定必须绑定到同一 fd：**
+
+当功能模块将输出定向到特定 fd（如 `process.stderr`）时，判定该 fd 的终端能力（如 `isTTY`、颜色支持）必须使用**同一个 fd** 的属性，禁止混用其他 fd 的属性。
+
+```typescript
+✅ // spinner 用 stderr 输出 → TTY 判定用 stderr.isTTY
+   createReporter({
+     quiet: args.quiet,
+     isTty: process.stderr.isTTY === true,  // ← 与 ora({ stream: process.stderr }) 同一 fd
+   })
+
+❌ // spinner 用 stderr 输出，但 TTY 判定却用 stdout.isTTY
+   createReporter({
+     quiet: args.quiet,
+     isTty: process.stdout.isTTY === true,  // ← fd 不一致
+   })
+   // → aiforge ... > result.txt 时，stderr 仍在终端但 spinner 被错误禁用
+   // → aiforge ... | cmd 时，用户在终端看不到 spinner 动画
+```
+
+> 来源：Story 5-1 CR R1 — `TtyReporter` 内部 `ora({ stream: process.stderr })`，但入口层使用 `process.stdout.isTTY`；在 stdout 被重定向但 stderr 仍在终端的场景下，spinner 意外退化为 PlainReporter。
+
 <!-- PATTERNS_APPEND_2 -->
 
 ### Input Validation Patterns
@@ -607,6 +652,25 @@ describe('authenticate', () => {
 ```
 
 > 来源：Story 4-6b CR R1→R2 — 修复 `reportResult()` 后新增测试直接使用绝对路径作为断言基准，将错误的 `sourcePath` 行为固化，R2 审查发现后才纠正为 Story 约定的 repo-relative 路径。
+
+**CR 修复改变行为后必须同步更新所有与"旧行为"绑定的测试断言：**
+
+当 CR 修复使某个行为发生变化时，必须搜索测试文件中所有基于旧行为编写的断言并将其更新为反映正确行为的断言。特别注意：原本"通过"的测试若因修复而变为"失败"，禁止为了"让测试重新变绿"而回退修复或注释断言——应更新断言以匹配正确行为，同时在注释中说明语义变更原因。
+
+```typescript
+✅ // 修复 processedCount 后，将旧断言更新为正确预期，并补充注释说明语义变更
+   it('skipped 文件仍调用 reporter.updatePhase 推进进度计数', async () => {
+     // skipped 仍是已处理的终态，应推进进度计数
+     expect(reporter.updatePhase).toHaveBeenCalledWith('执行安装... (1/1)')
+   })
+
+❌ // 修复后测试失败，注释掉断言或回退修复，将旧行为固化
+   // expect(reporter.updatePhase).not.toHaveBeenCalled() // 暂时注释，待确认
+
+❌ // 为了让测试通过而回退修复代码，恢复"skipped 不推进计数"的错误行为
+```
+
+> 来源：Story 5-1 CR 修复 — 修复进度计数后，2 个旧断言 `not.toHaveBeenCalled()` 需同步更新为 `toHaveBeenCalledWith('执行安装... (1/1)')`，否则测试会将"skipped 不推进进度"的错误行为固化。
 
 ### CR Workflow Patterns
 

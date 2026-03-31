@@ -138,6 +138,8 @@ index.ts → pipeline.ts → stages/* → services/*
 - Result icons: `✅` new, `🔄` updated, `⏭️` skipped, `❌` failed
 - Stats line: `安装: N 项  更新: N 项  跳过: N 项  失败: N 项`
 - Output strings centralized in `data/messages.ts`
+- **进度计数变量的分子/分母必须绑定到同一语义单元：** 实现 `processedCount / totalFiles` 类进度显示时，必须在代码注释中明确"进度单位"语义，并确保所有"已处理的终态"（`new`/`updated`/`skipped`/`conflictAction === 'skip'`/`warn+skip`）统一推进分子计数。若某终态不推进，用户会看到进度停滞后突然结束，误以为还有文件未处理。注意：`processedCount++` 和 `reporter.updatePhase(...)` 必须在 `resultItems.push()` 和 `continue` 之前执行。（来源：Story 5-1 CR R1 — 3 类 skipped 终态均未推进计数，进度显示失真）
+- **输出通道与 TTY 能力判定必须绑定到同一 fd：** 当功能模块将输出定向到特定 fd（如 `process.stderr`）时，判定该 fd 的终端能力（如 `isTTY`、颜色支持）必须使用**同一个 fd** 的属性。具体到 spinner/Reporter 创建场景：spinner 用 `stderr` 输出则 `isTty: process.stderr.isTTY === true`，禁止混用 `process.stdout.isTTY`。否则在 `aiforge ... > result.txt` 或 `aiforge ... | cmd` 场景下，stderr 仍在终端但 spinner 被错误禁用。（来源：Story 5-1 CR R1 — `ora({ stream: process.stderr })` 与入口层 `process.stdout.isTTY` fd 不一致）
 
 ### Security Rules
 
@@ -173,6 +175,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - **标记为集成测试的文件必须至少覆盖一条真实闭包/工厂函数路径：** 当测试文件放在 `tests/integration/` 目录且标记为集成测试时，至少有一条测试必须使用真实的工厂函数（如 `createProductionStages()`）而非全部 mock。全 Mock 编排测试只验证调用顺序，不验证阶段内部逻辑——工厂函数返回的闭包、共享状态变量的读写一致性，只有通过真实路径才能覆盖。如果确有"纯编排"测试的需求，应在文件或 describe 块中显式标注 `(orchestration-only)`，与真实集成测试区分。（来源：Story 4-6a CR R1 — `tests/integration/pipeline.test.ts` 8 个阶段全部 mock，553/553 全绿但 manifest mode 类型不匹配和空值兜底两个缺陷全部漏过）
 - **Mock 断言必须验证被测函数的实际调用链：** 当测试涉及安全关键行为（如 Token 脱敏、权限检查）时，禁止在测试中直接调用 mock 函数来验证其行为。必须通过被测函数的入口触发 mock，然后断言：(1) mock 函数被调用且参数正确（`toHaveBeenCalledWith`）；(2) 被测函数的输出/副作用中包含 mock 处理结果而非原始输入。（来源：Story 2-3 CR — AC #7 脱敏测试直接调用 mock 的 `sanitizeToken()`，无法守住安全回归）
 - **测试断言必须基于 Story 契约而非当前实现行为：** 新增或修改测试断言时，断言的期望值必须基于 Story 文档中定义的输出契约（如示例输出格式、字段语义），而非当前实现的实际输出。如果实现与 Story 契约不一致，应先修复实现使其符合契约，再编写断言——禁止"先让测试绿了、再说契约的事"。否则测试会将错误行为固化，后续修正时还需连带修改测试。（来源：Story 4-6b CR R1→R2 — 修复 `reportResult()` 后新增测试直接使用绝对路径作为断言基准，将错误的 `sourcePath` 行为固化，R2 审查发现后才纠正为 Story 约定的 repo-relative 路径）
+- **CR 修复改变行为后必须同步更新所有与"旧行为"绑定的测试断言：** 当 CR 修复使某个行为发生变化时，必须搜索测试文件中所有基于旧行为编写的断言并将其更新为正确行为的断言。特别注意：原本"通过"的测试若因修复而变为"失败"，禁止为了"让测试重新变绿"而回退修复或注释断言——应更新断言以匹配正确行为，同时在注释中说明语义变更原因（如"skipped 仍是已处理的终态，应推进进度计数"）。（来源：Story 5-1 CR 修复 — 修复进度计数后，2 个旧断言 `not.toHaveBeenCalled()` 需同步更新为正确预期）
 
 ### CR Workflow Rules
 

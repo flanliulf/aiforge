@@ -53,8 +53,10 @@ current_activity:
     - epic-2: "done"  # 知识仓库获取与认证 — 5/5 Stories 完成（2026-03-25）
     - epic-3: "done"  # 智能检测与安装规划 — 3/3 Stories 完成（2026-03-25）
     - epic-4: "done"  # 安装执行与冲突保护 — 7/7 Stories 完成（2026-03-31），Retrospective 完成（2026-03-31）
-  notes: "Epic 4 Retrospective 完成。遗留项清理率 92%（12 项中清理 10 项），仅剩 TODO-001 (P2) 延续至 Epic 5 Story 5.5a。管道端到端可运行（dry-run + 真实安装已验证）。全仓 576 测试通过。"
+  completed_stories:
+    - 5-1-phase-progress-and-spinner: "done"  # 阶段式进度与 spinner 动画 — CR Approved（2026-03-31）
+  notes: "Story 5-1 完成 CR，状态更新为 done。全仓 584 测试通过（新增进度计数修复 + TTY 判定修复）。"
   next_steps:
-    - "启动 Epic 5：Story 5-1 phase-progress-and-spinner"
-    - "按 Epic 顺序推进：Epic 5"
+    - "启动 Story 5-2：tree-result-summary-and-stats"
+    - "按 Epic 5 顺序继续推进"
     - "TODO-001 在 Story 5.5a 触及 init.ts 时修复"

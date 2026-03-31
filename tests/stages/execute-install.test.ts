@@ -409,7 +409,7 @@ describe('stages/execute-install', () => {
       expect(reporter.updatePhase).toHaveBeenCalledTimes(2)
     })
 
-    it('skipped 文件不调用 reporter.updatePhase', async () => {
+    it('skipped 文件仍调用 reporter.updatePhase 推进进度计数', async () => {
       const srcFile = join(tmpDir, 'no-update.md')
       const targetDir = join(tmpDir, 'no-update-target')
       await mkdir(targetDir)
@@ -420,8 +420,8 @@ describe('stages/execute-install', () => {
       const plan = makeFilePlan([srcFile], targetDir)
       await executeInstall(plan, makeArgs(), reporter, pathResolver)
 
-      // skipped 文件不调用 updatePhase
-      expect(reporter.updatePhase).not.toHaveBeenCalled()
+      // skipped 仍是已处理的终态，应推进进度计数
+      expect(reporter.updatePhase).toHaveBeenCalledWith('执行安装... (1/1)')
     })
 
     // CR R4-#2 回归：成功路径调用 completePhase
@@ -795,7 +795,8 @@ describe('stages/execute-install', () => {
       const result = await executeInstall(plan, makeArgs(), reporter, pathResolver)
 
       expect(result.items[0]!.status).toBe('skipped')
-      expect(reporter.updatePhase).not.toHaveBeenCalled()
+      // skipped 仍是已处理的终态，应推进进度计数
+      expect(reporter.updatePhase).toHaveBeenCalledWith('执行安装... (1/1)')
     })
   })
 
@@ -1442,5 +1443,130 @@ describe('stages/execute-install', () => {
       )
       expect(reporter.completePhase).not.toHaveBeenCalled()
     })
+  })
+})
+
+// ── Story 5.1: 进度计数格式测试 ──────────────────────────────────────────────
+
+describe('Story 5.1 — Phase progress count format', () => {
+  let tmpDir: string
+  let reporter: Reporter
+  let pathResolver: PathResolver
+
+  beforeEach(async () => {
+    tmpDir = await makeTmpDir()
+    reporter = makeReporter()
+    pathResolver = makePathResolver(tmpDir)
+  })
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true })
+    vi.restoreAllMocks()
+  })
+
+  it('updatePhase 调用时包含 (当前/总数) 计数格式 (AC #2)', async () => {
+    // 创建 3 个源文件
+    const srcFiles = await Promise.all(
+      ['file1.md', 'file2.md', 'file3.md'].map(async (name) => {
+        const p = join(tmpDir, name)
+        await writeFile(p, `content ${name}`)
+        return p
+      }),
+    )
+    const targetDir = join(tmpDir, 'progress-count-target')
+    await mkdir(targetDir, { recursive: true })
+
+    const plan: MatchedPlan = {
+      items: [
+        {
+          rule: {
+            tool: 'claude',
+            scope: 'global',
+            sourceDir: 'agents',
+            type: InstallType.Files,
+            targetDir: targetDir,
+          },
+          mode: 'copy',
+          sourceFiles: srcFiles,
+          targetPath: targetDir,
+        },
+      ],
+    }
+
+    await executeInstall(plan, makeArgs(), reporter, pathResolver)
+
+    const updateCalls = (reporter.updatePhase as ReturnType<typeof vi.fn>).mock.calls
+    // 3 个文件应有 3 次 updatePhase 调用
+    expect(updateCalls.length).toBe(3)
+    // 每次调用的参数应包含 (n/3) 格式的计数
+    expect(updateCalls[0][0]).toContain('(1/3)')
+    expect(updateCalls[1][0]).toContain('(2/3)')
+    expect(updateCalls[2][0]).toContain('(3/3)')
+  })
+
+  it('单文件时 updatePhase 调用包含 (1/1) 计数 (AC #2)', async () => {
+    const src = join(tmpDir, 'single.md')
+    await writeFile(src, 'single content')
+    const targetDir = join(tmpDir, 'single-count-target')
+    await mkdir(targetDir, { recursive: true })
+
+    const plan: MatchedPlan = {
+      items: [
+        {
+          rule: {
+            tool: 'claude',
+            scope: 'global',
+            sourceDir: 'agents',
+            type: InstallType.Files,
+            targetDir: targetDir,
+          },
+          mode: 'copy',
+          sourceFiles: [src],
+          targetPath: targetDir,
+        },
+      ],
+    }
+
+    await executeInstall(plan, makeArgs(), reporter, pathResolver)
+
+    const updateCalls = (reporter.updatePhase as ReturnType<typeof vi.fn>).mock.calls
+    expect(updateCalls.length).toBe(1)
+    expect(updateCalls[0][0]).toContain('(1/1)')
+  })
+
+  it('进度计数文本格式为 "执行安装... (n/total)" (AC #2)', async () => {
+    const srcFiles = await Promise.all(
+      ['a.md', 'b.md'].map(async (name) => {
+        const p = join(tmpDir, name)
+        await writeFile(p, `content ${name}`)
+        return p
+      }),
+    )
+    const targetDir = join(tmpDir, 'format-target')
+    await mkdir(targetDir, { recursive: true })
+
+    const plan: MatchedPlan = {
+      items: [
+        {
+          rule: {
+            tool: 'claude',
+            scope: 'global',
+            sourceDir: 'agents',
+            type: InstallType.Files,
+            targetDir: targetDir,
+          },
+          mode: 'copy',
+          sourceFiles: srcFiles,
+          targetPath: targetDir,
+        },
+      ],
+    }
+
+    await executeInstall(plan, makeArgs(), reporter, pathResolver)
+
+    const updateCalls = (reporter.updatePhase as ReturnType<typeof vi.fn>).mock.calls
+    // 格式验证：包含阶段名 + 计数
+    expect(updateCalls[0][0]).toMatch(/执行安装.*\(1\/2\)/)
+    expect(updateCalls[1][0]).toMatch(/执行安装.*\(2\/2\)/)
   })
 })

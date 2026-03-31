@@ -458,6 +458,54 @@ describe('TtyReporter', () => {
     // succeed() 输出使用 spinner 当前 text；若 updatePhase 成功更新了 text，输出应包含新文字
     expect(allOutput).toContain('更新后的文字...')
   })
+
+  // AC #1 + #3: startPhase 输出到 stderr（不污染 stdout）
+  it('startPhase 进度信息仅输出到 stderr，不输出到 stdout (AC #3)', () => {
+    reporter.startPhase('执行安装...')
+    expect(stderrSpy).toHaveBeenCalled()
+    expect(stdoutSpy).not.toHaveBeenCalled()
+  })
+
+  // AC #3: completePhase 仅输出到 stderr
+  it('completePhase 进度信息仅输出到 stderr，不输出到 stdout (AC #3)', () => {
+    reporter.startPhase('执行安装...')
+    stdoutSpy.mockClear()
+    stderrSpy.mockClear()
+    reporter.completePhase()
+    expect(stderrSpy).toHaveBeenCalled()
+    expect(stdoutSpy).not.toHaveBeenCalled()
+  })
+
+  // AC #1: 阶段完成时显示 ✓ 标记（ora succeed 在非 TTY 输出 ✔）
+  it('completePhase 显示 ✓ 完成标记 (AC #1)', () => {
+    reporter.startPhase('验证认证信息...')
+    stderrSpy.mockClear()
+    reporter.completePhase()
+    const allOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('✔')
+  })
+
+  // AC #1: reportError 时 spinner 显示 ✗ 标记（ora fail）
+  it('reportError 时若有活跃 spinner 则先调用 fail() 显示 ✗ 标记 (AC #1)', async () => {
+    const { AiforgeError } = await import('../../src/core/errors.js')
+    reporter.startPhase('执行安装...')
+    stderrSpy.mockClear()
+    const err = new AiforgeError('安装失败', 'INSTALL_FAILED', 1, 'fatal', '文件被锁定', ['重试'])
+    reporter.reportError(err)
+    const allOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+    // ora.fail() 输出包含 ✖ 或 ✗
+    expect(allOutput).toMatch(/[✖✗]/)
+  })
+
+  // AC #3: updatePhase 在 spinner 激活时不走 stderr.write fallback 路径
+  it('updatePhase 在 spinner 激活时更新 spinner.text（无额外 stderr.write 调用）(AC #3)', () => {
+    reporter.startPhase('执行安装...')
+    stderrSpy.mockClear() // 清除 startPhase 的输出
+    reporter.updatePhase('执行安装... (1/7)')
+    // spinner 激活时 updatePhase 只更新 text 属性，不直接 write stderr
+    // 因此 stderrSpy 不应有新的调用（spinner text 变更不触发 write）
+    expect(stderrSpy).not.toHaveBeenCalled()
+  })
 })
 
 describe('QuietReporter', () => {
