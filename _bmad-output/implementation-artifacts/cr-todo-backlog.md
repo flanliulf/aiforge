@@ -101,7 +101,7 @@
 - **类别**: test-gap
 - **描述**: `src/index.ts` 中的 TTY 判定已修正为 `process.stderr.isTTY === true`，但缺少显式覆盖 "stdout 非 TTY、stderr 为 TTY" 组合场景的入口层集成测试。当前测试只验证 `createReporter` 工厂函数在 `isTty` 参数层面的行为（直接 mock 参数），未覆盖 `index.ts` 从 `process.stderr.isTTY` 读取的完整路径。若后续有人将判定改回 `process.stdout.isTTY`，现有测试仍全绿，无法守住回归。建议补一条入口层测试：mock `process.stdout.isTTY = false`、`process.stderr.isTTY = true`，断言 `createReporter` 被以 `isTty: true` 调用，即仍使用 `TtyReporter`。
 - **涉及文件**: `src/index.ts`, `tests/cli-args.test.ts`
-- **建议时机**: Epic 5 内下次触及 `src/index.ts` 时（Story 5-3 tty-adaptive-and-quiet-mode 高度相关）
+- **建议时机**: Epic 5 内下次触及 `src/index.ts` 时（Story 5-3 已完成未落地，Story 5-4 或 5-5 系列触及 index.ts 时处理）
 - **状态**: open
 - **解决记录**:
 

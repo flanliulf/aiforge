@@ -244,16 +244,33 @@ class TtyReporter implements Reporter {
 // ── PlainReporter ─────────────────────────────────────────────────────────────
 
 class PlainReporter implements Reporter {
+  /** 记录当前阶段名，用于 completePhase 输出 [DONE] 阶段名 */
+  private currentPhase = ''
+
+  /**
+   * startPhase — 输出 [PHASE] 阶段名 到 stderr（Story 5-3 Task 2.1, AC #1）
+   * 格式: [PHASE] 解析仓库地址...
+   */
   startPhase(name: string): void {
-    process.stderr.write(`${name}\n`)
+    this.currentPhase = name
+    process.stderr.write(`[PHASE] ${name}\n`)
   }
 
-  updatePhase(message: string): void {
-    process.stderr.write(`${message}\n`)
+  /**
+   * updatePhase — 不输出（避免刷屏，Story 5-3 Task 2.2, AC #1）
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  updatePhase(_message: string): void {
+    // CI 非 TTY 环境下不输出进度更新，避免刷屏
   }
 
+  /**
+   * completePhase — 输出 [DONE] 阶段名 到 stderr（Story 5-3 Task 2.3, AC #1）
+   * 格式: [DONE] 解析仓库地址...
+   */
   completePhase(): void {
-    process.stderr.write('✓\n')
+    process.stderr.write(`[DONE] ${this.currentPhase}\n`)
+    this.currentPhase = ''
   }
 
   /**
@@ -289,20 +306,22 @@ class PlainReporter implements Reporter {
     }
 
     // 统计行（---分隔符 + 英文键名，CI 管道友好）
+    // CR Round-2 修复：改为 \t 分隔，与明细行和 Story Task 2.4 契约对齐
     const installed = results.items.filter((i) => i.status === 'new').length
     const updated = results.items.filter((i) => i.status === 'updated').length
     const skipped = results.items.filter((i) => i.status === 'skipped').length
-    process.stdout.write(`---\ninstalled: ${installed}  updated: ${updated}  skipped: ${skipped}\n`)
+    process.stdout.write(`---\ninstalled: ${installed}\tupdated: ${updated}\tskipped: ${skipped}\n`)
   }
 
   /**
    * PlainReporter.reportPlan — 纯文本输出，CI 友好，可被 grep/awk 解析（AC #2）
    *
-   * 格式（每行一个文件）:
-   *   <tool>  <sourceDir>/<filename>  →  <targetPath>  <type>  <mode>
+   * 格式（每行一个文件，制表符分隔）:
+   *   <tool>\t<sourceDir>/<filename>\t<targetPath>\t<type>\t<mode>
    *
    * 输出到 stdout（安装计划是数据输出，支持管道消费）
    * 来源: architecture/03-core-decisions.md#D4 — stdout/stderr 分工
+   * CR Round-1 修复：改为 \t 分隔，与 reportResult 对齐（Story Task 2.5）
    */
   reportPlan(plan: MatchedPlan): void {
     for (const item of plan.items) {
@@ -313,7 +332,7 @@ class PlainReporter implements Reporter {
         const name = basename(srcFile)
         const src = `${item.rule.sourceDir}/${name}`
         const fileTarget = resolveFileTarget(item.targetPath, srcFile)
-        process.stdout.write(`${item.rule.tool}  ${src}  →  ${fileTarget}  ${type}  ${mode}\n`)
+        process.stdout.write(`${item.rule.tool}\t${src}\t${fileTarget}\t${type}\t${mode}\n`)
       }
     }
 

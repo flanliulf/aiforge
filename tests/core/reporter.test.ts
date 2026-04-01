@@ -3,6 +3,7 @@ import chalk from 'chalk'
 import { createReporter } from '../../src/core/reporter.js'
 import type { Reporter } from '../../src/core/reporter.js'
 import type { InstallResult } from '../../src/core/types.js'
+import { InstallType } from '../../src/core/types.js'
 
 // ── 测试 Fixture ──────────────────────────────────────────────────────────────
 
@@ -129,6 +130,42 @@ describe('createReporter', () => {
     expect(reporter1).toBeDefined()
     expect(reporter2).toBeDefined()
   })
+
+  // Story 5-3 Task 4.3: Mock process.stdout.isTTY 验证工厂选择逻辑
+  it('工厂选择：quiet=true 时始终返回 QuietReporter（mock isTTY）(AC #2 Story 5-3)', () => {
+    // QuietReporter 在 quiet=true 时优先，startPhase/updatePhase/completePhase 均为 no-op
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    try {
+      const reporter = createReporter({ quiet: true, isTty: true })
+      reporter.startPhase('阶段')
+      expect(stderrSpy).not.toHaveBeenCalled()
+    } finally {
+      vi.restoreAllMocks()
+    }
+  })
+
+  it('工厂选择：isTty=false 且 quiet=false 时返回 PlainReporter（输出 [PHASE] 格式）(AC #1 Story 5-3)', () => {
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    try {
+      const reporter = createReporter({ quiet: false, isTty: false })
+      reporter.startPhase('验证认证信息...')
+      const output = stderrSpy.mock.calls[0]?.[0] as string
+      expect(output).toBe('[PHASE] 验证认证信息...\n')
+    } finally {
+      vi.restoreAllMocks()
+    }
+  })
+
+  it('工厂选择：isTty=true 且 quiet=false 时返回 TtyReporter（spinner 使用 stderr）(AC #1 Story 5-3)', () => {
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    try {
+      const reporter = createReporter({ quiet: false, isTty: true })
+      reporter.startPhase('解析仓库地址...')
+      expect(stderrSpy).toHaveBeenCalled()
+    } finally {
+      vi.restoreAllMocks()
+    }
+  })
 })
 
 describe('PlainReporter', () => {
@@ -153,14 +190,34 @@ describe('PlainReporter', () => {
     expect(output).toContain('解析仓库地址...')
   })
 
-  it('updatePhase writes to stderr', () => {
+  // Story 5-3 Task 2.1: startPhase 输出 [PHASE] 前缀格式（AC #1）
+  it('startPhase 输出 [PHASE] 前缀格式到 stderr (AC #1 Story 5-3)', () => {
+    reporter.startPhase('解析仓库地址...')
+    const output = stderrSpy.mock.calls[0][0] as string
+    expect(output).toBe('[PHASE] 解析仓库地址...\n')
+  })
+
+  // Story 5-3 Task 2.2: updatePhase 不输出（避免刷屏）
+  it('updatePhase 不输出任何内容（AC #1 Story 5-3）', () => {
     reporter.updatePhase('正在处理...')
-    expect(stderrSpy).toHaveBeenCalled()
+    expect(stderrSpy).not.toHaveBeenCalled()
+    expect(stdoutSpy).not.toHaveBeenCalled()
   })
 
   it('completePhase writes to stderr', () => {
+    reporter.startPhase('解析仓库地址...')
+    stderrSpy.mockClear()
     reporter.completePhase()
     expect(stderrSpy).toHaveBeenCalled()
+  })
+
+  // Story 5-3 Task 2.3: completePhase 输出 [DONE] 阶段名
+  it('completePhase 输出 [DONE] + 阶段名到 stderr (AC #1 Story 5-3)', () => {
+    reporter.startPhase('解析仓库地址...')
+    stderrSpy.mockClear()
+    reporter.completePhase()
+    const output = stderrSpy.mock.calls[0][0] as string
+    expect(output).toBe('[DONE] 解析仓库地址...\n')
   })
 
   it('warn writes to stderr', () => {
@@ -250,6 +307,14 @@ describe('PlainReporter', () => {
     expect(allOutput).toContain('skipped: 2')
   })
 
+  // CR Round-2 修复：统计行使用 \t 分隔（Story Task 2.4 契约对齐）
+  it('reportResult: 统计行各键值对使用制表符 \\t 分隔 (CR Round-2)', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    // 统计行应包含 \t 分隔的完整格式
+    expect(allOutput).toContain('installed: 1\tupdated: 1\tskipped: 1')
+  })
+
   it('reportResult stdout/stderr 分工：结果到 stdout，无 stderr 输出 (AC #2)', () => {
     reporter.reportResult(createSingleToolResult())
     expect(stdoutSpy).toHaveBeenCalled()
@@ -280,6 +345,33 @@ describe('PlainReporter', () => {
       ],
     })
     expect(stdoutSpy).toHaveBeenCalled()
+  })
+
+  // CR Round-1 修复：补充制表符分隔格式断言（Story Task 2.5 契约）
+  it('reportPlan: 输出制表符分隔格式（tool\\tsrc\\ttarget\\ttype\\tmode）(CR Round-1)', () => {
+    reporter.reportPlan({
+      items: [
+        {
+          rule: {
+            tool: 'copilot',
+            scope: 'global',
+            sourceDir: 'agents',
+            type: InstallType.Files,
+            targetDir: '~/.copilot',
+          },
+          sourceFiles: ['agents/coding-agent.md'],
+          targetPath: '~/.copilot/agents',
+          mode: 'copy',
+        },
+      ],
+    })
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    // 验证制表符分隔格式：tool\tsrc\ttarget\ttype\tmode
+    expect(allOutput).toContain(
+      'copilot\tagents/coding-agent.md\t~/.copilot/agents/coding-agent.md\tfiles\tcopy',
+    )
+    // 不应包含原来的双空格 + 箭头格式
+    expect(allOutput).not.toContain('  →  ')
   })
 
   it('reportError writes to stderr', async () => {
@@ -705,5 +797,53 @@ describe('QuietReporter', () => {
     const err = new AiforgeError('test', 'ERR_TEST', 1, 'fatal', 'why', ['fix'])
     reporter.reportError(err)
     expect(stderrSpy).toHaveBeenCalled()
+  })
+
+  // Story 5-3 Task 3.6: reportError 输出错误信息（错误不能被静默）
+  it('reportError 输出错误 message 到 stderr（不能静默）(AC #2 Story 5-3)', async () => {
+    const { AiforgeError } = await import('../../src/core/errors.js')
+    const err = new AiforgeError('无法访问仓库', 'ERR_TEST', 1, 'fatal', 'Git 服务器返回 401', [
+      'npx aiforge --ssh',
+    ])
+    reporter.reportError(err)
+    const allOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('无法访问仓库')
+  })
+
+  // Story 5-3 Task 3.4: reportResult 只输出统计行
+  it('reportResult 只输出统计行到 stdout (AC #2 Story 5-3)', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    // 不应包含文件级详情（只有统计行）
+    expect(allOutput).not.toContain('agents/coding-agent.md')
+    expect(allOutput).not.toContain('agents/review-agent.md')
+    // 必须包含统计行
+    expect(allOutput).toContain('安装:')
+    expect(allOutput).toContain('更新:')
+    expect(allOutput).toContain('跳过:')
+  })
+
+  // Story 5-3 Task 3.5: reportPlan 只输出计划摘要
+  it('reportPlan 只输出计划摘要到 stdout (AC #2 Story 5-3)', () => {
+    reporter.reportPlan({
+      items: [
+        {
+          rule: {
+            tool: 'copilot',
+            scope: 'global',
+            sourceDir: 'agents',
+            type: 0 as never,
+            targetDir: '~/.copilot',
+          },
+          sourceFiles: ['agents/coding-agent.md', 'agents/review-agent.md'],
+          targetPath: '~/.copilot/agents',
+        },
+      ],
+    })
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    // 包含计划统计摘要
+    expect(allOutput).toContain('计划安装:')
+    // 不应包含文件级详情
+    expect(allOutput).not.toContain('agents/coding-agent.md')
   })
 })

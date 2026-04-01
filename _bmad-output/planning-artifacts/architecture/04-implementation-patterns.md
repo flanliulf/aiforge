@@ -410,6 +410,24 @@ CR 修复中如果修改了类型定义（interface/type/enum 的字段增删改
 
 > 来源：Story 5-1 CR R1 — `TtyReporter` 内部 `ora({ stream: process.stderr })`，但入口层使用 `process.stdout.isTTY`；在 stdout 被重定向但 stderr 仍在终端的场景下，spinner 意外退化为 PlainReporter。
 
+**PlainReporter 输出方法内所有行必须遵从同一分隔符契约：**
+
+当方法要求"制表符分隔输出"时，该方法内的**所有** `stdout.write()` 调用（含明细行、统计行、汇总行）均须使用 `\t` 分隔，不能只修改主数据行而遗漏统计行或汇总行。实现完成后必须横向比对方法内全部输出行，逐行确认分隔符一致性；同一 Reporter 类中多个输出方法（`reportResult()` / `reportPlan()`）的分隔规则也必须相互对齐。
+
+```typescript
+✅ // reportResult() — 明细行和统计行均使用 \t 分隔
+   process.stdout.write(`${item.status}\t${tool}\t${item.sourcePath}\t${item.targetPath}\n`)
+   // ... 统计行同样 \t 分隔
+   process.stdout.write(`---\ninstalled: ${installed}\tupdated: ${updated}\tskipped: ${skipped}\n`)
+
+❌ // 明细行已修复为 \t，统计行仍遗留双空格 — 同一方法两套分隔规则
+   process.stdout.write(`${item.status}\t${tool}\t${item.sourcePath}\t${item.targetPath}\n`)
+   process.stdout.write(`---\ninstalled: ${installed}  updated: ${updated}  skipped: ${skipped}\n`)
+   // → 调用方 awk -F '\t' 解析统计行时，整行退化为单字段
+```
+
+> 来源：Story 5-3 CR R1 — `reportPlan()` 主数据行用双空格而非 `\t`；CR R2 — `reportResult()` 明细行已用 `\t` 但统计行仍用双空格，同一方法内两套分隔规则，两轮 CR 才全部收口。
+
 <!-- PATTERNS_APPEND_2 -->
 
 ### Input Validation Patterns

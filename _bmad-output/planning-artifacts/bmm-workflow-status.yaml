@@ -56,8 +56,9 @@ current_activity:
   completed_stories:
     - 5-1-phase-progress-and-spinner: "done"  # 阶段式进度与 spinner 动画 — CR Approved（2026-03-31）
     - 5-2-tree-result-summary-and-stats: "done"  # 树形结果汇总与统计 — CR Approved（2026-03-31）
-  notes: "Story 5-2 完成 CR（3轮），状态更新为 done。全仓 595 测试通过（新增树形输出 + chalk 彩色语义 + 规则文档 failed 残留清理 + 03-core-decisions.md 类型定义修正）。"
+    - 5-3-tty-adaptive-and-quiet-mode: "done"  # TTY 自适应与 quiet 模式 — CR Approved（2026-04-01）
+  notes: "Story 5-3 完成 CR（3轮），状态更新为 done。修复 PlainReporter.reportResult() 统计行 \\t 分隔问题，全仓 72 测试通过（reporter.test.ts）。"
   next_steps:
-    - "启动 Story 5-3：tty-adaptive-and-quiet-mode"
+    - "启动 Story 5-4：three-part-error-messages"
     - "按 Epic 5 顺序继续推进"
     - "TODO-001 在 Story 5.5a 触及 init.ts 时修复"

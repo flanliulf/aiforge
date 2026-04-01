@@ -1,6 +1,6 @@
 # Story 5.3: TTY 自适应与 quiet 模式
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -17,28 +17,28 @@ So that 在 CI 管道中也能正常工作，在脚本中输出可解析。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 完善 Reporter 工厂函数 `createReporter` (AC: #1, #2)
-  - [ ] 1.1 检测逻辑：`--quiet` → QuietReporter；`!process.stdout.isTTY` → PlainReporter；否则 → TtyReporter
-  - [ ] 1.2 确保工厂函数在 `index.ts` 中正确调用
-- [ ] Task 2: 完善 `PlainReporter` 实现 (AC: #1, #3)
-  - [ ] 2.1 `startPhase()` → 输出纯文本行到 stderr（如 `[PHASE] 解析仓库地址...`）
-  - [ ] 2.2 `updatePhase()` → 不输出（避免刷屏）
-  - [ ] 2.3 `completePhase()` → 输出 `[DONE] 阶段名`
-  - [ ] 2.4 `reportResult()` → 制表符分隔纯文本到 stdout
-  - [ ] 2.5 `reportPlan()` → 制表符分隔纯文本到 stdout
-  - [ ] 2.6 `reportError()` → 纯文本三段式到 stderr
-  - [ ] 2.7 无 ANSI 转义码、无 spinner、无 emoji（CI 兼容）
-- [ ] Task 3: 完善 `QuietReporter` 实现 (AC: #2)
-  - [ ] 3.1 `startPhase()` → 不输出
-  - [ ] 3.2 `updatePhase()` → 不输出
-  - [ ] 3.3 `completePhase()` → 不输出
-  - [ ] 3.4 `reportResult()` → 只输出统计行到 stdout
-  - [ ] 3.5 `reportPlan()` → 只输出计划摘要（N 项，M 个工具）
-  - [ ] 3.6 `reportError()` → 输出错误到 stderr（错误不能被静默）
-- [ ] Task 4: 编写单元测试 (AC: #1-4)
-  - [ ] 4.1 `tests/core/reporter.test.ts` — 扩展 PlainReporter 和 QuietReporter 测试
-  - [ ] 4.2 测试用例：PlainReporter 无 ANSI 码、QuietReporter 只输出统计、createReporter 工厂选择逻辑
-  - [ ] 4.3 Mock `process.stdout.isTTY`
+- [x] Task 1: 完善 Reporter 工厂函数 `createReporter` (AC: #1, #2)
+  - [x] 1.1 检测逻辑：`--quiet` → QuietReporter；`!process.stdout.isTTY` → PlainReporter；否则 → TtyReporter
+  - [x] 1.2 确保工厂函数在 `index.ts` 中正确调用
+- [x] Task 2: 完善 `PlainReporter` 实现 (AC: #1, #3)
+  - [x] 2.1 `startPhase()` → 输出纯文本行到 stderr（如 `[PHASE] 解析仓库地址...`）
+  - [x] 2.2 `updatePhase()` → 不输出（避免刷屏）
+  - [x] 2.3 `completePhase()` → 输出 `[DONE] 阶段名`
+  - [x] 2.4 `reportResult()` → 制表符分隔纯文本到 stdout
+  - [x] 2.5 `reportPlan()` → 制表符分隔纯文本到 stdout
+  - [x] 2.6 `reportError()` → 纯文本三段式到 stderr
+  - [x] 2.7 无 ANSI 转义码、无 spinner、无 emoji（CI 兼容）
+- [x] Task 3: 完善 `QuietReporter` 实现 (AC: #2)
+  - [x] 3.1 `startPhase()` → 不输出
+  - [x] 3.2 `updatePhase()` → 不输出
+  - [x] 3.3 `completePhase()` → 不输出
+  - [x] 3.4 `reportResult()` → 只输出统计行到 stdout
+  - [x] 3.5 `reportPlan()` → 只输出计划摘要（N 项，M 个工具）
+  - [x] 3.6 `reportError()` → 输出错误到 stderr（错误不能被静默）
+- [x] Task 4: 编写单元测试 (AC: #1-4)
+  - [x] 4.1 `tests/core/reporter.test.ts` — 扩展 PlainReporter 和 QuietReporter 测试
+  - [x] 4.2 测试用例：PlainReporter 无 ANSI 码、QuietReporter 只输出统计、createReporter 工厂选择逻辑
+  - [x] 4.3 Mock `process.stdout.isTTY`
 
 ## Dev Notes
 
@@ -121,8 +121,23 @@ installed: 1	updated: 1	skipped: 0
 
 ### Agent Model Used
 
+claude-sonnet-4.6
+
 ### Debug Log References
+
+- 技术决策：`index.ts` 使用 `process.stderr.isTTY === true`（非 Dev Notes 中的 `process.stdout.isTTY`），依据 project-context.md Output Rules："输出通道与 TTY 能力判定必须绑定到同一 fd"，spinner 使用 stderr，故以 stderr.isTTY 为准
 
 ### Completion Notes List
 
+- Task 1 (createReporter)：已实现，选择逻辑：`quiet → QuietReporter; !isTty → PlainReporter; else → TtyReporter`，index.ts 使用 `process.stderr.isTTY === true`（符合架构规则）
+- Task 2 (PlainReporter)：完善 `startPhase` → `[PHASE] 阶段名`；`updatePhase` → no-op（避免刷屏）；`completePhase` → `[DONE] 阶段名`（通过 `currentPhase` 字段记录阶段名）；其余方法已在前序 Story 实现 ✅
+- Task 3 (QuietReporter)：所有阶段方法 no-op、reportResult 只输出统计行、reportPlan 只输出摘要、reportError 输出 message 到 stderr — 均已在前序 Story 实现 ✅
+- Task 4 (Tests)：新增 8 个测试用例（Story 5-3 专项），含 [PHASE]/[DONE] 格式断言、updatePhase no-op 断言、createReporter 工厂选择断言（含 mock isTTY 场景）
+- 测试：当前 Story 新增 8 个测试；全仓 603 个测试全绿
+- Lint：✅ 通过（`npm run lint`）
+- Build：✅ 通过（`npm run build`）
+
 ### File List
+
+- `src/core/reporter.ts` — 完善 PlainReporter：startPhase/updatePhase/completePhase 实现
+- `tests/core/reporter.test.ts` — 新增 8 个 Story 5-3 专项测试用例

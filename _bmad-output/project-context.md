@@ -140,6 +140,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - Output strings centralized in `data/messages.ts`
 - **进度计数变量的分子/分母必须绑定到同一语义单元：** 实现 `processedCount / totalFiles` 类进度显示时，必须在代码注释中明确"进度单位"语义，并确保所有"已处理的终态"（`new`/`updated`/`skipped`/`conflictAction === 'skip'`/`warn+skip`）统一推进分子计数。若某终态不推进，用户会看到进度停滞后突然结束，误以为还有文件未处理。注意：`processedCount++` 和 `reporter.updatePhase(...)` 必须在 `resultItems.push()` 和 `continue` 之前执行。（来源：Story 5-1 CR R1 — 3 类 skipped 终态均未推进计数，进度显示失真）
 - **输出通道与 TTY 能力判定必须绑定到同一 fd：** 当功能模块将输出定向到特定 fd（如 `process.stderr`）时，判定该 fd 的终端能力（如 `isTTY`、颜色支持）必须使用**同一个 fd** 的属性。具体到 spinner/Reporter 创建场景：spinner 用 `stderr` 输出则 `isTty: process.stderr.isTTY === true`，禁止混用 `process.stdout.isTTY`。否则在 `aiforge ... > result.txt` 或 `aiforge ... | cmd` 场景下，stderr 仍在终端但 spinner 被错误禁用。（来源：Story 5-1 CR R1 — `ora({ stream: process.stderr })` 与入口层 `process.stdout.isTTY` fd 不一致）
+- **PlainReporter 输出方法内所有行必须遵从同一分隔符契约：** 当方法要求"制表符分隔输出"时，该方法内的**所有** `stdout.write()` 调用（含明细行、统计行、汇总行）均须使用 `\t` 分隔，不能只修改主数据行而遗漏统计行或汇总行。实现完成后必须横向比对方法内**全部输出行**，逐行确认分隔符一致性；同一 Reporter 类中多个输出方法（`reportResult()` / `reportPlan()`）的分隔规则也必须相互对齐。（来源：Story 5-3 CR R1 — `reportPlan()` 主数据行用双空格而非 `\t`；CR R2 — `reportResult()` 明细行已用 `\t` 但统计行仍用双空格，同一方法内两套分隔规则）
 
 ### Security Rules
 

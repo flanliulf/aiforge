@@ -150,6 +150,10 @@ interface Reporter {
 
 这确保 `npx aiforge --dry-run 2>/dev/null` 只输出纯安装计划，可被 `grep`/`awk`/`jq` 解析。
 
+**PlainReporter 输出方法内所有行必须遵从同一分隔符契约：**
+
+当方法要求"制表符分隔输出"时，该方法内的**所有** `stdout.write()` 调用（含明细行、统计行、汇总行）均须使用 `\t` 分隔，不能只修改主数据行而遗漏统计行或汇总行。实现完成后必须横向比对方法内全部输出行，逐行确认分隔符一致性；同一 Reporter 类中多个输出方法（`reportResult()` / `reportPlan()`）的分隔规则也必须相互对齐。（来源：Story 5-3 CR R1 — `reportPlan()` 主数据行用双空格而非 `\t`；CR R2 — `reportResult()` 明细行已用 `\t` 但统计行仍用双空格，同一方法内两套分隔规则）
+
 #### D5: Tool Detection & Platform Abstraction
 
 **工具检测 — 数据驱动注册表：**
