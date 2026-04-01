@@ -19,6 +19,8 @@ import {
 import type { MatchedPlan } from '../../src/core/types.js'
 import type { PathResolver } from '../../src/core/path-resolver.js'
 import { InstallType } from '../../src/core/types.js'
+import { setLanguage } from '../../src/core/messages.js'
+import { AiforgeError } from '../../src/core/errors.js'
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -563,6 +565,54 @@ describe('services/fs-utils', () => {
       } finally {
         await rm(outsideDir, { recursive: true, force: true })
       }
+    })
+  })
+
+  // ── 英文模式 fix 数组语言切换（CR Round-5 Fix #3）─────────────────
+
+  describe('英文模式 fix 数组', () => {
+    afterEach(() => {
+      setLanguage('zh-CN')
+    })
+
+    it('setLanguage("en") 后 copyFile 错误 fix 包含英文提示', async () => {
+      setLanguage('en')
+      const src = join(tmpDir, 'nonexistent.txt')
+      const dest = join(tmpDir, 'dest.txt')
+      try {
+        await copyFile(src, dest)
+      } catch (err) {
+        const e = err as AiforgeError
+        expect(e.code).toBe('FILE_COPY_FAILED')
+        // fix 应为英文，不应含中文
+        expect(e.fix[0]).toContain('Check if source file exists')
+        expect(e.fix[0]).not.toContain('检查源文件是否存在')
+        expect(e.fix[1]).toContain('Check if target directory is writable')
+        expect(e.fix[1]).not.toContain('检查目标目录是否可写')
+        return
+      }
+      throw new Error('Expected copyFile to throw')
+    })
+
+    it('setLanguage("en") 后 ensureDir 错误 fix 包含英文提示', async () => {
+      setLanguage('en')
+      // 使用一个存在的文件路径作为目录路径，触发 ensureDir 错误
+      const filePath = join(tmpDir, 'blockfile')
+      await writeFile(filePath, 'block')
+      const dirPath = join(filePath, 'subdir')
+      try {
+        await ensureDir(dirPath)
+      } catch (err) {
+        const e = err as AiforgeError
+        expect(e.code).toBe('ENSURE_DIR_FAILED')
+        // fix 应为英文
+        expect(e.fix[0]).toContain('Check if directory is writable')
+        expect(e.fix[0]).not.toContain('检查')
+        expect(e.fix[1]).toContain('Check if path conflicts')
+        expect(e.fix[1]).not.toContain('检查路径')
+        return
+      }
+      throw new Error('Expected ensureDir to throw')
     })
   })
 })

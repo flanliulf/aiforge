@@ -2,7 +2,7 @@
  * services/fs-utils.ts
  *
  * 文件操作工具集与预检查逻辑
- * - 依赖 core/（AiforgeError、MatchedPlan、PathResolver）和 Node.js 内置模块
+ * - 依赖 core/（AiforgeError、MatchedPlan、PathResolver、messages）和 Node.js 内置模块
  * - 不依赖 stages/、data/、commands/
  */
 
@@ -26,6 +26,7 @@ import { join, resolve, dirname } from 'node:path'
 import { AiforgeError, EXIT_INSTALL_FAILURE } from '../core/errors.js'
 import type { MatchedPlan } from '../core/types.js'
 import type { PathResolver } from '../core/path-resolver.js'
+import { msg } from '../core/messages.js'
 
 // ── PreflightResult ──────────────────────────────────────────────────────────
 
@@ -46,12 +47,15 @@ export async function copyFile(src: string, dest: string): Promise<void> {
     await fsCopyFile(src, dest)
   } catch (error) {
     throw new AiforgeError(
-      `无法复制文件: ${src} → ${dest}`,
+      msg('fsUtils.copyFileFailed').replace('{src}', src).replace('{dest}', dest),
       'FILE_COPY_FAILED',
       EXIT_INSTALL_FAILURE,
       'fatal',
-      `复制文件时出错: ${errorMessage(error)}`,
-      [`检查源文件是否存在: ${src}`, `检查目标目录是否可写: ${dirname(dest)}`],
+      msg('fsUtils.copyFileWhy').replace('{err}', errorMessage(error)),
+      [
+        msg('fsUtils.fixCheckSourceFile').replace('{path}', src),
+        msg('fsUtils.fixCheckTargetDirWritable').replace('{dir}', dirname(dest)),
+      ],
     )
   }
 }
@@ -66,12 +70,15 @@ export async function copyDir(src: string, dest: string): Promise<void> {
     await cp(src, dest, { recursive: true })
   } catch (error) {
     throw new AiforgeError(
-      `无法复制目录: ${src} → ${dest}`,
+      msg('fsUtils.copyDirFailed').replace('{src}', src).replace('{dest}', dest),
       'DIR_COPY_FAILED',
       EXIT_INSTALL_FAILURE,
       'fatal',
-      `复制目录时出错: ${errorMessage(error)}`,
-      [`检查源目录是否存在: ${src}`, `检查目标目录是否可写: ${dirname(dest)}`],
+      msg('fsUtils.copyDirWhy').replace('{err}', errorMessage(error)),
+      [
+        msg('fsUtils.fixCheckSourceDir').replace('{path}', src),
+        msg('fsUtils.fixCheckTargetDirWritable').replace('{dir}', dirname(dest)),
+      ],
     )
   }
 }
@@ -98,12 +105,15 @@ export async function createSymlink(target: string, linkPath: string): Promise<v
   } catch (error) {
     if (error instanceof AiforgeError) throw error
     throw new AiforgeError(
-      `无法创建符号链接: ${target} → ${linkPath}`,
+      msg('fsUtils.symlinkFailed').replace('{target}', target).replace('{linkPath}', linkPath),
       'SYMLINK_CREATE_FAILED',
       EXIT_INSTALL_FAILURE,
       'fatal',
-      `创建符号链接时出错: ${errorMessage(error)}`,
-      [`检查 linkPath 的父目录是否可写`, `检查 target 路径是否有效: ${target}`],
+      msg('fsUtils.symlinkWhy').replace('{err}', errorMessage(error)),
+      [
+        msg('fsUtils.fixCheckLinkParentWritable'),
+        msg('fsUtils.fixCheckTargetValid').replace('{path}', target),
+      ],
     )
   }
 }
@@ -121,12 +131,15 @@ export async function backupFile(filePath: string): Promise<string> {
     return backupPath
   } catch (error) {
     throw new AiforgeError(
-      `无法备份文件: ${filePath}`,
+      msg('fsUtils.backupFileFailed').replace('{filePath}', filePath),
       'BACKUP_FAILED',
       EXIT_INSTALL_FAILURE,
       'fatal',
-      `备份文件时出错: ${errorMessage(error)}`,
-      [`检查源文件是否存在: ${filePath}`, `检查目录是否可写: ${dirname(filePath)}`],
+      msg('fsUtils.backupFileWhy').replace('{err}', errorMessage(error)),
+      [
+        msg('fsUtils.fixCheckSourceFile').replace('{path}', filePath),
+        msg('fsUtils.fixCheckDirWritable').replace('{dir}', dirname(filePath)),
+      ],
     )
   }
 }
@@ -144,12 +157,15 @@ export async function backupDir(dirPath: string): Promise<string> {
     return backupPath
   } catch (error) {
     throw new AiforgeError(
-      `无法备份目录: ${dirPath}`,
+      msg('fsUtils.backupDirFailed').replace('{dirPath}', dirPath),
       'BACKUP_FAILED',
       EXIT_INSTALL_FAILURE,
       'fatal',
-      `备份目录时出错: ${errorMessage(error)}`,
-      [`检查源目录是否存在: ${dirPath}`, `检查父目录是否可写: ${dirname(dirPath)}`],
+      msg('fsUtils.backupDirWhy').replace('{err}', errorMessage(error)),
+      [
+        msg('fsUtils.fixCheckSourceDir').replace('{path}', dirPath),
+        msg('fsUtils.fixCheckDirWritable').replace('{dir}', dirname(dirPath)),
+      ],
     )
   }
 }
@@ -169,12 +185,15 @@ export async function ensureDir(dirPath: string): Promise<void> {
     await mkdir(dirPath, { recursive: true })
   } catch (error) {
     throw new AiforgeError(
-      `无法创建目录: ${dirPath}`,
+      msg('fsUtils.ensureDirFailed').replace('{dirPath}', dirPath),
       'ENSURE_DIR_FAILED',
       EXIT_INSTALL_FAILURE,
       'fatal',
-      `创建目录时出错: ${errorMessage(error)}`,
-      [`检查父目录是否可写: ${dirname(dirPath)}`, `检查路径是否与已存在的文件冲突`],
+      msg('fsUtils.ensureDirWhy').replace('{err}', errorMessage(error)),
+      [
+        msg('fsUtils.fixCheckDirWritable').replace('{dir}', dirname(dirPath)),
+        msg('fsUtils.fixCheckPathConflict'),
+      ],
     )
   }
 }
@@ -219,12 +238,15 @@ export async function fileHash(filePath: string): Promise<string> {
     })
   } catch (error) {
     throw new AiforgeError(
-      `无法计算文件 hash: ${filePath}`,
+      msg('fsUtils.fileHashFailed').replace('{filePath}', filePath),
       'FILE_HASH_FAILED',
       EXIT_INSTALL_FAILURE,
       'fatal',
-      `计算 SHA256 hash 时出错: ${errorMessage(error)}`,
-      [`检查文件是否存在: ${filePath}`, `检查文件是否可读`],
+      msg('fsUtils.fileHashWhy').replace('{err}', errorMessage(error)),
+      [
+        msg('fsUtils.fixCheckFileExists').replace('{path}', filePath),
+        msg('fsUtils.fixCheckFileReadable'),
+      ],
     )
   }
 }
@@ -277,12 +299,14 @@ function validatePathSecurity(targetPath: string, allowedRoot: string): void {
   const root = resolve(allowedRoot)
   if (!resolved.startsWith(join(root, '/')) && resolved !== root) {
     throw new AiforgeError(
-      '检测到路径遍历攻击',
+      msg('fsUtils.pathTraversal'),
       'PATH_TRAVERSAL',
       EXIT_INSTALL_FAILURE,
       'fatal',
-      `目标路径 ${targetPath} 超出允许范围 ${allowedRoot}`,
-      ['检查安装规则中的 targetDir 配置'],
+      msg('fsUtils.pathTraversalWhy')
+        .replace('{target}', targetPath)
+        .replace('{root}', allowedRoot),
+      [msg('fsUtils.fixCheckTargetDir')],
     )
   }
 }
@@ -303,12 +327,16 @@ async function validateAncestorRealpath(ancestorDir: string, allowedRoot: string
   const realRoot = await realpath(allowedRoot)
   if (!realAncestor.startsWith(join(realRoot, '/')) && realAncestor !== realRoot) {
     throw new AiforgeError(
-      '检测到 symlink 逃逸路径遍历攻击',
+      msg('fsUtils.symlinkEscape'),
       'PATH_TRAVERSAL',
       EXIT_INSTALL_FAILURE,
       'fatal',
-      `目标路径祖先 ${ancestorDir} 经 symlink 解析后真实路径 ${realAncestor} 超出允许范围 ${allowedRoot}（真实根：${realRoot}）`,
-      ['检查路径链中是否存在指向 allowedRoot 之外的符号链接', '检查安装规则中的 targetDir 配置'],
+      msg('fsUtils.symlinkEscapeWhy')
+        .replace('{ancestor}', ancestorDir)
+        .replace('{real}', realAncestor)
+        .replace('{root}', allowedRoot)
+        .replace('{realRoot}', realRoot),
+      [msg('fsUtils.fixCheckSymlink'), msg('fsUtils.fixCheckTargetDir')],
     )
   }
 }
@@ -332,34 +360,34 @@ async function findExistingAncestor(targetPath: string): Promise<string> {
         } catch {
           // broken symlink（目标不存在）：无法在其下创建子路径
           throw new AiforgeError(
-            `路径链中存在损坏的符号链接: ${current}`,
+            msg('fsUtils.brokenSymlink').replace('{path}', current),
             'PATH_NOT_DIRECTORY',
             EXIT_INSTALL_FAILURE,
             'fatal',
-            `${current} 是损坏的符号链接（目标不存在），无法在其下创建子路径`,
-            [`检查路径配置，确保安装目标路径的父级均为目录`],
+            msg('fsUtils.brokenSymlinkWhy').replace('{path}', current),
+            [msg('fsUtils.fixCheckPathConfig')],
           )
         }
         if (!linkTargetStat.isDirectory()) {
           // symlink 指向非目录（如文件），无法在其下创建子路径
           throw new AiforgeError(
-            `路径链中存在指向非目录的符号链接: ${current}`,
+            msg('fsUtils.symlinkToNonDir').replace('{path}', current),
             'PATH_NOT_DIRECTORY',
             EXIT_INSTALL_FAILURE,
             'fatal',
-            `${current} 是符号链接但目标不是目录，无法在其下创建子路径`,
-            [`检查路径配置，确保安装目标路径的父级均为目录`],
+            msg('fsUtils.symlinkToNonDirWhy').replace('{path}', current),
+            [msg('fsUtils.fixCheckPathConfig')],
           )
         }
       } else if (!entryStat.isDirectory()) {
         // 路径链中存在一个非目录条目（如文件），无法在其下创建子路径
         throw new AiforgeError(
-          `路径链中存在非目录条目: ${current}`,
+          msg('fsUtils.nonDirInPath').replace('{path}', current),
           'PATH_NOT_DIRECTORY',
           EXIT_INSTALL_FAILURE,
           'fatal',
-          `${current} 存在但不是目录，无法在其下创建子路径`,
-          [`检查路径配置，确保安装目标路径的父级均为目录`],
+          msg('fsUtils.nonDirInPathWhy').replace('{path}', current),
+          [msg('fsUtils.fixCheckPathConfig')],
         )
       }
       return current
@@ -421,12 +449,12 @@ async function checkTargetWritability(
     const parentWritable = await isWritable(ancestorDir)
     if (!parentWritable) {
       throw new AiforgeError(
-        `目标路径父目录不可写: ${ancestorDir}`,
+        msg('fsUtils.permissionDenied').replace('{dir}', ancestorDir),
         'PERMISSION_DENIED',
         EXIT_INSTALL_FAILURE,
         'fatal',
-        `无法在 ${ancestorDir} 中创建文件，权限不足`,
-        [`chmod 755 ${ancestorDir}`, 'sudo npx aiforge -g'],
+        msg('fsUtils.permissionDeniedWhy').replace('{dir}', ancestorDir),
+        [msg('fsUtils.fixChmod').replace('{dir}', ancestorDir), msg('fsUtils.fixSudo')],
       )
     }
     // 标记需要创建
@@ -471,12 +499,12 @@ async function checkTargetWritability(
     }
     if (!writable) {
       throw new AiforgeError(
-        `目标文件不可写: ${targetPath}`,
+        msg('fsUtils.fileNotWritable').replace('{filePath}', targetPath),
         'PERMISSION_DENIED',
         EXIT_INSTALL_FAILURE,
         'fatal',
-        `无法写入文件 ${targetPath}，权限不足`,
-        [`chmod 755 ${targetPath}`, 'sudo npx aiforge -g'],
+        msg('fsUtils.fileNotWritableWhy').replace('{filePath}', targetPath),
+        [msg('fsUtils.fixChmodFile').replace('{filePath}', targetPath), msg('fsUtils.fixSudo')],
       )
     }
   }
@@ -549,12 +577,16 @@ export async function validateDestPathSecurity(
     const realRoot = await realpath(allowedRoot)
     if (!realDest.startsWith(join(realRoot, '/')) && realDest !== realRoot) {
       throw new AiforgeError(
-        '检测到 symlink 逃逸路径遍历攻击',
+        msg('fsUtils.symlinkEscape'),
         'PATH_TRAVERSAL',
         EXIT_INSTALL_FAILURE,
         'fatal',
-        `目标文件 ${destPath} 经 symlink 解析后真实路径 ${realDest} 超出允许范围 ${allowedRoot}（真实根：${realRoot}）`,
-        ['检查目标目录中是否存在指向允许范围之外的符号链接', '检查安装规则中的 targetDir 配置'],
+        msg('fsUtils.symlinkEscapeWhy')
+          .replace('{ancestor}', destPath)
+          .replace('{real}', realDest)
+          .replace('{root}', allowedRoot)
+          .replace('{realRoot}', realRoot),
+        [msg('fsUtils.fixCheckSymlink'), msg('fsUtils.fixCheckTargetDir')],
       )
     }
   } else {
@@ -575,12 +607,16 @@ export async function validateDestPathSecurity(
     const realRoot = await realpath(allowedRoot)
     if (!realDest.startsWith(join(realRoot, '/')) && realDest !== realRoot) {
       throw new AiforgeError(
-        '检测到 symlink 逃逸路径遍历攻击',
+        msg('fsUtils.symlinkEscape'),
         'PATH_TRAVERSAL',
         EXIT_INSTALL_FAILURE,
         'fatal',
-        `目标文件 ${destPath} 经 symlink 解析后真实路径 ${realDest} 超出允许范围 ${allowedRoot}（真实根：${realRoot}）`,
-        ['检查目标目录中是否存在指向允许范围之外的符号链接', '检查安装规则中的 targetDir 配置'],
+        msg('fsUtils.symlinkEscapeWhy')
+          .replace('{ancestor}', destPath)
+          .replace('{real}', realDest)
+          .replace('{root}', allowedRoot)
+          .replace('{realRoot}', realRoot),
+        [msg('fsUtils.fixCheckSymlink'), msg('fsUtils.fixCheckTargetDir')],
       )
     }
   }

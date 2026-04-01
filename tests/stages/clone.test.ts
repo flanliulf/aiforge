@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { AuthenticatedSource, ParsedArgs } from '../../src/core/types.js'
 import type { Reporter } from '../../src/core/reporter.js'
 import { AiforgeError } from '../../src/core/errors.js'
+import { setLanguage } from '../../src/core/messages.js'
 
 // ── Mocks ──────────────────────────────────────────────────────
 
@@ -705,6 +706,105 @@ describe('Story 5-4: clone 错误文案审计', () => {
       const e = err as AiforgeError
       expect(e.code).toBe('PULL_FAILED')
       expect(e.why).not.toContain('glpat-supersecret1234')
+    }
+  })
+})
+
+// ── 英文场景测试（Story 5-5a CR Round-3 P2 补充）──────────────────────────────
+
+describe('clone — English language mode', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    vi.mocked(createGit).mockReturnValue(mockGit as never)
+    setLanguage('en')
+  })
+
+  afterEach(() => {
+    setLanguage('zh-CN')
+  })
+
+  it('AUTH_FAILED message is in English when language=en (clone path)', async () => {
+    vi.mocked(access).mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
+    vi.mocked(rm).mockResolvedValue(undefined)
+    vi.mocked(mockGit.clone).mockRejectedValue(
+      new Error('fatal: Authentication failed for https://gitlab.example.com/org/repo.git'),
+    )
+
+    try {
+      await cloneRepo(mockSource, makeArgs(), mockReporter, mockPathResolver)
+      expect.unreachable('should throw AUTH_FAILED')
+    } catch (err) {
+      const e = err as AiforgeError
+      expect(e.code).toBe('AUTH_FAILED')
+      expect(e.message).toBe('Cannot access repository')
+      expect(e.why).toBe('Git server returned 401 (authentication failed)')
+    }
+  })
+
+  it('CLONE_FAILED message is in English when language=en', async () => {
+    vi.mocked(access).mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
+    vi.mocked(rm).mockResolvedValue(undefined)
+    vi.mocked(mockGit.clone).mockRejectedValue(new Error('network timeout'))
+
+    try {
+      await cloneRepo(mockSource, makeArgs(), mockReporter, mockPathResolver)
+      expect.unreachable('should throw CLONE_FAILED')
+    } catch (err) {
+      const e = err as AiforgeError
+      expect(e.code).toBe('CLONE_FAILED')
+      expect(e.message).toBe('Failed to clone repository')
+      expect(e.fix.some((f) => f.includes('Check network'))).toBe(true)
+    }
+  })
+
+  it('PULL_FAILED AUTH_FAILED message is in English when language=en', async () => {
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(readdir).mockResolvedValue([])
+    vi.mocked(mockGit.pull).mockRejectedValue(
+      new Error('fatal: Authentication failed for https://gitlab.example.com/'),
+    )
+
+    try {
+      await cloneRepo(mockSource, makeArgs(), mockReporter, mockPathResolver)
+      expect.unreachable('should throw AUTH_FAILED')
+    } catch (err) {
+      const e = err as AiforgeError
+      expect(e.code).toBe('AUTH_FAILED')
+      expect(e.message).toBe('Cannot access repository')
+    }
+  })
+
+  it('CLONE_FAILED why is English "Unknown network error" when non-Error thrown and language=en', async () => {
+    vi.mocked(access).mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
+    vi.mocked(rm).mockResolvedValue(undefined)
+    // 抛出非 Error 实例（极端场景）
+    vi.mocked(mockGit.clone).mockRejectedValue('string error — not an Error instance')
+
+    try {
+      await cloneRepo(mockSource, makeArgs(), mockReporter, mockPathResolver)
+      expect.unreachable('should throw CLONE_FAILED')
+    } catch (err) {
+      const e = err as AiforgeError
+      expect(e.code).toBe('CLONE_FAILED')
+      // 非-Error fallback 应使用 msg('clone.unknownNetworkError') → English
+      expect(e.why).toContain('Unknown network error')
+    }
+  })
+
+  it('PULL_FAILED why is English "Unknown error" when non-Error thrown and language=en', async () => {
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(readdir).mockResolvedValue([])
+    // 抛出非 Error 实例
+    vi.mocked(mockGit.pull).mockRejectedValue(42)
+
+    try {
+      await cloneRepo(mockSource, makeArgs(), mockReporter, mockPathResolver)
+      expect.unreachable('should throw PULL_FAILED')
+    } catch (err) {
+      const e = err as AiforgeError
+      expect(e.code).toBe('PULL_FAILED')
+      // 非-Error fallback 应使用 msg('clone.unknownError') → English
+      expect(e.why).toContain('Unknown error')
     }
   })
 })

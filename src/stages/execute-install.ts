@@ -54,6 +54,7 @@ import {
 import { checkConflict, checkDirConflict } from '../services/manifest.js'
 import type { ConflictType } from '../services/manifest.js'
 import { handleConflict } from './conflict-resolver.js'
+import { msg } from '../core/messages.js'
 
 // ── 状态判定 ──────────────────────────────────────────────────────────────────
 
@@ -148,7 +149,7 @@ async function checkBrokenLinks(
       const target = await readlink(item.targetPath)
       await access(target)
     } catch {
-      reporter.warn(`⚠️ 断链: ${item.targetPath} → 目标文件不存在`)
+      reporter.warn(msg('executeInstall.brokenLink').replace('{targetPath}', item.targetPath))
     }
   }
 }
@@ -267,16 +268,20 @@ function diagnoseZeroResults(
   const scannedDirs = [...new Set(plan.items.map((item) => item.rule.sourceDir))]
   const matchedRules = plan.items.map((item) => `${item.rule.tool}:${item.rule.scope}`)
 
-  reporter.warn('⚠️ 未安装任何文件')
+  reporter.warn(msg('executeInstall.zeroResultsWarning'))
   reporter.warn('')
-  reporter.warn('诊断信息：')
-  reporter.warn(`  扫描目录: ${scannedDirs.join(', ')}`)
-  reporter.warn(`  匹配规则: ${matchedRules.join(', ')} (${matchedRules.length} 条)`)
-  reporter.warn(`  所有文件已是最新或被跳过`)
+  reporter.warn(msg('executeInstall.diagHeader'))
+  reporter.warn(msg('executeInstall.diagScannedDirs').replace('{dirs}', scannedDirs.join(', ')))
+  reporter.warn(
+    msg('executeInstall.diagMatchedRules')
+      .replace('{rules}', matchedRules.join(', '))
+      .replace('{count}', String(matchedRules.length)),
+  )
+  reporter.warn(msg('executeInstall.diagAllSkipped'))
   reporter.warn('')
-  reporter.warn('建议：')
-  reporter.warn('  1. 使用 --force 强制重新安装')
-  reporter.warn('  2. 检查知识仓库是否有新内容')
+  reporter.warn(msg('executeInstall.suggestHeader'))
+  reporter.warn(msg('executeInstall.suggestForce'))
+  reporter.warn(msg('executeInstall.suggestCheckRepo'))
 }
 
 // ── manifest 冲突上下文 ─────────────────────────────────────────────────────
@@ -318,7 +323,7 @@ export async function executeInstall(
   pathResolver: PathResolver,
   manifestContext?: ManifestContext,
 ): Promise<InstallResult> {
-  reporter.startPhase('执行安装...')
+  reporter.startPhase(msg('phases.install'))
 
   // Step 1: 预检查（路径安全性 + 可写性）
   await preflight(plan, pathResolver)
@@ -366,7 +371,11 @@ export async function executeInstall(
           const code = (error as NodeJS.ErrnoException).code
           if (code === 'ENOENT' || code === 'ENOTDIR') {
             // 主文件不存在，跳过该子目录，记录警告（AC #4）
-            reporter.warn(`⚠️ flatten: ${basename(srcDir)}/ 中未找到 ${mainFile}，跳过`)
+            reporter.warn(
+              msg('executeInstall.flattenMissingMainFile')
+                .replace('{srcDir}', basename(srcDir))
+                .replace('{mainFile}', mainFile),
+            )
             resultItems.push({
               status: 'skipped',
               tool: item.rule.tool,
@@ -375,7 +384,9 @@ export async function executeInstall(
               targetPath: destPath,
             })
             processedCount++
-            reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
+            reporter.updatePhase(
+              `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
+            )
             continue
           }
           // 其他 I/O 错误向上抛出
@@ -403,7 +414,9 @@ export async function executeInstall(
             targetPath: destPath,
           })
           processedCount++
-          reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
+          reporter.updatePhase(
+            `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
+          )
           continue
         }
 
@@ -413,7 +426,9 @@ export async function executeInstall(
             await createSymlink(mainPath, destPath)
           }
           processedCount++
-          reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
+          reporter.updatePhase(
+            `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
+          )
           itemModes.set(destPath, 'symlink')
           resultItems.push({
             status,
@@ -428,7 +443,9 @@ export async function executeInstall(
             await copyFile(mainPath, destPath)
           }
           processedCount++
-          reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
+          reporter.updatePhase(
+            `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
+          )
           resultItems.push({
             status,
             tool: item.rule.tool,
@@ -465,7 +482,9 @@ export async function executeInstall(
               targetPath: destPath,
             })
             processedCount++
-            reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
+            reporter.updatePhase(
+              `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
+            )
             continue
           }
 
@@ -476,7 +495,9 @@ export async function executeInstall(
               await createSymlink(srcPath, destPath)
             }
             processedCount++
-            reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
+            reporter.updatePhase(
+              `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
+            )
             itemModes.set(destPath, 'symlink')
             resultItems.push({
               status,
@@ -492,7 +513,9 @@ export async function executeInstall(
               await copyFile(srcPath, destPath)
             }
             processedCount++
-            reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
+            reporter.updatePhase(
+              `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
+            )
             resultItems.push({
               status,
               tool: item.rule.tool,
@@ -525,7 +548,9 @@ export async function executeInstall(
               targetPath: destPath,
             })
             processedCount++
-            reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
+            reporter.updatePhase(
+              `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
+            )
             continue
           }
 
@@ -536,7 +561,9 @@ export async function executeInstall(
               await createSymlink(srcPath, destPath)
             }
             processedCount++
-            reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
+            reporter.updatePhase(
+              `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
+            )
             itemModes.set(destPath, 'symlink')
             resultItems.push({
               status,
@@ -550,7 +577,9 @@ export async function executeInstall(
             const status = await determineDirStatus(destPath)
             await copyDir(srcPath, destPath)
             processedCount++
-            reporter.updatePhase(`执行安装... (${processedCount}/${totalFiles})`)
+            reporter.updatePhase(
+              `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
+            )
             resultItems.push({
               status,
               tool: item.rule.tool,

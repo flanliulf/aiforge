@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { DetectedEnv, ParsedArgs } from '../../src/core/types.js'
 import type { Reporter } from '../../src/core/reporter.js'
 import { InstallType } from '../../src/core/types.js'
+import { setLanguage } from '../../src/core/messages.js'
 
 // ── Mocks ──────────────────────────────────────────────────────
 
@@ -561,5 +562,50 @@ describe('matchRules', () => {
     const agentsItem = plan.items.find((i) => i.rule.sourceDir === 'agents')
     expect(agentsItem!.sourceFiles[0]).toContain('/tmp/repo')
     expect(agentsItem!.sourceFiles[0]).toContain('my-agent.md')
+  })
+})
+
+// ── LINK_PROJECT_REJECTED 双语测试（Story 5-5a CR Round-4 P2 补充）────────────
+
+describe('matchRules — LINK_PROJECT_REJECTED i18n', () => {
+  beforeEach(() => {
+    vi.mocked(readdir).mockResolvedValue([])
+  })
+
+  it('LINK_PROJECT_REJECTED message is in Chinese when language=zh-CN (default)', async () => {
+    try {
+      await matchRules(
+        mockRepo,
+        makeEnv(['copilot'], 'project'),
+        makeArgs({ link: true, global: false }),
+        mockReporter,
+        mockPathResolver as never,
+      )
+      expect.unreachable('应抛出 LINK_PROJECT_REJECTED')
+    } catch (err) {
+      const e = err as import('../../src/core/errors.js').AiforgeError
+      expect(e.code).toBe('LINK_PROJECT_REJECTED')
+      expect(e.message).toBe('符号链接模式不支持项目级安装')
+    }
+  })
+
+  it('LINK_PROJECT_REJECTED message is in English when language=en', async () => {
+    setLanguage('en')
+    try {
+      await matchRules(
+        mockRepo,
+        makeEnv(['copilot'], 'project'),
+        makeArgs({ link: true, global: false }),
+        mockReporter,
+        mockPathResolver as never,
+      )
+      expect.unreachable('should throw LINK_PROJECT_REJECTED')
+    } catch (err) {
+      const e = err as import('../../src/core/errors.js').AiforgeError
+      expect(e.code).toBe('LINK_PROJECT_REJECTED')
+      expect(e.message).toBe('Symlink mode does not support project-scope installation')
+    } finally {
+      setLanguage('zh-CN')
+    }
   })
 })

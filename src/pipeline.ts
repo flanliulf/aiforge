@@ -24,6 +24,7 @@ import { InstallType } from './core/types.js'
 import type { Reporter } from './core/reporter.js'
 import type { PathResolver } from './core/path-resolver.js'
 import { AiforgeError, EXIT_INSTALL_FAILURE } from './core/errors.js'
+import { msg } from './core/messages.js'
 import { resolveSource } from './stages/resolve-source.js'
 import { authenticate as authenticateStage } from './stages/authenticate.js'
 import { cloneRepo } from './stages/clone.js'
@@ -115,11 +116,11 @@ export interface PipelineStages {
 
 function notImplemented(stage: string): never {
   throw new AiforgeError(
-    `阶段 "${stage}" 未实现`,
+    msg('pipeline.stageNotImplemented').replace('{stage}', stage),
     'NOT_IMPLEMENTED',
     EXIT_INSTALL_FAILURE,
     'fatal',
-    '该阶段尚未实现',
+    msg('pipeline.stageNotImplementedWhy'),
     [],
   )
 }
@@ -407,7 +408,7 @@ export async function runPipeline(
       'ERR_UNKNOWN',
       EXIT_INSTALL_FAILURE,
       'fatal',
-      '发生未预期的错误',
+      msg('pipeline.unknownErrorWhy'),
       [],
     )
     reporter.reportError(wrapped)

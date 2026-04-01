@@ -19,7 +19,7 @@ import type { PathResolver } from '../core/path-resolver.js'
 import { AiforgeError } from '../core/errors.js'
 import { EXIT_ARG_ERROR, EXIT_INSTALL_FAILURE } from '../core/errors.js'
 import { TOOL_DEFINITIONS } from '../data/tool-registry.js'
-import { MESSAGES } from '../data/messages.js'
+import { msg } from '../core/messages.js'
 
 // ── fs 存在性检查（ENOENT/ENOTDIR 白名单降级）──────────────────
 
@@ -92,24 +92,28 @@ function emitDiagnostics(reporter: Reporter, pathResolver: PathResolver): void {
   const globalBase = pathResolver.home()
   const projectBase = process.cwd()
 
-  const lines: string[] = ['❌ 未检测到任何 AI 编码工具', '', '扫描路径：']
+  const lines: string[] = [msg('detectTools.noToolsFound'), '', msg('detectTools.scanPathsHeader')]
 
   // 列出每个工具的全局侧标志路径
   const globalFlags = TOOL_DEFINITIONS.flatMap((t) =>
     t.detect.global.map((f) => {
       const normalized = f.replace(/^~[/\\]?/, '')
-      return `  全局: ${join(globalBase, normalized)} (不存在)`
+      return msg('detectTools.globalFlag').replace('{path}', join(globalBase, normalized))
     }),
   )
   // 列出每个工具的项目侧标志路径
   const projectFlags = TOOL_DEFINITIONS.flatMap((t) =>
-    t.detect.project.map((f) => `  项目: ${join(projectBase, f)} (不存在)`),
+    t.detect.project.map((f) =>
+      msg('detectTools.projectFlag').replace('{path}', join(projectBase, f)),
+    ),
   )
 
   lines.push(...globalFlags, ...projectFlags)
-  lines.push('', '建议：')
-  lines.push('  1. 安装 GitHub Copilot、Claude Code、Cursor 或 VS Code')
-  lines.push(`  2. 使用 --tools ${TOOL_DEFINITIONS.map((t) => t.id).join(' ')} 手动指定工具`)
+  lines.push('', msg('detectTools.suggestionsHeader'))
+  lines.push(msg('detectTools.suggestion1'))
+  lines.push(
+    msg('detectTools.suggestion2').replace('{tools}', TOOL_DEFINITIONS.map((t) => t.id).join(' ')),
+  )
 
   reporter.warn(lines.join('\n'))
 }
@@ -130,7 +134,7 @@ export async function detectTools(
   reporter: Reporter,
   pathResolver: PathResolver,
 ): Promise<DetectedEnv> {
-  reporter.startPhase(MESSAGES.phases.detect)
+  reporter.startPhase(msg('phases.detect'))
 
   const scope: 'global' | 'project' = args.global ? 'global' : 'project'
 
@@ -140,13 +144,16 @@ export async function detectTools(
       const def = TOOL_DEFINITIONS.find((t) => t.id === id)
       if (!def) {
         throw new AiforgeError(
-          `未知的工具 ID: ${id}`,
+          msg('detectTools.unknownTool').replace('{id}', id),
           'UNKNOWN_TOOL',
           EXIT_ARG_ERROR,
           'fatal',
-          `工具 ID "${id}" 在注册表中不存在`,
+          msg('detectTools.unknownToolWhy').replace('{id}', id),
           [
-            `支持的工具: ${TOOL_DEFINITIONS.map((t) => t.id).join(', ')}`,
+            msg('detectTools.fixSupportedTools').replace(
+              '{tools}',
+              TOOL_DEFINITIONS.map((t) => t.id).join(', '),
+            ),
             `npx aiforge --tools ${TOOL_DEFINITIONS.map((t) => t.id).join(' ')}`,
           ],
         )
@@ -171,13 +178,13 @@ export async function detectTools(
   if (detectedTools.length === 0) {
     emitDiagnostics(reporter, pathResolver)
     throw new AiforgeError(
-      '未检测到任何 AI 编码工具',
+      msg('detectTools.noToolsError'),
       'NO_TOOLS',
       EXIT_INSTALL_FAILURE,
       'fatal',
-      '在全局目录和项目目录中均未找到支持工具的标志文件',
+      msg('detectTools.noToolsErrorWhy'),
       [
-        '安装 GitHub Copilot、Claude Code、Cursor 或 VS Code',
+        msg('detectTools.fixInstallTools'),
         `npx aiforge --tools ${TOOL_DEFINITIONS.map((t) => t.id).join(' ')}`,
       ],
     )

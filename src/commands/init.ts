@@ -10,6 +10,9 @@
  * CR Fix (Round 2):
  * - Finding #1/#2/#4: 提前 resolver.resolve() 到连接验证前，避免 Token SCP 假成功 / SSH HTTPS 误报
  * - Finding #3: 以 existingConfig 为基础 merge，避免重写时丢失已有字段
+ *
+ * CR Fix (Round 3 — Story 5.5a):
+ * - Finding #1: 语言选择后立即调用 setLanguage()，后续所有输出通过 msg() 获取（AC #1/#3）
  */
 
 import { input, select, password, confirm } from '@inquirer/prompts'
@@ -18,11 +21,12 @@ import { UnixPathResolver } from '../core/path-resolver.js'
 import type { AiforgeConfig } from '../core/types.js'
 import { loadConfig, saveConfig } from '../services/config.js'
 import { createGit, GitSourceResolver } from '../services/git.js'
+import { msg, setLanguage } from '../core/messages.js'
 
 export function registerInitCommand(program: import('commander').Command): void {
   program
     .command('init')
-    .description('初始化 aiforge 配置')
+    .description('Initialize aiforge configuration')
     .action(async () => {
       await runInit()
     })
@@ -34,12 +38,12 @@ async function runInit(): Promise<void> {
   // Task 1.2: TTY 检测
   if (!process.stdin.isTTY) {
     throw new AiforgeError(
-      'aiforge init 需要交互式终端',
+      msg('errors.nonTty'),
       'NON_TTY',
       EXIT_ARG_ERROR,
       'fatal',
-      '当前环境不支持交互式输入（如 CI/CD 管道）',
-      ['在本地终端运行 aiforge init', '或手动创建 ~/.aiforge/config.json'],
+      msg('errors.nonTtyWhy'),
+      [msg('errors.fixRunInTerminal'), msg('errors.fixManualConfig')],
     )
   }
 
@@ -49,21 +53,25 @@ async function runInit(): Promise<void> {
   let existingConfig: AiforgeConfig | undefined
   try {
     existingConfig = await loadConfig(pathResolver)
+    // Story 5.5a CR Fix Round 2 — Finding #1a:
+    // 在输出配置摘要之前预加载已有配置中的语言设置，
+    // 确保 init 子命令走自己的 action()（不走 index.ts 的语言预加载路径）时也能正确显示语言（AC #1/#4）
+    setLanguage(existingConfig.language ?? 'zh-CN')
     // 显示当前配置摘要
     const authSummary = Object.keys(existingConfig.auth)
       .map((h) => `${h} (${existingConfig!.auth[h]!.method})`)
       .join(', ')
-    console.log('当前配置：')
-    console.log(`  仓库: ${existingConfig.defaultRepo ?? '（未设置）'}`)
-    console.log(`  认证: ${authSummary || '（未设置）'}`)
+    console.log(msg('init.currentConfig'))
+    console.log(`${msg('init.repoLabel')}${existingConfig.defaultRepo ?? msg('init.notSet')}`)
+    console.log(`${msg('init.authLabel')}${authSummary || msg('init.notSet')}`)
 
-    const modify = await confirm({ message: '是否修改当前配置？', default: false })
+    const modify = await confirm({ message: msg('init.modifyPrompt'), default: false })
     if (!modify) return
   } catch (error: unknown) {
     if (error instanceof AiforgeError) {
       if (error.code === 'CONFIG_CORRUPT') {
         // 配置损坏：显式提示用户，继续首次配置流程
-        console.log('⚠️ 配置文件损坏，将重新配置。')
+        console.log(msg('init.corruptWarning'))
       }
       // CONFIG_NOT_FOUND：无配置，继续首次配置流程（无需额外处理）
       // CONFIG_READ_FAILED：向上抛出（权限/I/O 问题需用户干预）
@@ -76,11 +84,25 @@ async function runInit(): Promise<void> {
   }
 
   // Task 1.3: 交互式问答
+  // Step 0: 语言选择（Story 5.5a Task 2）
+  const language = await select({
+    message: '界面语言 / Display language:',
+    choices: [
+      { name: '中文', value: 'zh-CN' },
+      { name: 'English', value: 'en' },
+    ],
+    default: existingConfig?.language ?? 'zh-CN',
+  })
+
+  // Story 5.5a CR Fix — Finding #1:
+  // 语言选择完成后立即调用 setLanguage()，确保后续所有 msg() 调用返回正确语言（AC #1/#3）
+  setLanguage(language)
+
   // Step 1: 仓库 URL
   const repoUrl = await input({
-    message: '默认知识仓库 URL:',
+    message: msg('init.repoUrlPrompt'),
     default: existingConfig?.defaultRepo,
-    validate: (val) => (val.trim() ? true : '请输入仓库 URL'),
+    validate: (val) => (val.trim() ? true : msg('init.inputValidateRepo')),
   })
 
   // CR Fix #1/#2/#4: 提前解析 URL，确保验证 URL 与 clone URL 一致
@@ -92,10 +114,10 @@ async function runInit(): Promise<void> {
 
   // Step 2: 认证方式
   const authMethod = await select({
-    message: '认证方式:',
+    message: msg('init.authMethodPrompt'),
     choices: [
-      { name: 'SSH Key（推荐）', value: 'ssh' },
-      { name: 'Personal Access Token', value: 'token' },
+      { name: msg('init.sshChoice'), value: 'ssh' },
+      { name: msg('init.tokenChoice'), value: 'token' },
     ],
   })
 
@@ -107,8 +129,8 @@ async function runInit(): Promise<void> {
   if (authMethod === 'token') {
     // Task 3.4: Token 输入不回显
     token = await password({
-      message: 'Personal Access Token:',
-      validate: (val) => (val.trim() ? true : '请输入 Token'),
+      message: msg('init.tokenPrompt'),
+      validate: (val) => (val.trim() ? true : msg('init.inputValidateToken')),
     })
     // 构造 HTTPS token URL：https://oauth2:token@hostname/repoPath.git
     const tokenUrl = `https://oauth2:${token}@${hostname}/${repoPath}.git`
@@ -125,10 +147,11 @@ async function runInit(): Promise<void> {
   }
 
   // CR Fix #3: 以 existingConfig 为基础 merge，保留已有字段
-  // 只更新本次涉及的字段（defaultRepo、auth[hostname]、preferSSH），其余字段保留
+  // 只更新本次涉及的字段（defaultRepo、language、auth[hostname]、preferSSH），其余字段保留
   const config: AiforgeConfig = {
     ...existingConfig,
     defaultRepo: repoUrl,
+    language,
     auth: {
       ...existingConfig?.auth,
       [hostname]: {
@@ -163,16 +186,16 @@ async function verifySshConnection(sshVerifyUrl: string): Promise<boolean> {
   try {
     await git.raw(['ls-remote', '--exit-code', sshVerifyUrl])
     // Task 2.2: 成功
-    console.log('✅ SSH 连接成功')
+    console.log(msg('init.sshSuccess'))
     return true
   } catch {
     // Task 2.3: 三段式错误提示
-    console.log('❌ SSH 连接失败')
-    console.log('Git 服务器拒绝了 SSH 连接')
-    console.log('修复建议：')
-    console.log('  ssh-keygen -t ed25519 -C "your-email@example.com"')
-    console.log('  cat ~/.ssh/id_ed25519.pub  # 复制公钥到 GitLab Settings > SSH Keys')
-    console.log('  ssh -T git@<hostname>  # 测试连接')
+    console.log(msg('init.sshFail'))
+    console.log(msg('init.sshFailReason'))
+    console.log(msg('init.fixTitle'))
+    console.log(msg('init.fixSshKeygen'))
+    console.log(msg('init.fixSshCopyKey'))
+    console.log(msg('init.fixSshTest'))
     return false
   }
 }
@@ -193,15 +216,15 @@ async function verifyTokenConnection(tokenUrl: string, token: string): Promise<b
     await git.raw(['ls-remote', '--exit-code', tokenUrl])
     // Task 3.2: 成功，Token 脱敏显示
     const sanitized = sanitizeTokenDisplay(token)
-    console.log(`✅ Token 验证成功（${sanitized}）`)
+    console.log(`${msg('init.tokenSuccessPrefix')} (${sanitized})`)
     return true
   } catch {
     // Task 3.3: 三段式错误提示
-    console.log('❌ Token 验证失败')
-    console.log('Token 无效或权限不足')
-    console.log('修复建议：')
-    console.log('  访问 GitLab Settings > Access Tokens 生成新 Token')
-    console.log('  确保 Token 具有 read_repository 权限')
+    console.log(msg('init.tokenFail'))
+    console.log(msg('init.tokenFailReason'))
+    console.log(msg('init.fixTitle'))
+    console.log(msg('init.fixTokenGenerate'))
+    console.log(msg('init.fixTokenPermission'))
     return false
   }
 }

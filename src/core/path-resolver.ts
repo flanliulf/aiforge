@@ -2,6 +2,7 @@ import os from 'os'
 import path from 'path'
 import { AiforgeError } from './errors.js'
 import { EXIT_ARG_ERROR } from './errors.js'
+import { msg } from './messages.js'
 
 export interface PathResolver {
   home(): string
@@ -18,12 +19,12 @@ export class UnixPathResolver implements PathResolver {
     const homeDir = os.homedir()
     if (!homeDir) {
       throw new AiforgeError(
-        'HOME 环境变量未设置',
+        msg('pathResolver.noHome'),
         'ERR_NO_HOME',
         EXIT_ARG_ERROR,
         'fatal',
-        'os.homedir() 返回空值，HOME 环境变量可能未设置',
-        ['请确保 HOME 环境变量已正确设置', '例如: export HOME=/home/youruser'],
+        msg('pathResolver.noHomeWhy'),
+        [msg('pathResolver.fixHomeEnv'), msg('pathResolver.fixHomeExample')],
       )
     }
     this.homeDir = homeDir

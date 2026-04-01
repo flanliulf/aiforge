@@ -477,13 +477,16 @@ describe('commands/init — 交互式配置', () => {
     })
 
     it('用户选择修改时，保留已有配置字段（CR Fix #3）', async () => {
-      // CR Fix #3 新增断言：修改配置后旧字段（cloneDir、language）必须保留
+      // CR Fix #3 新增断言：修改配置后旧字段（cloneDir）必须保留
+      // Story 5.5a: 新增语言选择，select 调用顺序为：语言 → 认证方式
       mocks.loadConfig.mockResolvedValue(EXISTING_CONFIG)
       mocks.confirm.mockResolvedValue(true) // 用户选择修改
 
       const newUrl = 'git@github.com:org/new-repo.git'
       mocks.input.mockResolvedValue(newUrl)
-      mocks.select.mockResolvedValue('ssh')
+      mocks.select
+        .mockResolvedValueOnce('zh-CN') // 语言选择
+        .mockResolvedValueOnce('ssh') // 认证方式
       mocks.saveConfig.mockResolvedValue(undefined)
       mocks.gitResolve.mockResolvedValue({
         hostname: 'github.com',
@@ -505,12 +508,13 @@ describe('commands/init — 交互式配置', () => {
       expect(mocks.select).toHaveBeenCalled()
       expect(mocks.saveConfig).toHaveBeenCalled()
 
-      // CR Fix #3 关键断言：旧字段 cloneDir、language 必须保留在保存的配置中
+      // CR Fix #3 关键断言：旧字段 cloneDir 必须保留在保存的配置中
+      // 注意：language 字段会被新的语言选择覆盖（'zh-CN'），不再沿用旧值
       const savedConfig = mocks.saveConfig.mock.calls[0]?.[0]
       expect(savedConfig).toMatchObject({
         defaultRepo: newUrl,
         cloneDir: EXISTING_CONFIG.cloneDir, // 保留旧字段
-        language: EXISTING_CONFIG.language, // 保留旧字段
+        language: 'zh-CN', // 用户在本次 init 中选择的语言
         auth: expect.objectContaining({
           'github.com': expect.objectContaining({ method: 'ssh' }),
           // 旧的 auth 条目（gitlab.example.com）也应保留
@@ -556,7 +560,159 @@ describe('commands/init — 交互式配置', () => {
 
       const initCmd = program.commands.find((cmd) => cmd.name() === 'init')
       expect(initCmd).toBeDefined()
-      expect(initCmd!.description()).toBe('初始化 aiforge 配置')
+      expect(initCmd!.description()).toBe('Initialize aiforge configuration')
+    })
+  })
+
+  // ── AC #1: 语言选择（Story 5.5a Task 2）────────────────────────
+
+  describe('语言选择 (AC #1, Story 5.5a)', () => {
+    beforeEach(() => {
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: true,
+        writable: true,
+        configurable: true,
+      })
+      mocks.loadConfig.mockRejectedValue(
+        new AiforgeError('未找到配置文件', 'CONFIG_NOT_FOUND', 3, 'fatal', '尚未初始化', []),
+      )
+    })
+
+    it('init 流程中调用语言选择（第一个 select 调用）', async () => {
+      // 第一个 select 是语言选择，第二个 select 是认证方式
+      mocks.input.mockResolvedValue('git@gitlab.example.com:org/repo.git')
+      mocks.select
+        .mockResolvedValueOnce('zh-CN') // 语言选择
+        .mockResolvedValueOnce('ssh') // 认证方式
+      mocks.saveConfig.mockResolvedValue(undefined)
+      mocks.gitResolve.mockResolvedValue({
+        hostname: 'gitlab.example.com',
+        repoPath: 'org/repo',
+        protocol: 'ssh',
+      })
+
+      const rawMock = makeGitRaw(false)
+      mocks.createGit.mockReturnValue({ raw: rawMock })
+
+      const program = new Command()
+      program.exitOverride()
+      registerInitCommand(program)
+
+      await program.parseAsync(['node', 'aiforge', 'init'])
+
+      // select 被调用 2 次：语言 + 认证方式
+      expect(mocks.select).toHaveBeenCalledTimes(2)
+    })
+
+    it('选择 zh-CN 时，language 字段保存为 "zh-CN"（AC #1）', async () => {
+      mocks.input.mockResolvedValue('git@gitlab.example.com:org/repo.git')
+      mocks.select
+        .mockResolvedValueOnce('zh-CN') // 语言选择
+        .mockResolvedValueOnce('ssh') // 认证方式
+      mocks.saveConfig.mockResolvedValue(undefined)
+      mocks.gitResolve.mockResolvedValue({
+        hostname: 'gitlab.example.com',
+        repoPath: 'org/repo',
+        protocol: 'ssh',
+      })
+
+      const rawMock = makeGitRaw(false)
+      mocks.createGit.mockReturnValue({ raw: rawMock })
+
+      const program = new Command()
+      program.exitOverride()
+      registerInitCommand(program)
+
+      await program.parseAsync(['node', 'aiforge', 'init'])
+
+      const savedConfig = mocks.saveConfig.mock.calls[0]?.[0]
+      expect(savedConfig).toMatchObject({ language: 'zh-CN' })
+    })
+
+    it('选择英文时，language 字段保存为 "en"（AC #1）', async () => {
+      mocks.input.mockResolvedValue('git@gitlab.example.com:org/repo.git')
+      mocks.select
+        .mockResolvedValueOnce('en') // 语言选择 → 英文
+        .mockResolvedValueOnce('ssh') // 认证方式
+      mocks.saveConfig.mockResolvedValue(undefined)
+      mocks.gitResolve.mockResolvedValue({
+        hostname: 'gitlab.example.com',
+        repoPath: 'org/repo',
+        protocol: 'ssh',
+      })
+
+      const rawMock = makeGitRaw(false)
+      mocks.createGit.mockReturnValue({ raw: rawMock })
+
+      const program = new Command()
+      program.exitOverride()
+      registerInitCommand(program)
+
+      await program.parseAsync(['node', 'aiforge', 'init'])
+
+      const savedConfig = mocks.saveConfig.mock.calls[0]?.[0]
+      expect(savedConfig).toMatchObject({ language: 'en' })
+    })
+  })
+
+  // ── Story 5.5a CR Fix — Finding #1: setLanguage 调用验证 ───────────────────
+
+  describe('语言切换后 setLanguage 被调用（AC #1 CR Fix）', () => {
+    let setLanguageSpy: ReturnType<typeof vi.spyOn>
+
+    beforeEach(async () => {
+      // 动态 import core/messages 以便 spy
+      const messages = await import('../../src/core/messages.js')
+      setLanguageSpy = vi.spyOn(messages, 'setLanguage')
+
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: true,
+        writable: true,
+        configurable: true,
+      })
+      mocks.loadConfig.mockRejectedValue(
+        new AiforgeError('未找到配置文件', 'CONFIG_NOT_FOUND', 3, 'fatal', '尚未初始化', []),
+      )
+    })
+
+    afterEach(() => {
+      setLanguageSpy?.mockRestore()
+    })
+
+    it('选择英文后 setLanguage("en") 被调用（AC #1）', async () => {
+      mocks.input.mockResolvedValue('git@gitlab.example.com:org/repo.git')
+      mocks.select
+        .mockResolvedValueOnce('en') // 语言选择 → 英文
+        .mockResolvedValueOnce('ssh') // 认证方式
+      mocks.saveConfig.mockResolvedValue(undefined)
+      const rawMock = makeGitRaw(false)
+      mocks.createGit.mockReturnValue({ raw: rawMock })
+
+      const program = new Command()
+      program.exitOverride()
+      registerInitCommand(program)
+
+      await program.parseAsync(['node', 'aiforge', 'init'])
+
+      expect(setLanguageSpy).toHaveBeenCalledWith('en')
+    })
+
+    it('选择中文后 setLanguage("zh-CN") 被调用（AC #1）', async () => {
+      mocks.input.mockResolvedValue('git@gitlab.example.com:org/repo.git')
+      mocks.select
+        .mockResolvedValueOnce('zh-CN') // 语言选择 → 中文
+        .mockResolvedValueOnce('ssh') // 认证方式
+      mocks.saveConfig.mockResolvedValue(undefined)
+      const rawMock = makeGitRaw(false)
+      mocks.createGit.mockReturnValue({ raw: rawMock })
+
+      const program = new Command()
+      program.exitOverride()
+      registerInitCommand(program)
+
+      await program.parseAsync(['node', 'aiforge', 'init'])
+
+      expect(setLanguageSpy).toHaveBeenCalledWith('zh-CN')
     })
   })
 })

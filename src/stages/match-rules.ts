@@ -24,7 +24,7 @@ import { AiforgeError } from '../core/errors.js'
 import { EXIT_ARG_ERROR } from '../core/errors.js'
 import { RULE_INDEX } from '../data/install-rules.js'
 import { DEFAULT_EXCLUDES } from '../data/excludes.js'
-import { MESSAGES } from '../data/messages.js'
+import { msg } from '../core/messages.js'
 
 // ── 安装模式推导 ─────────────────────────────────────────────────────────────
 
@@ -42,12 +42,12 @@ import { MESSAGES } from '../data/messages.js'
 function getInstallMode(args: ParsedArgs, scope: 'global' | 'project'): 'copy' | 'symlink' {
   if (args.link && scope === 'project') {
     throw new AiforgeError(
-      '符号链接模式不支持项目级安装',
+      msg('matchRules.linkProjectRejected'),
       'LINK_PROJECT_REJECTED',
       EXIT_ARG_ERROR,
       'fatal',
-      '-l/--link 仅支持全局安装模式（-g）',
-      ['npx aiforge -g -l <repo>  # 全局 + 符号链接'],
+      msg('matchRules.linkProjectRejectedWhy'),
+      ['npx aiforge -g -l <repo>'],
     )
   }
   if (args.link && scope === 'global') return 'symlink'
@@ -148,7 +148,7 @@ export async function matchRules(
   reporter: Reporter,
   pathResolver: PathResolver,
 ): Promise<MatchedPlan> {
-  reporter.startPhase(MESSAGES.phases.match)
+  reporter.startPhase(msg('phases.match'))
 
   // LINK_PROJECT_REJECTED 校验提前执行（尽早发现参数错误）
   // 仅在 args.link 为 true 时才需要校验，getInstallMode 内部会抛出

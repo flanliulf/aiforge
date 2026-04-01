@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { PathResolver } from '../core/path-resolver.js'
 import type { AiforgeConfig, HostAuth } from '../core/types.js'
 import { AiforgeError, EXIT_ARG_ERROR } from '../core/errors.js'
+import { msg } from '../core/messages.js'
 
 /**
  * Load and parse ~/.aiforge/config.json
@@ -20,24 +21,21 @@ export async function loadConfig(pathResolver: PathResolver): Promise<AiforgeCon
   } catch (err: unknown) {
     if (isNodeError(err) && err.code === 'ENOENT') {
       throw new AiforgeError(
-        '未找到配置文件',
+        msg('config.notFound'),
         'CONFIG_NOT_FOUND',
         EXIT_ARG_ERROR,
         'fatal',
-        '尚未运行初始化配置',
-        ['npx aiforge init  # 首次配置'],
+        msg('config.notFoundWhy'),
+        [msg('config.fixInit')],
       )
     }
     throw new AiforgeError(
-      '配置文件读取失败',
+      msg('config.readFailed'),
       'CONFIG_READ_FAILED',
       EXIT_ARG_ERROR,
       'fatal',
-      `无法读取配置文件: ${isNodeError(err) ? err.code : String(err)}`,
-      [
-        'ls -la ~/.aiforge/config.json  # 检查文件权限',
-        'chmod 600 ~/.aiforge/config.json  # 修复权限',
-      ],
+      `${msg('config.readFailed')}: ${isNodeError(err) ? err.code : String(err)}`,
+      [msg('config.fixCheckPerms'), msg('config.fixPermsCmd')],
     )
   }
 
@@ -46,23 +44,23 @@ export async function loadConfig(pathResolver: PathResolver): Promise<AiforgeCon
     parsed = JSON.parse(raw)
   } catch {
     throw new AiforgeError(
-      '配置文件损坏',
+      msg('config.corrupt'),
       'CONFIG_CORRUPT',
       EXIT_ARG_ERROR,
       'fatal',
-      'config.json 不是有效的 JSON 格式',
-      ['npx aiforge init  # 重新配置'],
+      msg('config.corruptWhy'),
+      [msg('config.fixReinit')],
     )
   }
 
   if (!isValidConfigStructure(parsed)) {
     throw new AiforgeError(
-      '配置文件损坏',
+      msg('config.corrupt'),
       'CONFIG_CORRUPT',
       EXIT_ARG_ERROR,
       'fatal',
-      'config.json 缺少必要的 auth 字段或 auth 不是有效的对象',
-      ['npx aiforge init  # 重新配置'],
+      msg('config.corruptWhyBadAuth'),
+      [msg('config.fixReinit')],
     )
   }
 

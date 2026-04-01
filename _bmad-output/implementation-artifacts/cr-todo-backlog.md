@@ -7,7 +7,7 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 9 |
+| 🔴 open | 10 |
 | 🟡 in-progress | 0 |
 | ✅ resolved | 2 |
 
@@ -113,6 +113,17 @@
 - **描述**: `pipeline.ts:330` 处通过 `as 'copy' | 'symlink' | 'flatten'` 类型断言确保 manifest mode 类型正确。虽然三元表达式逻辑保证了值域正确（Flatten 规则写 `'flatten'`，其余写 `planInfo.mode`），但 `as` 断言绕过了类型系统的静态验证。可考虑将该映射提取为一个辅助函数（如 `resolveManifestMode(ruleType, installMode): ManifestEntry['mode']`），明确输入输出类型，让 TypeScript 通过类型推断而非断言来保证正确性。CR 评估方明确标注为"代码风格偏好，不构成审查发现"，无功能风险。
 - **涉及文件**: `src/pipeline.ts`
 - **建议时机**: 下次触及 `pipeline.ts` saveManifest 逻辑时，或代码质量专项优化时
+- **状态**: open
+- **解决记录**:
+
+### TODO-012: `.agent` / `.agents` / `.gemini` 外部目录污染全仓 lint
+
+- **来源**: 5-5a CR round 2-6 (2026-04-01)
+- **优先级**: P3
+- **类别**: tech-debt
+- **描述**: `.agent`/`.agents`/`.gemini` 目录中的外部 agent/gemini 配置文件被 `prettier --check .` 扫描，导致 `npm run lint` 返回非零。R2 修复时已将 `_analysis_output/` 加入 `.prettierignore`，但上述三个目录未一并处理，问题持续存在至 R6 审查结论。R6 建议"将 `.agent`/`.agents`/`.gemini` 纳入 `.prettierignore`，或清理这些目录后再恢复全仓 lint 全绿"。当前 Story 范围内已接受此状态，但未彻底关闭。
+- **涉及文件**: `.prettierignore`
+- **建议时机**: 下次触及 `.prettierignore` 或全仓 lint 清理专项时
 - **状态**: open
 - **解决记录**:
 

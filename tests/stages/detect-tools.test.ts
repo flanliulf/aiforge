@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { LocalRepo, ParsedArgs } from '../../src/core/types.js'
 import type { Reporter } from '../../src/core/reporter.js'
 import { AiforgeError } from '../../src/core/errors.js'
+import { setLanguage } from '../../src/core/messages.js'
 
 // ── Mocks ──────────────────────────────────────────────────────
 
@@ -384,5 +385,31 @@ describe('detectTools', () => {
     expect(caughtError!.code).toBe('NO_TOOLS')
     // Task 2.7: fix 应包含 npx aiforge --tools copilot claude
     expect(caughtError!.fix.some((f) => f.includes('--tools') && f.includes('copilot'))).toBe(true)
+  })
+
+  // ──────────────────────────────────────────────────────────────
+  // 英文模式：UNKNOWN_TOOL fix 数组语言切换（CR Round-5 Fix #2）
+  // ──────────────────────────────────────────────────────────────
+
+  it('setLanguage("en") 后 UNKNOWN_TOOL fix 包含英文 "Supported tools"', async () => {
+    setLanguage('en')
+    let caughtError: AiforgeError | null = null
+    try {
+      await detectTools(
+        mockRepo,
+        makeArgs({ tools: ['invalidtool'] }),
+        mockReporter,
+        mockPathResolver,
+      )
+    } catch (err) {
+      caughtError = err as AiforgeError
+    }
+    expect(caughtError).not.toBeNull()
+    expect(caughtError!.code).toBe('UNKNOWN_TOOL')
+    // fix[0] 应为英文 "Supported tools: ..."
+    expect(caughtError!.fix[0]).toContain('Supported tools')
+    expect(caughtError!.fix[0]).not.toContain('支持的工具')
+    // 清理
+    setLanguage('zh-CN')
   })
 })

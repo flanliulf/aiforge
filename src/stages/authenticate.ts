@@ -18,6 +18,7 @@ import { AiforgeError, EXIT_ARG_ERROR } from '../core/errors.js'
 import { sanitizeToken } from '../core/sanitize.js'
 import { loadConfig, getHostAuth } from '../services/config.js'
 import { UnixPathResolver } from '../core/path-resolver.js'
+import { msg } from '../core/messages.js'
 
 // ── URL 构建辅助 ───────────────────────────────────────────────
 
@@ -46,16 +47,16 @@ export async function authenticate(
   reporter: Reporter,
   pathResolver?: PathResolver,
 ): Promise<AuthenticatedSource> {
-  reporter.startPhase('验证认证信息...')
+  reporter.startPhase(msg('phases.auth'))
 
   // Layer 0: 互斥校验（--ssh 与 --token 不能同时使用）
   if (args.ssh && args.token) {
     throw new AiforgeError(
-      '--ssh 和 --token 不能同时使用',
+      msg('authenticate.argConflict'),
       'ARG_CONFLICT',
       EXIT_ARG_ERROR,
       'fatal',
-      '两种认证方式互斥，请只选择其中一种',
+      msg('authenticate.argConflictWhy'),
       ['npx aiforge --ssh <repo>', 'npx aiforge --token <token> <repo>'],
     )
   }
@@ -80,7 +81,9 @@ export async function authenticate(
   // Layer 2: 环境变量（AIFORGE_TOKEN 优先于 GITLAB_TOKEN）
   const envToken = process.env['AIFORGE_TOKEN'] || process.env['GITLAB_TOKEN']
   if (envToken) {
-    reporter.updatePhase(`验证认证信息... (环境变量 Token: ${sanitizeToken(envToken)})`)
+    reporter.updatePhase(
+      `${msg('phases.auth').replace('...', '')}... (Token: ${sanitizeToken(envToken)})`,
+    )
     return {
       ...source,
       cloneUrl: buildTokenUrl(source, envToken),

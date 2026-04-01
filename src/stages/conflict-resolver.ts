@@ -14,6 +14,7 @@
  * - services/fs-utils.ts (backupFile)
  * - core/reporter.ts (Reporter)
  * - core/errors.ts (AiforgeError)
+ * - core/messages.ts (msg)
  *
  * 架构: stages/ → services/, core/
  */
@@ -25,6 +26,7 @@ import { select } from '@inquirer/prompts'
 
 import type { Reporter } from '../core/reporter.js'
 import { AiforgeError, EXIT_INSTALL_FAILURE } from '../core/errors.js'
+import { msg } from '../core/messages.js'
 
 // ── ConflictDecision ────────────────────────────────────────────────────────
 
@@ -42,13 +44,19 @@ async function showDiff(sourcePath: string, targetPath: string, reporter: Report
     const destStat = await stat(targetPath)
 
     reporter.warn(
-      `  📄 源文件:   ${basename(sourcePath)} (${srcStat.size} 字节, 修改时间: ${srcStat.mtime.toISOString()})`,
+      msg('conflictResolver.srcFileInfo')
+        .replace('{name}', basename(sourcePath))
+        .replace('{size}', String(srcStat.size))
+        .replace('{mtime}', srcStat.mtime.toISOString()),
     )
     reporter.warn(
-      `  📄 目标文件: ${basename(targetPath)} (${destStat.size} 字节, 修改时间: ${destStat.mtime.toISOString()})`,
+      msg('conflictResolver.destFileInfo')
+        .replace('{name}', basename(targetPath))
+        .replace('{size}', String(destStat.size))
+        .replace('{mtime}', destStat.mtime.toISOString()),
     )
   } catch {
-    reporter.warn('  ⚠️ 无法读取文件信息进行对比')
+    reporter.warn(msg('conflictResolver.diffReadError'))
   }
 }
 
@@ -71,13 +79,13 @@ export async function resolveConflict(
   reporter: Reporter,
 ): Promise<ConflictDecision> {
   const choice = await select({
-    message: `⚠️ 文件冲突: ${targetPath} 已存在（用户手写文件）`,
+    message: msg('conflictResolver.conflictMessage').replace('{target}', targetPath),
     choices: [
-      { name: '备份后覆盖（推荐）', value: 'backup' as const },
-      { name: '直接覆盖', value: 'overwrite' as const },
-      { name: '跳过此文件', value: 'skip' as const },
-      { name: '查看差异', value: 'diff' as const },
-      { name: '中止安装', value: 'abort' as const },
+      { name: msg('conflictResolver.backupChoice'), value: 'backup' as const },
+      { name: msg('conflictResolver.overwriteChoice'), value: 'overwrite' as const },
+      { name: msg('conflictResolver.skipChoice'), value: 'skip' as const },
+      { name: msg('conflictResolver.diffChoice'), value: 'diff' as const },
+      { name: msg('conflictResolver.abortChoice'), value: 'abort' as const },
     ],
   })
 
@@ -121,12 +129,12 @@ export async function handleConflict(
 
   if (!process.stdin.isTTY) {
     throw new AiforgeError(
-      '文件冲突需要交互式终端',
+      msg('conflictResolver.nonTtyConflict'),
       'CONFLICT_NON_TTY',
       EXIT_INSTALL_FAILURE,
       'fatal',
-      `目标文件 ${targetPath} 已存在且为用户手写文件，非 TTY 环境无法交互式确认`,
-      ['在终端中运行此命令', '使用 --force 跳过交互式确认'],
+      msg('conflictResolver.nonTtyConflictWhy').replace('{target}', targetPath),
+      [msg('conflictResolver.fixRunInTerminal'), msg('conflictResolver.fixUseForce')],
     )
   }
 
@@ -134,12 +142,12 @@ export async function handleConflict(
 
   if (decision === 'abort') {
     throw new AiforgeError(
-      '用户中止安装',
+      msg('conflictResolver.userAbort'),
       'USER_ABORT',
       EXIT_INSTALL_FAILURE,
       'fatal',
-      '用户在冲突解决中选择了中止安装',
-      ['重新运行安装命令', '使用 --force 跳过冲突确认'],
+      msg('conflictResolver.userAbortWhy'),
+      [msg('conflictResolver.fixRerun'), msg('conflictResolver.fixForceConflict')],
     )
   }
 

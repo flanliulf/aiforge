@@ -28,6 +28,7 @@ import { AiforgeError } from '../../src/core/errors.js'
 import { InstallType } from '../../src/core/types.js'
 import type { MatchedPlan, ParsedArgs } from '../../src/core/types.js'
 import type { Reporter } from '../../src/core/reporter.js'
+import { setLanguage } from '../../src/core/messages.js'
 import type { PathResolver } from '../../src/core/path-resolver.js'
 
 // ── helpers ─────────────────────────────────────────────────────────────────
@@ -1568,5 +1569,153 @@ describe('Story 5.1 — Phase progress count format', () => {
     // 格式验证：包含阶段名 + 计数
     expect(updateCalls[0][0]).toMatch(/执行安装.*\(1\/2\)/)
     expect(updateCalls[1][0]).toMatch(/执行安装.*\(2\/2\)/)
+  })
+})
+
+// ── 英文场景测试（Story 5-5a CR Round-3 P2 补充）──────────────────────────────
+
+describe('executeInstall — English language mode (zero results diagnostics)', () => {
+  let tmpDir: string
+  let reporter: Reporter
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'aiforge-en-test-'))
+    reporter = {
+      startPhase: vi.fn(),
+      updatePhase: vi.fn(),
+      completePhase: vi.fn(),
+      reportResult: vi.fn(),
+      reportPlan: vi.fn(),
+      reportError: vi.fn(),
+      warn: vi.fn(),
+    }
+    setLanguage('en')
+  })
+
+  afterEach(async () => {
+    setLanguage('zh-CN')
+    await rm(tmpDir, { recursive: true, force: true })
+  })
+
+  it('zero results diagnostics are in English when language=en', async () => {
+    const srcFile = join(tmpDir, 'en-zero-src.md')
+    const targetDir = join(tmpDir, 'en-zero-target')
+    await mkdir(targetDir)
+    const sameContent = 'identical'
+    await writeFile(srcFile, sameContent)
+    await writeFile(join(targetDir, basename(srcFile)), sameContent)
+
+    const plan: MatchedPlan = {
+      items: [
+        {
+          rule: {
+            tool: 'claude',
+            scope: 'global',
+            sourceDir: 'agents',
+            type: InstallType.Files,
+            targetDir: targetDir,
+          },
+          mode: 'copy',
+          sourceFiles: [srcFile],
+          targetPath: targetDir,
+        },
+      ],
+    }
+
+    const pathResolver = { home: () => tmpDir, reposDir: () => join(tmpDir, 'repos') }
+    await executeInstall(plan, { force: false } as ParsedArgs, reporter, pathResolver as never)
+
+    // English mode: zero results warning should be in English
+    expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('No files were installed'))
+    expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('--force'))
+  })
+
+  it('broken link warn is in English when language=en', async () => {
+    const srcFile = join(tmpDir, 'en-broken-src.md')
+    const targetDir = join(tmpDir, 'en-broken-target')
+    await writeFile(srcFile, 'link target')
+
+    const plan: MatchedPlan = {
+      items: [
+        {
+          rule: {
+            tool: 'claude',
+            scope: 'global',
+            sourceDir: 'agents',
+            type: InstallType.Files,
+            targetDir: targetDir,
+          },
+          mode: 'symlink',
+          sourceFiles: [srcFile],
+          targetPath: targetDir,
+        },
+      ],
+    }
+
+    const pathResolver = { home: () => tmpDir, reposDir: () => join(tmpDir, 'repos') }
+    // 安装 symlink（srcFile 存在）
+    await executeInstall(
+      plan,
+      { force: false, link: true } as ParsedArgs,
+      reporter,
+      pathResolver as never,
+    )
+    // 删除源文件使链接断裂
+    await rm(srcFile)
+    ;(reporter.warn as ReturnType<typeof vi.fn>).mockClear()
+
+    // 再次安装（此时源文件不存在，断链检测应触发 English warn）
+    const nonexistent = join(tmpDir, 'nonexistent-en.md')
+    const plan2: MatchedPlan = {
+      items: [
+        {
+          rule: plan.items[0]!.rule,
+          mode: 'symlink',
+          sourceFiles: [nonexistent],
+          targetPath: targetDir,
+        },
+      ],
+    }
+    await executeInstall(
+      plan2,
+      { force: false, link: true } as ParsedArgs,
+      reporter,
+      pathResolver as never,
+    )
+
+    expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('Broken link'))
+  })
+
+  it('flatten missing mainFile warn is in English when language=en', async () => {
+    const skillsDir = join(tmpDir, 'en-flatten-missing')
+    const emptySkill = join(skillsDir, 'en-empty-skill')
+    await mkdir(emptySkill, { recursive: true })
+    // 不创建 index.md
+
+    const targetDir = join(tmpDir, 'en-flatten-missing-target')
+    const pathResolver = { home: () => tmpDir, reposDir: () => join(tmpDir, 'repos') }
+
+    const plan: MatchedPlan = {
+      items: [
+        {
+          rule: {
+            tool: 'cursor',
+            scope: 'global',
+            sourceDir: 'skills',
+            type: InstallType.Flatten,
+            targetDir: targetDir,
+          },
+          sourceFiles: [emptySkill],
+          targetPath: targetDir,
+          mode: 'copy',
+        },
+      ],
+    }
+
+    await executeInstall(plan, { force: false } as ParsedArgs, reporter, pathResolver as never)
+
+    // English mode: flatten missing warn should be in English
+    expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('not found'))
+    expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('index.md'))
   })
 })

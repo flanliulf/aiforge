@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { Reporter } from '../../src/core/reporter.js'
 import type { ParsedArgs, AiforgeConfig } from '../../src/core/types.js'
 import type { PathResolver } from '../../src/core/path-resolver.js'
 import { AiforgeError } from '../../src/core/errors.js'
+import { setLanguage } from '../../src/core/messages.js'
 
 // Mock services/config module and services/git module
 vi.mock('../../src/services/config.js')
@@ -314,5 +315,58 @@ describe('stages/resolve-source', () => {
         severity: 'fatal',
       })
     })
+  })
+})
+
+// ── 英文场景测试（Story 5-5a CR Round-3 P2 补充）──────────────────────────────
+
+describe('resolveSource — English language mode', () => {
+  let reporter: Reporter
+  let pathResolver: PathResolver
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+    reporter = {
+      startPhase: vi.fn(),
+      updatePhase: vi.fn(),
+      completePhase: vi.fn(),
+      reportResult: vi.fn(),
+      reportPlan: vi.fn(),
+      reportError: vi.fn(),
+      warn: vi.fn(),
+    }
+    pathResolver = {
+      home: () => '/home/user',
+      reposDir: () => '/home/user/.aiforge/repos',
+    } as unknown as PathResolver
+    setLanguage('en')
+  })
+
+  afterEach(() => {
+    setLanguage('zh-CN')
+  })
+
+  it('startPhase message is in English when language=en', async () => {
+    const args = { source: 'https://gitlab.com/org/repo.git' } as ParsedArgs
+
+    await resolveSource(args, reporter, pathResolver)
+
+    expect(reporter.startPhase).toHaveBeenCalledWith('Resolving repository...')
+  })
+
+  it('NO_REPO error message is in English when language=en', async () => {
+    const args = { source: '' } as ParsedArgs
+    vi.mocked(loadConfig).mockRejectedValue(
+      new AiforgeError('Config file not found', 'CONFIG_NOT_FOUND', 1, 'fatal', '', []),
+    )
+
+    try {
+      await resolveSource(args, reporter, pathResolver)
+      expect.unreachable('should throw NO_REPO')
+    } catch (err) {
+      const e = err as AiforgeError
+      expect(e.code).toBe('NO_REPO')
+      expect(e.message).toBe('No knowledge repository specified')
+    }
   })
 })

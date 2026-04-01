@@ -11,6 +11,7 @@ import simpleGit, { type SimpleGit } from 'simple-git'
 import type { ResolvedSource } from '../core/types.js'
 import { AiforgeError, EXIT_ARG_ERROR } from '../core/errors.js'
 import { sanitizeUrl } from '../core/sanitize.js'
+import { msg } from '../core/messages.js'
 
 // ── SourceResolver 接口 ──────────────────────────────────────
 
@@ -107,16 +108,14 @@ function parseGitUrl(url: string): ResolvedSource {
   // HTTPS — 校验 scheme 白名单，拒绝 http:// / ftp:// / file:// 等不支持的协议
   const parsed = safeParseUrl(url)
   if (parsed.protocol !== 'https:') {
+    const protocol = parsed.protocol.replace(/:$/, '')
     throw new AiforgeError(
-      '不支持的仓库协议',
+      msg('git.unsupportedProtocol'),
       'UNSUPPORTED_PROTOCOL',
       EXIT_ARG_ERROR,
       'fatal',
-      `不支持的协议: ${parsed.protocol.replace(/:$/, '')}，仅支持 HTTPS 和 SSH`,
-      [
-        'npx aiforge https://gitlab.com/org/repo.git  # HTTPS 格式',
-        'npx aiforge git@gitlab.com:org/repo.git      # SSH 格式',
-      ],
+      msg('git.unsupportedProtocolWhy').replace('{protocol}', protocol),
+      ['npx aiforge https://gitlab.com/org/repo.git', 'npx aiforge git@gitlab.com:org/repo.git'],
     )
   }
   const repoPath = stripGitSuffix(parsed.pathname.replace(/^\//, ''))
@@ -134,15 +133,12 @@ function parseGitUrl(url: string): ResolvedSource {
 function assertRepoPath(repoPath: string, url: string): void {
   if (!repoPath) {
     throw new AiforgeError(
-      '仓库地址缺少仓库路径',
+      msg('git.missingRepoPath'),
       'INVALID_URL',
       EXIT_ARG_ERROR,
       'fatal',
-      `仓库地址缺少仓库路径: ${sanitizeUrl(url)}`,
-      [
-        'npx aiforge https://gitlab.com/org/repo.git  # HTTPS 格式',
-        'npx aiforge git@gitlab.com:org/repo.git      # SSH 格式',
-      ],
+      msg('git.missingRepoPathWhy').replace('{url}', sanitizeUrl(url)),
+      ['npx aiforge https://gitlab.com/org/repo.git', 'npx aiforge git@gitlab.com:org/repo.git'],
     )
   }
 }
@@ -159,15 +155,12 @@ function safeParseUrl(url: string): URL {
     return new URL(url)
   } catch {
     throw new AiforgeError(
-      '仓库地址格式非法',
+      msg('git.invalidUrl'),
       'INVALID_URL',
       EXIT_ARG_ERROR,
       'fatal',
-      `无法解析仓库地址: ${sanitizeUrl(url)}`,
-      [
-        'npx aiforge https://gitlab.com/org/repo.git  # HTTPS 格式',
-        'npx aiforge git@gitlab.com:org/repo.git      # SSH 格式',
-      ],
+      msg('git.invalidUrlWhy').replace('{url}', sanitizeUrl(url)),
+      ['npx aiforge https://gitlab.com/org/repo.git', 'npx aiforge git@gitlab.com:org/repo.git'],
     )
   }
 }

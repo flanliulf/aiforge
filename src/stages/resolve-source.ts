@@ -21,6 +21,7 @@ import type { PathResolver } from '../core/path-resolver.js'
 import { AiforgeError, EXIT_ARG_ERROR } from '../core/errors.js'
 import { loadConfig } from '../services/config.js'
 import { GitSourceResolver } from '../services/git.js'
+import { msg } from '../core/messages.js'
 
 const gitResolver = new GitSourceResolver()
 
@@ -41,7 +42,7 @@ export async function resolveSource(
   reporter: Reporter,
   pathResolver: PathResolver,
 ): Promise<ResolvedSource> {
-  reporter.startPhase('解析仓库地址...')
+  reporter.startPhase(msg('phases.resolve'))
 
   const url = args.source || (await resolveDefaultRepo(pathResolver))
   const result = await gitResolver.resolve(url)
@@ -76,12 +77,12 @@ async function resolveDefaultRepo(pathResolver: PathResolver): Promise<string> {
 
   if (!defaultRepo) {
     throw new AiforgeError(
-      '未指定知识仓库地址',
+      msg('resolveSource.noRepo'),
       'NO_REPO',
       EXIT_ARG_ERROR,
       'fatal',
-      '未通过命令行参数提供仓库 URL，且配置文件中无 defaultRepo',
-      ['npx aiforge <repo-url>  # 直接指定仓库地址', 'npx aiforge init        # 配置默认仓库'],
+      msg('resolveSource.noRepoWhy'),
+      ['npx aiforge <repo-url>', 'npx aiforge init'],
     )
   }
 

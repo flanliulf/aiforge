@@ -4,6 +4,7 @@ import { createReporter } from '../../src/core/reporter.js'
 import type { Reporter } from '../../src/core/reporter.js'
 import type { InstallResult } from '../../src/core/types.js'
 import { InstallType } from '../../src/core/types.js'
+import { setLanguage } from '../../src/core/messages.js'
 
 // ── 测试 Fixture ──────────────────────────────────────────────────────────────
 
@@ -1062,22 +1063,119 @@ describe('Story 5-4 Task 3: 各类 AiforgeError 实例渲染', () => {
     expect(fixLines[1]).toBe('  FIX: npx aiforge --token <your-token>\n')
     expect(fixLines[2]).toBe('  FIX: npx aiforge init\n')
   })
+})
 
-  // Task 3.2: NO_TOOLS 场景渲染 (AC #4)
-  it('TtyReporter: NO_TOOLS 渲染包含 --tools 修复命令 (AC #4 Story 5-4)', async () => {
+// ── Story 5.5a CR Fix — Finding #3: 英文输出断言 ─────────────────────────────
+
+describe('Story 5.5a — 英文模式输出断言（AC #1 CR Fix）', () => {
+  let stdoutSpy: ReturnType<typeof vi.spyOn>
+  let stderrSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    // 切换到英文模式
+    setLanguage('en')
+    stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    // 恢复中文模式（测试隔离）
+    setLanguage('zh-CN')
+    vi.restoreAllMocks()
+  })
+
+  it('QuietReporter: setLanguage("en") 后 reportResult 输出英文统计行', () => {
+    const reporter = createReporter({ quiet: true, isTty: false })
+    reporter.reportResult({
+      items: [
+        { status: 'new', tool: 'claude', sourcePath: 'src/a.ts', targetPath: 'dist/a.ts' },
+        { status: 'updated', tool: 'claude', sourcePath: 'src/b.ts', targetPath: 'dist/b.ts' },
+        { status: 'skipped', tool: 'claude', sourcePath: 'src/c.ts', targetPath: 'dist/c.ts' },
+      ],
+    })
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('Installed:')
+    expect(allOutput).toContain('Updated:')
+    expect(allOutput).toContain('Skipped:')
+    // 不应含中文统计标签
+    expect(allOutput).not.toContain('安装:')
+    expect(allOutput).not.toContain('更新:')
+    expect(allOutput).not.toContain('跳过:')
+  })
+
+  it('TtyReporter: setLanguage("en") 后 reportPlan 输出英文标题', () => {
+    const reporter = createReporter({ quiet: false, isTty: true })
+    reporter.reportPlan({
+      items: [
+        {
+          rule: {
+            tool: 'copilot',
+            scope: 'global',
+            sourceDir: 'agents',
+            type: InstallType.Files,
+            targetDir: '~/.copilot',
+          },
+          mode: 'copy',
+          sourceFiles: ['agents/coding-agent.md'],
+          targetPath: '/home/user/.copilot/agents',
+        },
+      ],
+    })
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    // 标题应含 "dry-run"（英文）
+    expect(allOutput).toContain('dry-run')
+    // scope 标签应为英文 "global"
+    expect(allOutput).toContain('global')
+    // 不应含中文 "全局"
+    expect(allOutput).not.toContain('全局')
+    // 统计行应为英文
+    expect(allOutput).toContain('Plan:')
+    expect(allOutput).not.toContain('计划安装:')
+    // 量词应为英文 "items"，不应含中文 "项"
+    expect(allOutput).toContain('items')
+    expect(allOutput).not.toContain('项')
+  })
+
+  it('PlainReporter: setLanguage("en") 后 reportPlan 统计行为英文', () => {
+    const reporter = createReporter({ quiet: false, isTty: false })
+    reporter.reportPlan({
+      items: [
+        {
+          rule: {
+            tool: 'copilot',
+            scope: 'global',
+            sourceDir: 'agents',
+            type: InstallType.Files,
+            targetDir: '~/.copilot',
+          },
+          mode: 'copy',
+          sourceFiles: ['agents/coding-agent.md'],
+          targetPath: '/home/user/.copilot/agents',
+        },
+      ],
+    })
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('Plan:')
+    expect(allOutput).toContain('tools')
+    expect(allOutput).not.toContain('计划安装:')
+  })
+
+  it('TtyReporter: setLanguage("en") 后 reportError 使用英文 Fix 标签', async () => {
     const { AiforgeError } = await import('../../src/core/errors.js')
     const reporter = createReporter({ quiet: false, isTty: true })
     const err = new AiforgeError(
-      '未检测到任何 AI 编码工具',
+      'No tools detected',
       'NO_TOOLS',
       1,
       'fatal',
-      '在全局目录和项目目录中均未找到支持工具的标志文件',
-      ['npx aiforge --tools copilot claude'],
+      'No marker files found',
+      ['npx aiforge --tools copilot'],
     )
     reporter.reportError(err)
     const allOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
-    expect(allOutput).toContain('未检测到任何 AI 编码工具')
-    expect(allOutput).toContain('npx aiforge --tools copilot claude')
+    // 英文模式下修复方法标签应为 "Fix:"
+    expect(allOutput).toContain('Fix:')
+    // 不应含中文 "修复方法："
+    expect(allOutput).not.toContain('修复方法：')
   })
 })

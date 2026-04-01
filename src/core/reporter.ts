@@ -4,6 +4,7 @@ import { basename, join } from 'node:path'
 import type { InstallResult, MatchedPlan } from './types.js'
 import { InstallType } from './types.js'
 import type { AiforgeError } from './errors.js'
+import { msg } from './messages.js'
 
 export interface Reporter {
   startPhase(name: string): void
@@ -53,24 +54,25 @@ function typeLabel(type: InstallType): string {
 }
 
 /**
- * dry-run 计划统计行
- * 格式: 计划安装: N 项 (M 个工具)
- * 内联于 core/ 以维持零外部依赖（core/ 不得引用 data/）
+ * dry-run 计划统计行（国际化）
  */
 function planStatsLine(totalFiles: number, toolCount: number): string {
-  return `计划安装: ${totalFiles} 项 (${toolCount} 个工具)`
+  return msg('reporter.planStats')
+    .replace('{total}', String(totalFiles))
+    .replace('{tools}', String(toolCount))
 }
 
 /**
- * 安装结果统计行
- * 格式: 安装: N 项  更新: N 项  跳过: N 项
- * 内联于 core/ 以维持零外部依赖（core/ 不得引用 data/）
+ * 安装结果统计行（国际化）
  */
 function resultStatsLine(installed: number, updated: number, skipped: number): string {
-  return `安装: ${installed} 项  更新: ${updated} 项  跳过: ${skipped} 项`
+  return msg('reporter.resultStats')
+    .replace('{installed}', String(installed))
+    .replace('{updated}', String(updated))
+    .replace('{skipped}', String(skipped))
 }
 
-/** 安装结果状态图标映射（内联常量，与 data/messages.ts ICONS 保持一致） */
+/** 安装结果状态图标映射（内联常量，与 core/messages.ts icons 保持一致） */
 const STATUS_ICONS: Record<string, string> = {
   new: '✅',
   updated: '🔄',
@@ -134,7 +136,11 @@ class TtyReporter implements Reporter {
       // 优先使用 toolDisplayName（如 'GitHub Copilot'），fallback 到内部 id
       const displayName = items[0]?.toolDisplayName ?? tool
       // 工具标题：bold 显示名 + 项数（FR-036，Story 5-2 Dev Notes chalk 示例）
-      process.stdout.write(chalk.bold(`\n🔧 ${displayName} (${items.length} 项)\n`))
+      process.stdout.write(
+        chalk.bold(
+          `\n🔧 ${displayName} (${msg('reporter.itemCount').replace('{count}', String(items.length))})\n`,
+        ),
+      )
 
       const lastIdx = items.length - 1
       items.forEach((item, idx) => {
@@ -155,11 +161,14 @@ class TtyReporter implements Reporter {
       })
     }
 
-    // 统计行：按段分段着色（Story 5-2 Dev Notes chalk 示例）
+    // 统计行（国际化）
     const installed = results.items.filter((i) => i.status === 'new').length
     const updated = results.items.filter((i) => i.status === 'updated').length
     const skipped = results.items.filter((i) => i.status === 'skipped').length
-    const statsLine = `${chalk.green(`安装: ${installed} 项`)}  ${chalk.blue(`更新: ${updated} 项`)}  ${chalk.gray(`跳过: ${skipped} 项`)}`
+    const installedStr = msg('reporter.statsInstalled').replace('{n}', String(installed))
+    const updatedStr = msg('reporter.statsUpdated').replace('{n}', String(updated))
+    const skippedStr = msg('reporter.statsSkipped').replace('{n}', String(skipped))
+    const statsLine = `${chalk.green(installedStr)}  ${chalk.blue(updatedStr)}  ${chalk.gray(skippedStr)}`
     process.stdout.write(`\n${statsLine}\n`)
   }
 
@@ -180,8 +189,8 @@ class TtyReporter implements Reporter {
    * 来源: architecture/03-core-decisions.md#D4 — stdout/stderr 分工
    */
   reportPlan(plan: MatchedPlan): void {
-    // 标题行
-    process.stdout.write(chalk.bold('\n📋 安装计划预览 (dry-run)\n'))
+    // 标题行（国际化）
+    process.stdout.write(chalk.bold(`\n${msg('reporter.planTitle')}\n`))
 
     // 按工具分组
     const byTool = new Map<string, typeof plan.items>()
@@ -196,8 +205,11 @@ class TtyReporter implements Reporter {
     }
 
     for (const [tool, items] of byTool) {
-      const scope = items[0]!.rule.scope === 'global' ? '全局' : '项目'
-      process.stdout.write(chalk.yellow(`\n🔧 ${tool} (${scope})\n`))
+      const scopeLabel =
+        items[0]!.rule.scope === 'global'
+          ? msg('reporter.scopeGlobal')
+          : msg('reporter.scopeProject')
+      process.stdout.write(chalk.yellow(`\n🔧 ${tool} (${scopeLabel})\n`))
 
       for (const item of items) {
         const label = `[${typeLabel(item.rule.type)}/${item.mode}]`
@@ -212,14 +224,15 @@ class TtyReporter implements Reporter {
           process.stdout.write(`${prefix}${name}  → ${fileTarget}  ${annotation}\n`)
         })
 
-        // 空 sourceFiles 时仍输出规则行（说明源目录为空）
+        // 空 sourceFiles 时仍输出规则行（说明源目录为空，国际化）
         if (item.sourceFiles.length === 0) {
-          process.stdout.write(chalk.dim(`    (源目录为空: ${item.rule.sourceDir})\n`))
+          const emptyMsg = msg('reporter.emptySourceDir').replace('{dir}', item.rule.sourceDir)
+          process.stdout.write(chalk.dim(`    ${emptyMsg}\n`))
         }
       }
     }
 
-    // 统计行
+    // 统计行（国际化）
     const { totalFiles, toolCount } = calcPlanStats(plan)
     process.stdout.write(chalk.bold(`\n${planStatsLine(totalFiles, toolCount)}\n`))
   }
@@ -229,12 +242,12 @@ class TtyReporter implements Reporter {
       this.spinner.fail()
       this.spinner = null
     }
-    // Story 5-4 AC #2: 三段式彩色格式
-    // ❌ ${message} → chalk.gray(${why}) → chalk.yellow('修复方法：') → chalk.cyan(   ${cmd})
+    // Story 5-4 AC #2: 三段式彩色格式（国际化 fixMethod 标签）
+    // ❌ ${message} → chalk.gray(${why}) → chalk.yellow(fixMethod) → chalk.cyan(   ${cmd})
     const lines = [
       chalk.red(`❌ ${error.message}`),
       chalk.gray(`   ${error.why}`),
-      chalk.yellow('   修复方法：'),
+      chalk.yellow(`   ${msg('reporter.fixMethod')}`),
       ...error.fix.map((cmd) => chalk.cyan(`   ${cmd}`)),
     ].join('\n')
     process.stderr.write(lines + '\n')
@@ -340,7 +353,7 @@ class PlainReporter implements Reporter {
       }
     }
 
-    // 统计行
+    // 统计行（国际化）
     const { totalFiles, toolCount } = calcPlanStats(plan)
     process.stdout.write(`${planStatsLine(totalFiles, toolCount)}\n`)
   }
@@ -376,9 +389,7 @@ class QuietReporter implements Reporter {
   }
 
   /**
-   * QuietReporter.reportPlan — 只输出统计摘要（AC #2）
-   *
-   * 格式: 计划安装: N 项 (M 个工具)
+   * QuietReporter.reportPlan — 只输出统计摘要（AC #2，国际化）
    *
    * 输出到 stdout
    */

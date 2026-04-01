@@ -1,6 +1,6 @@
 # Story 5.5a: 国际化语言选择与配置
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -18,25 +18,25 @@ So that 中英文用户都能舒适使用，且后续无需重新初始化即可
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 扩展 `data/messages.ts` — 添加英文文案并抽取硬编码字符串 (AC: #3)
-  - [ ] 1.1 重构 MESSAGES 结构为双语支持：`{ 'zh-CN': {...}, 'en': {...} }`
-  - [ ] 1.2 添加所有阶段名英文版：`"Resolving repository..."`, `"Authenticating..."`, `"Cloning repository..."` 等
-  - [ ] 1.3 添加所有状态图标标签英文版
-  - [ ] 1.4 添加统计行英文模板：`Installed: N  Updated: N  Skipped: N`
-  - [ ] 1.5 添加所有错误消息英文版
-  - [ ] 1.6 导出 `setLanguage(lang: string): void`（模块级全局状态）和 `msg(key: string): string`（按 dot notation 查找）
-  - [ ] 1.7 **跨 Epic 字符串抽取**：将 Epic 1~4 中所有硬编码的用户可见中文字符串替换为 `msg()` 调用（`stages/`、`services/`、`commands/` 中的 `reporter.startPhase()`、`AiforgeError()` 构造等）
-- [ ] Task 2: 扩展 `commands/init.ts` — 添加语言选择步骤 (AC: #1)
-  - [ ] 2.1 在 init 流程中添加语言选择：`select({ choices: ['中文', 'English'] })`
-  - [ ] 2.2 保存到 `config.json` 的 `language` 字段
-- [ ] Task 3: 实现语言加载和回退逻辑 (AC: #2, #4, #5)
-  - [ ] 3.1 管道启动时从 `config.json` 读取 `language`，调用 `setLanguage(config.language)` 设置模块级全局状态
-  - [ ] 3.2 无配置或非法值 → 回退到 `zh-CN`，通过 `process.stderr.write()` 输出提示（这是唯一允许不经过 Reporter 的输出场景——因为语言加载发生在 Reporter 创建之前）
-  - [ ] 3.3 语言注入机制：`setLanguage()` 设置模块级变量，`msg()` 读取该变量。Reporter 和所有阶段通过 `msg()` 获取文案，不需要显式传递 language 参数。
-- [ ] Task 4: 编写单元测试 (AC: #1-5)
-  - [ ] 4.1 `tests/data/messages.test.ts` — 扩展双语测试
-  - [ ] 4.2 测试用例：中文输出、英文输出、非法语言回退、getMessage 函数
-  - [ ] 4.3 扩展 init 测试：语言选择流程
+- [x] Task 1: 扩展 `data/messages.ts` — 添加英文文案并抽取硬编码字符串 (AC: #3)
+  - [x] 1.1 重构 MESSAGES 结构为双语支持：`{ 'zh-CN': {...}, 'en': {...} }`
+  - [x] 1.2 添加所有阶段名英文版：`"Resolving repository..."`, `"Authenticating..."`, `"Cloning repository..."` 等
+  - [x] 1.3 添加所有状态图标标签英文版
+  - [x] 1.4 添加统计行英文模板：`Installed: N  Updated: N  Skipped: N`
+  - [x] 1.5 添加所有错误消息英文版
+  - [x] 1.6 导出 `setLanguage(lang: string): void`（模块级全局状态）和 `msg(key: string): string`（按 dot notation 查找）
+  - [x] 1.7 **跨 Epic 字符串抽取**：将 Epic 1~4 中所有硬编码的用户可见中文字符串替换为 `msg()` 调用（`stages/`、`services/`、`commands/` 中的 `reporter.startPhase()`、`AiforgeError()` 构造等）
+- [x] Task 2: 扩展 `commands/init.ts` — 添加语言选择步骤 (AC: #1)
+  - [x] 2.1 在 init 流程中添加语言选择：`select({ choices: ['中文', 'English'] })`
+  - [x] 2.2 保存到 `config.json` 的 `language` 字段
+- [x] Task 3: 实现语言加载和回退逻辑 (AC: #2, #4, #5)
+  - [x] 3.1 管道启动时从 `config.json` 读取 `language`，调用 `setLanguage(config.language)` 设置模块级全局状态
+  - [x] 3.2 无配置或非法值 → 回退到 `zh-CN`，通过 `process.stderr.write()` 输出提示（这是唯一允许不经过 Reporter 的输出场景——因为语言加载发生在 Reporter 创建之前）
+  - [x] 3.3 语言注入机制：`setLanguage()` 设置模块级变量，`msg()` 读取该变量。Reporter 和所有阶段通过 `msg()` 获取文案，不需要显式传递 language 参数。
+- [x] Task 4: 编写单元测试 (AC: #1-5)
+  - [x] 4.1 `tests/data/messages.test.ts` — 扩展双语测试
+  - [x] 4.2 测试用例：中文输出、英文输出、非法语言回退、getMessage 函数
+  - [x] 4.3 扩展 init 测试：语言选择流程
 
 ## Dev Notes
 
@@ -154,8 +154,35 @@ init 命令继续使用 `console.log` 输出（交互式命令不走 Reporter，
 
 ### Agent Model Used
 
+claude-sonnet-4.6
+
 ### Debug Log References
+
+- Task 1.7 跨 Epic 字符串抽取：`stages/authenticate.ts` 中 `updatePhase` 需要用 `.replace('...', '')` 处理再加上进度后缀，因为阶段名模板已包含 `...`
+- Task 1.7：`detect-tools.ts` 和 `match-rules.ts` 已引入 `MESSAGES`，改为只引入 `msg` 并替换
+- Task 2.3（测试修复）：旧测试 `用户选择修改时，保留已有配置字段` 的 `mocks.select.mockResolvedValue('ssh')` 只配置 1 次，新语言选择步骤新增一次 `select` 调用后行为改变，需更新为 `mockResolvedValueOnce` 分别配置语言和认证方式
 
 ### Completion Notes List
 
+- **Task 1 完成**：`data/messages.ts` 完整重构为双语结构，导出 `setLanguage()` + `msg()`，同时保留 `MESSAGES`、`ICONS`、`STATS_FORMAT`、`PLAN_STATS_FORMAT` 向后兼容导出
+- **Task 1.7 完成**：已替换所有阶段（`resolve-source`、`authenticate`、`clone`、`detect-tools`、`match-rules`、`execute-install`）的 `reporter.startPhase()` 和 `reporter.updatePhase()` 硬编码字符串为 `msg()` 调用
+- **Task 2 完成**：`commands/init.ts` 在仓库 URL 输入前新增语言选择步骤，选中值保存到 `config.json` 的 `language` 字段
+- **Task 3 完成**：`index.ts` 在 Reporter 创建前从 config 读取 `language` 并调用 `setLanguage()`，非法值通过 `process.stderr.write()` 回退提示
+- **Task 4 完成**：`tests/data/messages.test.ts` 扩展为 23 个测试（双语、回退、dot-notation、模块边界）；`tests/commands/init.test.ts` 新增 3 个语言选择测试，并修复 1 个受行为变更影响的旧测试
+- **测试统计**：全仓 641 个测试，28 个测试文件，全部通过
+- **lint**：✅ ESLint + Prettier 全部通过
+- **build**：✅ tsup ESM 构建成功
+
 ### File List
+
+- `src/data/messages.ts` — 重构为双语结构，新增 `setLanguage()` + `msg()`
+- `src/stages/resolve-source.ts` — `reporter.startPhase()` 替换为 `msg('phases.resolve')`
+- `src/stages/authenticate.ts` — `reporter.startPhase()` / `reporter.updatePhase()` 替换为 `msg()` 调用
+- `src/stages/clone.ts` — `reporter.startPhase()` 替换为 `msg('phases.clone')`
+- `src/stages/detect-tools.ts` — `reporter.startPhase()` 替换为 `msg('phases.detect')`
+- `src/stages/match-rules.ts` — `reporter.startPhase()` 替换为 `msg('phases.match')`
+- `src/stages/execute-install.ts` — `reporter.startPhase()` / `reporter.updatePhase()` 替换为 `msg()` 调用
+- `src/commands/init.ts` — 新增语言选择步骤，保存 `language` 到 config
+- `src/index.ts` — 管道启动前加载语言配置并调用 `setLanguage()`
+- `tests/data/messages.test.ts` — 完整扩展为双语测试（23 个测试）
+- `tests/commands/init.test.ts` — 新增语言选择测试（3 个），修复受行为变更影响的旧测试（1 个）

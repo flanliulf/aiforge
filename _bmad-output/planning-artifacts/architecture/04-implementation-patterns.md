@@ -423,6 +423,65 @@ CR 修复中如果修改了类型定义（interface/type/enum 的字段增删改
 安装: 7 项  更新: 1 项  跳过: 1 项
 ```
 
+**输出字符串集中管理：** 所有用户可见字符串统一通过 `src/core/messages.ts` 的 `msg()` 函数获取（Story 5-5a 将 `data/messages.ts` 迁移至 `core/messages.ts`，`data/messages.ts` 现为向后兼容 re-export 垫片）。
+
+**CLI help 文案不做国际化：** Commander `.description()` / `.option()` 描述统一使用英文硬编码，不通过 `msg()` 动态获取——Commander 在模块加载时求值 description，此时 `currentLanguage` 始终为默认值，动态获取无效。
+
+```typescript
+✅ command.description('Initialize aiforge configuration')  // 英文硬编码
+
+❌ command.description(msg('init.descInit') || 'Initialize aiforge configuration')
+// → msg() 模块加载时求值，currentLanguage = 'zh-CN'，fallback 永远不生效
+```
+
+> 来源：Story 5-5a CR R2 评估 — `.description(msg('init.descInit') || ...)` fallback 因 `msg()` 返回非空中文而永远不生效。
+
+**i18n 字符串覆盖完整性：** 实现多语言输出时，`AiforgeError.fix[]`、`reporter.warn()` 文案、Reporter 量词/标签（如 `(N 项)`）、诊断输出（如 `emitDiagnostics`）与 `message`/`why` 字段具有**同等用户可见性**，必须全部接入 `msg()`。
+
+自查清单（实现完成后逐项确认）：
+
+| # | 检查项 | 说明 |
+|---|--------|------|
+| 1 | `AiforgeError.fix[]` 数组 | 错误修复建议通过 Reporter FIX 行展示给用户 |
+| 2 | `reporter.warn()` 所有调用点 | 运行时警告文案 |
+| 3 | Reporter 量词/标签（如 `(${n} 项)`） | 使用 `msg()` 模板键，支持 `{count} 项` / `{count} items` |
+| 4 | 诊断输出（如 `emitDiagnostics`） | 工具检测失败时的建议文案 |
+| 5 | CLI help 文案 | 英文硬编码，不接入国际化 |
+
+```typescript
+✅ // fix[] 数组全部接入 msg()
+   throw new AiforgeError('克隆失败', 'CLONE_FAILED', ..., msg('clone.cloneFailedWhy'), [
+     msg('clone.fixCheckNetwork'),
+     msg('clone.fixCheckAuth'),
+   ])
+
+❌ // fix[] 数组硬编码中文，message/why 已国际化但 fix 遗漏
+   throw new AiforgeError('克隆失败', 'CLONE_FAILED', ..., msg('clone.cloneFailedWhy'), [
+     '检查网络连接',   // ← 英文模式下仍输出中文
+     '检查认证信息',
+   ])
+```
+
+> 来源：Story 5-5a CR R2~R5 — 每轮修复后仍被发现新的中文残留，均属 fix[]/warn/量词分层遗漏模式；经 5 轮才完全收口。
+
+**子命令独立语言初始化：** 具有独立 `action()` handler 的子命令（如 `aiforge init`）不走主管道的语言预加载路径。子命令 handler 必须在 `loadConfig()` 成功后、首次用户可见输出之前，独立调用 `setLanguage()`。
+
+```typescript
+✅ async function runInit() {
+     let existingConfig
+     try {
+       existingConfig = await loadConfig(...)
+       setLanguage(existingConfig.language ?? 'zh-CN')  // ← 在输出前预加载
+       console.log(msg('init.currentConfig'))            // ← 此时语言已正确
+     } catch { ... }
+   }
+
+❌ // 依赖 index.ts 的全局 setLanguage() — init 子命令路径下不执行
+   // config.language = 'en' 时，init 仍先以中文输出配置摘要
+```
+
+> 来源：Story 5-5a CR R2 — `init` 子命令有独立 `action()`，不经过 `index.ts` 语言预加载路径，导致已有 `config.language = 'en'` 时仍先输出中文。
+
 **进度计数变量的分子/分母必须绑定到同一语义单元：**
 
 实现 `processedCount / totalFiles` 类进度显示时，必须在代码注释中明确"进度单位"语义，并确保所有"已处理的终态"统一推进分子计数。
@@ -799,6 +858,42 @@ describe('authenticate', () => {
 
 > 来源：Story 5-2 CR R1 — Dev Notes 第 58-65 行给出 `chalk.green/blue/gray` 状态着色示例，实现仅对标题着色，结果行和统计行均未落地；配套测试也只验证文本结构而未验证颜色语义，导致缺口延续到 CR 才被发现。
 
+**i18n 测试必须验证"实际输出内容切换"，而非只验证"配置被持久化"：**
+
+测试多语言输出时，断言目标必须是相关模块在 `setLanguage('en')` 后的**实际输出字符串**（Reporter 统计行、`AiforgeError.message`/`fix[]`、`warn` 文案），而非 `saveConfig()` 调用或 `language` 字段值。禁止以"语言配置被正确保存"替代"输出内容真正切换"作为 i18n AC 的满足依据。
+
+```typescript
+✅ // 验证实际输出内容在语言切换后变为英文
+   it('英文模式下 warn 输出英文', async () => {
+     setLanguage('en')
+     await checkBrokenLinks(...)
+     expect(reporter.warn).toHaveBeenCalledWith(
+       expect.stringContaining('Broken link')
+     )
+     expect(reporter.warn).not.toHaveBeenCalledWith(
+       expect.stringContaining('断链')
+     )
+   })
+
+   it('英文模式下 reportPlan 量词为英文', () => {
+     setLanguage('en')
+     reporter.reportPlan(plan)
+     expect(allOutput).toContain('items')
+     expect(allOutput).not.toContain('项')
+   })
+
+❌ // 只验证配置持久化，不验证输出内容
+   it('保存语言选择', async () => {
+     await runInit(...)
+     expect(saveConfig).toHaveBeenCalledWith(
+       expect.objectContaining({ language: 'en' })
+     )
+     // ← 即使 init 整个过程仍输出中文，此测试也通过
+   })
+```
+
+> 来源：Story 5-5a CR R1/R3 — 新增测试只断言 `saveConfig()` 中的 `language` 字段值和 `select` 调用顺序，未验证英文模式下实际输出是否变为英文；阶段级测试也将中文输出固化为正确行为，无法在门禁中捕获运行时中文残留。
+
 ### CR Workflow Patterns
 
 **CR 修复后必须同步更新 Story Dev Agent Record：**
@@ -890,7 +985,7 @@ CR 修复记录中的"验证通过"结论必须附带可独立复现的验证命
 
 1. 文件命名 kebab-case，TypeScript 命名遵循上述约定
 2. 所有错误必须通过 AiforgeError 抛出，包含三段式信息
-3. 所有用户可见输出必须通过 Reporter 接口，不直接 console.log
+3. 所有用户可见输出必须通过 Reporter 接口，不直接 console.log（例外：`aiforge init` 交互式命令使用 `console.log` + `@inquirer/prompts`；Reporter 创建前的语言回退提示使用 `process.stderr.write()`）
 4. JSON 文件字段一律 camelCase
 5. ESM 导入路径必须带 `.js` 扩展名
 6. 命名导出，不用默认导出（工具配置文件如 `tsup.config.ts`、`vitest.config.ts` 豁免）
