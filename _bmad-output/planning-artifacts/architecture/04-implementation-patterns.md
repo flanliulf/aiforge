@@ -245,6 +245,38 @@ export type { ResolvedSource, InstallResult, MatchedPlan } from './types.js';
 
 > 来源：Story 4-1 CR — Round 3 修复 symlink 逃逸仅在 `targetStat === null` 分支添加 realpath 校验，遗漏 `isSymbolicLink()` 和 `isDirectory()` 分支，导致 P0 安全问题延续到 Round 4 才关闭。
 
+**新增错误处理分支必须全功能对标同函数内已有并行分支：**
+
+在 catch 块或同一函数中新增错误处理分支时，**禁止只实现核心字段（message/why/code）而忽略辅助功能字段**。必须找到同函数中已有的同类分支，逐字段对比，确保新分支在行为上与已有分支完全对等（如 cleanupWarning 透传、额外上下文追加等）。
+
+```typescript
+✅ // 新增 AUTH_FAILED 分支时，比对 CLONE_FAILED 分支的完整 fix 构建逻辑
+   if (isAuthFailure) {
+     throw new AiforgeError('无法访问仓库', 'AUTH_FAILED', EXIT_AUTH_FAILURE, 'fatal',
+       `Git 服务器返回 401（认证失败）`,
+       [
+         ...(cleanupWarning   // ← 与 CLONE_FAILED 分支对齐，不能遗漏
+           ? [`⚠️ 清理未完成目录也失败: ${cleanupWarning}，请手动删除: rm -rf ${targetDir}`]
+           : []),
+         'npx aiforge --ssh',
+         'npx aiforge --token <your-token>',
+         'npx aiforge init',
+       ]
+     )
+   }
+
+❌ // 新增 AUTH_FAILED 时只实现核心字段，忽略 cleanupWarning 透传
+   if (isAuthFailure) {
+     throw new AiforgeError('无法访问仓库', 'AUTH_FAILED', EXIT_AUTH_FAILURE, 'fatal',
+       `Git 服务器返回 401（认证失败）`,
+       ['npx aiforge --ssh', 'npx aiforge --token <your-token>', 'npx aiforge init']
+       // ← 缺少 cleanupWarning 透传：认证失败+清理失败时用户收不到手动删除提示
+     )
+   }
+```
+
+> 来源：Story 5-4 CR Round 2 — 新增 `AUTH_FAILED` 分支时未复制 `CLONE_FAILED` 分支的 cleanupWarning 透传逻辑，导致"认证失败 + 清理也失败"时用户看不到手动删除残留目录的提示。
+
 **复用函数接入新类型时必须审查内部所有分支的类型兼容性：**
 
 当一个已有函数（如 `processConflict()`）被新的调用方类型（如从仅 files 扩展到 directories）复用时，必须逐条审查该函数内部所有执行分支对新类型的兼容性。
@@ -327,6 +359,32 @@ CR 修复中如果修改了类型定义（interface/type/enum 的字段增删改
 ```
 
 > 来源：Story 2-4 CR Round 2 — Round 1 修复新增 `SANITIZE_REMOTE_FAILED`/`SCAN_FAILED` 但无测试。
+
+**错误码测试必须覆盖"真实生产创建链路"，禁止在 Reporter 层手工构造错误对象伪造 AC 满足：**
+
+为新错误码编写测试时，必须从该错误码的**真实创建模块**（如 `clone.ts`、`detect-tools.ts`、`fs-utils.ts`）的入口触发，断言最终抛出的 `AiforgeError.code` 和关键字段值。禁止"在 reporter 测试中手工 `new AiforgeError('...', 'NEW_CODE')` 构造错误对象"——这只证明 Reporter 能渲染该类型的错误，不能证明生产代码会在正确时机创建该错误。
+
+```typescript
+✅ // 从真实创建模块入口触发，断言生产链路
+   it('clone 认证失败（401）时抛出 AUTH_FAILED', async () => {
+     mockGit.clone.mockRejectedValue(new Error('Authentication failed for https://...'))
+     await expect(freshClone(source, targetDir)).rejects.toMatchObject({
+       code: 'AUTH_FAILED',
+       message: '无法访问仓库',
+       severity: 'fatal',
+     })
+   })
+
+❌ // 在 reporter 测试中手工构造错误对象 — 只验证渲染，不验证生产链路
+   it('AUTH_FAILED 错误渲染正确', async () => {
+     const error = new AiforgeError('无法访问仓库', 'AUTH_FAILED', ...)  // ← 手工构造
+     reporter.reportError(error)
+     expect(output).toContain('无法访问仓库')
+     // ← 即使 clone.ts 从未创建 AUTH_FAILED，此测试也会通过
+   })
+```
+
+> 来源：Story 5-4 CR Round 1 — `AUTH_FAILED` 只存在于 reporter 手工构造的单测中，生产代码 `clone.ts` 根本不存在创建该错误的链路，全仓测试全绿但真实认证失败仍输出 `CLONE_FAILED`。
 
 **错误创建模式：**
 
@@ -507,6 +565,30 @@ CR 修复中如果修改了类型定义（interface/type/enum 的字段增删改
 ❌ // why 字段直接拼接原始 URL
    `仓库地址缺少仓库路径: ${url}`
 ```
+
+**三种脱敏函数适用场景不可混用：**
+
+| 函数 | 适用场景 | 实现特点 |
+|------|---------|---------|
+| `sanitizeToken()` | 独立 token 字符串 | 按长度截断+掩码 |
+| `sanitizeUrl()` | 纯 URL 字符串 | 带 `^` 锚点正则，仅匹配纯 URL 格式 |
+| `sanitizeMessage()` | 任意字符串（如 git 错误消息） | 全局替换正则，无锚点，处理嵌入在任意位置的 token-bearing URL |
+
+将底层异常的 `error.message` 写入 `AiforgeError.why` 时，**必须使用 `sanitizeMessage()` 而非 `sanitizeUrl()`**——git 错误消息中 URL 嵌入在任意位置，`sanitizeUrl()` 的锚点正则无法匹配。
+
+```typescript
+✅ // 处理底层 git 异常消息（URL 可能嵌在任意位置）
+   const rawMessage = error instanceof Error ? error.message : '未知网络错误'
+   const safeMessage = sanitizeMessage(rawMessage)  // ← 全局替换，无锚点
+   throw new AiforgeError('克隆仓库失败', 'CLONE_FAILED', ..., safeMessage, [...])
+
+❌ // sanitizeUrl 带 ^ 锚点，无法处理嵌入在错误消息中的 URL
+   const safeMessage = sanitizeUrl(rawMessage)
+   // → "fatal: repository 'https://oauth2:glpat-xxx@host/repo.git' not found"
+   //   → 脱敏失败，token 仍暴露
+```
+
+> 来源：Story 5-4 CR Round 1 — `CLONE_FAILED`/`PULL_FAILED` 的 `why` 直接透传 `error.message`，simple-git 错误回显完整 clone URL（含 token），导致 token 通过 reporter 输出到 stderr；修复时新增 `sanitizeMessage()` 函数专门处理此场景。
 
 **symlink 感知的文件系统 API 选用规则：**
 

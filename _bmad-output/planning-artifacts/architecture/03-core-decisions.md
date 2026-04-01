@@ -154,6 +154,18 @@ interface Reporter {
 
 当方法要求"制表符分隔输出"时，该方法内的**所有** `stdout.write()` 调用（含明细行、统计行、汇总行）均须使用 `\t` 分隔，不能只修改主数据行而遗漏统计行或汇总行。实现完成后必须横向比对方法内全部输出行，逐行确认分隔符一致性；同一 Reporter 类中多个输出方法（`reportResult()` / `reportPlan()`）的分隔规则也必须相互对齐。（来源：Story 5-3 CR R1 — `reportPlan()` 主数据行用双空格而非 `\t`；CR R2 — `reportResult()` 明细行已用 `\t` 但统计行仍用双空格，同一方法内两套分隔规则）
 
+**错误码测试必须覆盖"真实生产创建链路"，禁止在 Reporter 层手工构造错误对象伪造 AC 满足：**
+
+为新错误码（如 `AUTH_FAILED`、`NO_TOOLS`、`PERMISSION_DENIED`）编写测试时，必须从该错误码的**真实创建模块**（如 `clone.ts`、`detect-tools.ts`、`fs-utils.ts`）的入口触发，断言最终抛出的 `AiforgeError.code` 和关键字段值。禁止"在 reporter 测试中手工 `new AiforgeError('...', 'NEW_CODE')` 构造错误对象"——这只证明 Reporter 能渲染该类型的错误，不能证明生产代码会在正确时机创建该错误，导致测试全绿但 AC 实质未满足。（来源：Story 5-4 CR Round 1 — `AUTH_FAILED` 只存在于 reporter 手工构造的单测中，生产代码根本不存在创建该错误的链路）
+
+**新增错误处理分支必须全功能对标同函数内已有并行分支：**
+
+在 catch 块或同一函数中新增错误处理分支时，**禁止只实现核心字段（message/why/code）而忽略辅助功能字段**。必须找到同函数中已有的同类分支，逐字段对比，确保新分支行为与已有分支完全对等（如 cleanupWarning 透传、额外上下文追加等）。（来源：Story 5-4 CR Round 2 — 新增 `AUTH_FAILED` 分支时未复制 `CLONE_FAILED` 分支的 cleanupWarning 透传逻辑）
+
+**三种脱敏函数适用场景不可混用：**
+
+`sanitizeToken()` 适用于独立 token 字符串；`sanitizeUrl()` 适用于纯 URL 字符串（带 `^` 锚点正则）；`sanitizeMessage()` 适用于任意字符串（如 git 错误消息）中嵌入 token-bearing URL 的场景（全局替换正则，无锚点）。将底层异常的 `error.message` 写入 `AiforgeError.why` 时，**必须使用 `sanitizeMessage()` 而非 `sanitizeUrl()`**。（来源：Story 5-4 CR Round 1 — `CLONE_FAILED`/`PULL_FAILED` 的 `why` 直接透传 `error.message` 导致 token 泄露；修复时新增 `sanitizeMessage()` 处理此场景）
+
 #### D5: Tool Detection & Platform Abstraction
 
 **工具检测 — 数据驱动注册表：**

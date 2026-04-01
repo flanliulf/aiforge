@@ -368,4 +368,21 @@ describe('detectTools', () => {
       detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver),
     ).rejects.toSatisfy((e: unknown) => e instanceof AiforgeError && e.code === 'NO_TOOLS')
   })
+
+  // Story 5-4 Task 2.7: NO_TOOLS fix 包含 --tools 具体命令
+  it('NO_TOOLS fix 包含 npx aiforge --tools 具体命令 (Story 5-4 Task 2.7)', async () => {
+    vi.mocked(access).mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
+
+    let caughtError: AiforgeError | null = null
+    try {
+      await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+    } catch (err) {
+      caughtError = err as AiforgeError
+    }
+
+    expect(caughtError).not.toBeNull()
+    expect(caughtError!.code).toBe('NO_TOOLS')
+    // Task 2.7: fix 应包含 npx aiforge --tools copilot claude
+    expect(caughtError!.fix.some((f) => f.includes('--tools') && f.includes('copilot'))).toBe(true)
+  })
 })

@@ -57,8 +57,9 @@ current_activity:
     - 5-1-phase-progress-and-spinner: "done"  # 阶段式进度与 spinner 动画 — CR Approved（2026-03-31）
     - 5-2-tree-result-summary-and-stats: "done"  # 树形结果汇总与统计 — CR Approved（2026-03-31）
     - 5-3-tty-adaptive-and-quiet-mode: "done"  # TTY 自适应与 quiet 模式 — CR Approved（2026-04-01）
-  notes: "Story 5-3 完成 CR（3轮），状态更新为 done。修复 PlainReporter.reportResult() 统计行 \\t 分隔问题，全仓 72 测试通过（reporter.test.ts）。"
+    - 5-4-three-part-error-messages: "done"  # 三段式错误提示完善 — CR Approved（2026-04-01）
+  notes: "Story 5-4 完成 CR（2轮 review + 1轮修复），状态更新为 done。修复 PERMISSION_DENIED 目标文件不可写分支 fix 文案对齐、AUTH_FAILED cleanupWarning 透传、prettier 格式问题，629 测试全绿。"
   next_steps:
-    - "启动 Story 5-4：three-part-error-messages"
+    - "启动 Story 5-5a：i18n-language-selection"
     - "按 Epic 5 顺序继续推进"
     - "TODO-001 在 Story 5.5a 触及 init.ts 时修复"

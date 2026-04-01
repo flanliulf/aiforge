@@ -426,10 +426,7 @@ async function checkTargetWritability(
         EXIT_INSTALL_FAILURE,
         'fatal',
         `无法在 ${ancestorDir} 中创建文件，权限不足`,
-        [
-          `检查目录权限: ls -la ${dirname(ancestorDir)}`,
-          `尝试以 sudo 运行，或联系系统管理员修复权限`,
-        ],
+        [`chmod 755 ${ancestorDir}`, 'sudo npx aiforge -g'],
       )
     }
     // 标记需要创建
@@ -479,7 +476,7 @@ async function checkTargetWritability(
         EXIT_INSTALL_FAILURE,
         'fatal',
         `无法写入文件 ${targetPath}，权限不足`,
-        [`检查文件权限: ls -la ${targetPath}`, `尝试以 sudo 运行，或联系系统管理员修复权限`],
+        [`chmod 755 ${targetPath}`, 'sudo npx aiforge -g'],
       )
     }
   }

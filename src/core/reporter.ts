@@ -229,11 +229,15 @@ class TtyReporter implements Reporter {
       this.spinner.fail()
       this.spinner = null
     }
-    process.stderr.write(chalk.red(`✗ ${error.message}\n`))
-    process.stderr.write(chalk.yellow(`  原因: ${error.why}\n`))
-    for (const fix of error.fix) {
-      process.stderr.write(chalk.gray(`  修复: ${fix}\n`))
-    }
+    // Story 5-4 AC #2: 三段式彩色格式
+    // ❌ ${message} → chalk.gray(${why}) → chalk.yellow('修复方法：') → chalk.cyan(   ${cmd})
+    const lines = [
+      chalk.red(`❌ ${error.message}`),
+      chalk.gray(`   ${error.why}`),
+      chalk.yellow('   修复方法：'),
+      ...error.fix.map((cmd) => chalk.cyan(`   ${cmd}`)),
+    ].join('\n')
+    process.stderr.write(lines + '\n')
   }
 
   warn(message: string): void {
@@ -342,10 +346,12 @@ class PlainReporter implements Reporter {
   }
 
   reportError(error: AiforgeError): void {
-    process.stderr.write(`✗ ${error.message}\n`)
-    process.stderr.write(`  原因: ${error.why}\n`)
+    // Story 5-4 AC #2: PlainReporter 三段式纯文本格式（CI 兼容，无 emoji，无颜色）
+    // ERROR: ${message} → WHY: ${why} → FIX: ${fix} per line
+    process.stderr.write(`ERROR: ${error.message}\n`)
+    process.stderr.write(`  WHY: ${error.why}\n`)
     for (const fix of error.fix) {
-      process.stderr.write(`  修复: ${fix}\n`)
+      process.stderr.write(`  FIX: ${fix}\n`)
     }
   }
 
@@ -382,7 +388,13 @@ class QuietReporter implements Reporter {
   }
 
   reportError(error: AiforgeError): void {
-    process.stderr.write(`✗ ${error.message}\n`)
+    // Story 5-4 AC #2: QuietReporter 三段式格式同 PlainReporter（错误不能被静默）
+    // ERROR: ${message} → WHY: ${why} → FIX: ${fix} per line
+    process.stderr.write(`ERROR: ${error.message}\n`)
+    process.stderr.write(`  WHY: ${error.why}\n`)
+    for (const fix of error.fix) {
+      process.stderr.write(`  FIX: ${fix}\n`)
+    }
   }
 }
 

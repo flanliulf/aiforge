@@ -431,6 +431,28 @@ describe('services/fs-utils', () => {
       }
     })
 
+    // Story 5-4 Finding #3 修复：PERMISSION_DENIED fix 文案对齐 Story Task 2.4
+    it('PERMISSION_DENIED fix 包含 chmod 755 和 sudo npx aiforge -g (Story 5-4 Task 2.4)', async () => {
+      const readonlyParent = join(tmpDir, 'readonly-parent3')
+      await mkdir(readonlyParent)
+      await chmod(readonlyParent, 0o444)
+      const target = join(readonlyParent, 'newfile.txt')
+      const plan = makeMatchedPlan([target])
+      try {
+        await preflight(plan, pathResolver)
+        expect.unreachable('应抛出 PERMISSION_DENIED')
+      } catch (err) {
+        const { AiforgeError } = await import('../../src/core/errors.js')
+        expect(err).toBeInstanceOf(AiforgeError)
+        const e = err as InstanceType<typeof AiforgeError>
+        expect(e.code).toBe('PERMISSION_DENIED')
+        expect(e.fix.some((f: string) => f.includes('chmod 755'))).toBe(true)
+        expect(e.fix.some((f: string) => f.includes('sudo npx aiforge'))).toBe(true)
+      } finally {
+        await chmod(readonlyParent, 0o755)
+      }
+    })
+
     it('returns empty dirsToCreate when all dirs already exist', async () => {
       const existingDir = join(tmpDir, 'existing-dir')
       await mkdir(existingDir)

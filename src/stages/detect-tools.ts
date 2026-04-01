@@ -178,7 +178,7 @@ export async function detectTools(
       '在全局目录和项目目录中均未找到支持工具的标志文件',
       [
         '安装 GitHub Copilot、Claude Code、Cursor 或 VS Code',
-        `使用 --tools <id> 手动指定工具，支持: ${TOOL_DEFINITIONS.map((t) => t.id).join(', ')}`,
+        `npx aiforge --tools ${TOOL_DEFINITIONS.map((t) => t.id).join(' ')}`,
       ],
     )
   }

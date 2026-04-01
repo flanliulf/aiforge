@@ -381,6 +381,45 @@ describe('PlainReporter', () => {
     expect(stderrSpy).toHaveBeenCalled()
   })
 
+  // Story 5-4 Task 1.2, AC #2: PlainReporter 三段式格式 ERROR/WHY/FIX
+  it('reportError 输出三段式格式 ERROR/WHY/FIX 到 stderr (AC #2 Story 5-4)', async () => {
+    const { AiforgeError } = await import('../../src/core/errors.js')
+    const err = new AiforgeError(
+      '无法访问仓库',
+      'AUTH_FAILED',
+      2,
+      'fatal',
+      'Git 服务器返回 401（认证失败）',
+      ['npx aiforge --ssh', 'npx aiforge --token <your-token>', 'npx aiforge init'],
+    )
+    reporter.reportError(err)
+    const allOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+    // 三段式语义：ERROR: message / WHY: why / FIX: fix
+    expect(allOutput).toContain('ERROR: 无法访问仓库')
+    expect(allOutput).toContain('WHY: Git 服务器返回 401（认证失败）')
+    expect(allOutput).toContain('FIX: npx aiforge --ssh')
+    expect(allOutput).toContain('FIX: npx aiforge --token <your-token>')
+    expect(allOutput).toContain('FIX: npx aiforge init')
+  })
+
+  // Story 5-4 Task 1.4, AC #3: 所有错误输出到 stderr
+  it('reportError 全部输出到 stderr，不输出到 stdout (AC #3 Story 5-4)', async () => {
+    const { AiforgeError } = await import('../../src/core/errors.js')
+    const err = new AiforgeError('失败', 'ERR_X', 1, 'fatal', '原因', ['修复'])
+    reporter.reportError(err)
+    expect(stderrSpy).toHaveBeenCalled()
+    expect(stdoutSpy).not.toHaveBeenCalled()
+  })
+
+  // Story 5-4 Task 1.2, AC #2: PlainReporter 无 emoji，CI 兼容
+  it('reportError 无 emoji，CI 兼容（无 ❌ 符号）(AC #2 Story 5-4)', async () => {
+    const { AiforgeError } = await import('../../src/core/errors.js')
+    const err = new AiforgeError('失败', 'ERR_X', 1, 'fatal', '原因', ['修复'])
+    reporter.reportError(err)
+    const allOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).not.toContain('❌')
+  })
+
   it('output contains no ANSI escape codes', () => {
     reporter.startPhase('测试阶段')
     const output = stderrSpy.mock.calls[0][0] as string
@@ -555,6 +594,53 @@ describe('TtyReporter', () => {
     expect(stderrSpy).toHaveBeenCalled()
     const allOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
     expect(allOutput).toContain('test')
+  })
+
+  // Story 5-4 Task 1.1, AC #2: TtyReporter 三段式彩色格式
+  it('reportError 输出 ❌ + message（彩色三段式）到 stderr (AC #2 Story 5-4)', async () => {
+    const { AiforgeError } = await import('../../src/core/errors.js')
+    const err = new AiforgeError(
+      '无法访问仓库',
+      'AUTH_FAILED',
+      2,
+      'fatal',
+      'Git 服务器返回 401（认证失败）',
+      ['npx aiforge --ssh', 'npx aiforge --token <your-token>'],
+    )
+    reporter.reportError(err)
+    const allOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('❌')
+    expect(allOutput).toContain('无法访问仓库')
+    expect(allOutput).toContain('Git 服务器返回 401（认证失败）')
+    expect(allOutput).toContain('修复方法')
+    expect(allOutput).toContain('npx aiforge --ssh')
+    expect(allOutput).toContain('npx aiforge --token <your-token>')
+  })
+
+  // Story 5-4 Task 1.1, AC #2: TtyReporter 三段式彩色语义验证
+  it('reportError 使用 chalk.red 着色 message（包含 ANSI red 码）(AC #2 Story 5-4)', async () => {
+    const origLevel = chalk.level
+    chalk.level = 1
+    const { AiforgeError } = await import('../../src/core/errors.js')
+    try {
+      const err = new AiforgeError('失败', 'ERR_X', 1, 'fatal', '原因', ['修复'])
+      reporter.reportError(err)
+      const allOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+      // chalk.red 产生 \x1b[31m
+      // eslint-disable-next-line no-control-regex
+      expect(allOutput).toMatch(/\x1b\[31m/)
+    } finally {
+      chalk.level = origLevel
+    }
+  })
+
+  // Story 5-4 Task 1.4, AC #3: TtyReporter 错误全部输出到 stderr
+  it('reportError 全部输出到 stderr，不输出到 stdout (AC #3 Story 5-4)', async () => {
+    const { AiforgeError } = await import('../../src/core/errors.js')
+    const err = new AiforgeError('失败', 'ERR_X', 1, 'fatal', '原因', ['修复'])
+    reporter.reportError(err)
+    expect(stderrSpy).toHaveBeenCalled()
+    expect(stdoutSpy).not.toHaveBeenCalled()
   })
 
   it('warn writes to stderr', () => {
@@ -845,5 +931,153 @@ describe('QuietReporter', () => {
     expect(allOutput).toContain('计划安装:')
     // 不应包含文件级详情
     expect(allOutput).not.toContain('agents/coding-agent.md')
+  })
+
+  // Story 5-4 Task 1.3, AC #2: QuietReporter 三段式格式（同 PlainReporter）
+  it('reportError 输出三段式格式 ERROR/WHY/FIX 到 stderr（不能静默）(AC #2 Story 5-4)', async () => {
+    const { AiforgeError } = await import('../../src/core/errors.js')
+    const err = new AiforgeError(
+      '无法访问仓库',
+      'AUTH_FAILED',
+      2,
+      'fatal',
+      'Git 服务器返回 401（认证失败）',
+      ['npx aiforge --ssh', 'npx aiforge --token <your-token>'],
+    )
+    reporter.reportError(err)
+    const allOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('ERROR: 无法访问仓库')
+    expect(allOutput).toContain('WHY: Git 服务器返回 401（认证失败）')
+    expect(allOutput).toContain('FIX: npx aiforge --ssh')
+    expect(allOutput).toContain('FIX: npx aiforge --token <your-token>')
+  })
+
+  // Story 5-4 Task 1.4, AC #3: QuietReporter 错误输出到 stderr
+  it('reportError 全部输出到 stderr，不输出到 stdout (AC #3 Story 5-4)', async () => {
+    const { AiforgeError } = await import('../../src/core/errors.js')
+    const err = new AiforgeError('失败', 'ERR_X', 1, 'fatal', '原因', ['修复'])
+    reporter.reportError(err)
+    expect(stderrSpy).toHaveBeenCalled()
+    expect(stdoutSpy).not.toHaveBeenCalled()
+  })
+})
+
+// ── Story 5-4 Task 3.3: 各类 AiforgeError 实例渲染验证 ───────────────────────
+
+describe('Story 5-4 Task 3: 各类 AiforgeError 实例渲染', () => {
+  let stderrSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    // mock stdout to suppress output (not asserted in this suite)
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // Task 3.2: 三段式格式验证 — TtyReporter (AC #1)
+  it('TtyReporter: 认证失败 AUTH_FAILED 渲染三段式彩色格式 (AC #1 Story 5-4)', async () => {
+    const { AiforgeError } = await import('../../src/core/errors.js')
+    const reporter = createReporter({ quiet: false, isTty: true })
+    const err = new AiforgeError(
+      '无法访问仓库',
+      'AUTH_FAILED',
+      2,
+      'fatal',
+      'Git 服务器返回 401（认证失败）',
+      ['npx aiforge --ssh', 'npx aiforge --token <your-token>', 'npx aiforge init'],
+    )
+    reporter.reportError(err)
+    const allOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+    // 三段式：❌ message → why → 修复方法 → fix commands
+    expect(allOutput).toContain('❌')
+    expect(allOutput).toContain('无法访问仓库')
+    expect(allOutput).toContain('Git 服务器返回 401（认证失败）')
+    expect(allOutput).toContain('修复方法')
+    expect(allOutput).toContain('npx aiforge --ssh')
+    expect(allOutput).toContain('npx aiforge --token <your-token>')
+    expect(allOutput).toContain('npx aiforge init')
+  })
+
+  // Task 3.3: PERMISSION_DENIED 错误渲染 (AC #4)
+  it('PlainReporter: PERMISSION_DENIED 渲染三段式纯文本 (AC #4 Story 5-4)', async () => {
+    const { AiforgeError } = await import('../../src/core/errors.js')
+    const reporter = createReporter({ quiet: false, isTty: false })
+    const err = new AiforgeError(
+      '目标路径无写入权限',
+      'PERMISSION_DENIED',
+      1,
+      'fatal',
+      '目标路径父目录不可写',
+      ['chmod 755 <target-dir>', 'sudo npx aiforge -g'],
+    )
+    reporter.reportError(err)
+    const allOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('ERROR: 目标路径无写入权限')
+    expect(allOutput).toContain('WHY: 目标路径父目录不可写')
+    expect(allOutput).toContain('FIX: chmod 755 <target-dir>')
+    expect(allOutput).toContain('FIX: sudo npx aiforge -g')
+  })
+
+  // Task 3.3: CONFIG_CORRUPT 错误渲染 (AC #4)
+  it('PlainReporter: CONFIG_CORRUPT 渲染含 init 修复命令 (AC #4 Story 5-4)', async () => {
+    const { AiforgeError } = await import('../../src/core/errors.js')
+    const reporter = createReporter({ quiet: false, isTty: false })
+    const err = new AiforgeError(
+      '配置文件损坏',
+      'CONFIG_CORRUPT',
+      3,
+      'fatal',
+      'config.json 不是有效的 JSON 格式',
+      ['npx aiforge init  # 重新配置'],
+    )
+    reporter.reportError(err)
+    const allOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('ERROR: 配置文件损坏')
+    expect(allOutput).toContain('WHY: config.json 不是有效的 JSON 格式')
+    expect(allOutput).toContain('FIX: npx aiforge init  # 重新配置')
+  })
+
+  // Task 3.2: 修复命令可复制性 — 每条 fix 单独一行，无额外格式干扰 (AC #1)
+  it('fix 命令每条单独一行，可直接复制执行 (AC #1 Story 5-4)', async () => {
+    const { AiforgeError } = await import('../../src/core/errors.js')
+    const reporter = createReporter({ quiet: false, isTty: false })
+    const err = new AiforgeError(
+      '无法访问仓库',
+      'AUTH_FAILED',
+      2,
+      'fatal',
+      'Git 服务器返回 401（认证失败）',
+      ['npx aiforge --ssh', 'npx aiforge --token <your-token>', 'npx aiforge init'],
+    )
+    reporter.reportError(err)
+    const allCalls = stderrSpy.mock.calls.map((c) => c[0] as string)
+    // 每次 write 调用是独立的 fix 行，包含 'FIX:' 前缀
+    const fixLines = allCalls.filter((line) => line.startsWith('  FIX:'))
+    expect(fixLines).toHaveLength(3)
+    // 可直接复制的命令（去掉前缀和换行后的命令）
+    expect(fixLines[0]).toBe('  FIX: npx aiforge --ssh\n')
+    expect(fixLines[1]).toBe('  FIX: npx aiforge --token <your-token>\n')
+    expect(fixLines[2]).toBe('  FIX: npx aiforge init\n')
+  })
+
+  // Task 3.2: NO_TOOLS 场景渲染 (AC #4)
+  it('TtyReporter: NO_TOOLS 渲染包含 --tools 修复命令 (AC #4 Story 5-4)', async () => {
+    const { AiforgeError } = await import('../../src/core/errors.js')
+    const reporter = createReporter({ quiet: false, isTty: true })
+    const err = new AiforgeError(
+      '未检测到任何 AI 编码工具',
+      'NO_TOOLS',
+      1,
+      'fatal',
+      '在全局目录和项目目录中均未找到支持工具的标志文件',
+      ['npx aiforge --tools copilot claude'],
+    )
+    reporter.reportError(err)
+    const allOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('未检测到任何 AI 编码工具')
+    expect(allOutput).toContain('npx aiforge --tools copilot claude')
   })
 })

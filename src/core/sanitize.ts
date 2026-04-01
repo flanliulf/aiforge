@@ -26,3 +26,24 @@ export function sanitizeUrl(url: string): string {
     return scheme + sanitizeToken(userinfo) + rest
   })
 }
+
+/**
+ * Sanitize error messages that may contain embedded token-bearing URLs.
+ * Unlike sanitizeUrl (which handles pure URL strings), this function
+ * performs global replacement on arbitrary strings that may contain URLs
+ * embedded within larger text (e.g., git error messages).
+ *
+ * Use this when sanitizing error.message from git operations.
+ */
+export function sanitizeMessage(message: string): string {
+  // Global replacement: match any embedded https://userinfo@host/... URLs
+  return message.replace(/(https?:\/\/)([^@\s]+)(@[^\s]*)/g, (_match, scheme, userinfo, rest) => {
+    const colonIdx = userinfo.indexOf(':')
+    if (colonIdx !== -1) {
+      const prefix = userinfo.slice(0, colonIdx + 1)
+      const credential = userinfo.slice(colonIdx + 1)
+      return scheme + prefix + sanitizeToken(credential) + rest
+    }
+    return scheme + sanitizeToken(userinfo) + rest
+  })
+}

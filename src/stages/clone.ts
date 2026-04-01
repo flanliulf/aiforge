@@ -17,10 +17,11 @@ import { access, rm, readdir } from 'node:fs/promises'
 import type { AuthenticatedSource, ParsedArgs, LocalRepo } from '../core/types.js'
 import type { Reporter } from '../core/reporter.js'
 import type { PathResolver } from '../core/path-resolver.js'
-import { AiforgeError, EXIT_INSTALL_FAILURE } from '../core/errors.js'
+import { AiforgeError, EXIT_INSTALL_FAILURE, EXIT_AUTH_FAILURE } from '../core/errors.js'
 import { createGit } from '../services/git.js'
 import { DEFAULT_EXCLUDES } from '../data/excludes.js'
 import { UnixPathResolver } from '../core/path-resolver.js'
+import { sanitizeMessage } from '../core/sanitize.js'
 
 // ── 路径计算 ────────────────────────────────────────────────────
 
@@ -242,18 +243,47 @@ async function freshClone(source: AuthenticatedSource, targetDir: string): Promi
         cleanupWarning = rmError instanceof Error ? rmError.message : '未知错误'
       }
     }
+    const rawMessage = error instanceof Error ? error.message : '未知网络错误'
+    const safeMessage = sanitizeMessage(rawMessage)
+
+    // 识别认证失败：HTTP 401 / Authentication failed / could not read Username 等关键词
+    const isAuthFailure =
+      /Authentication failed|could not read Username|401|Invalid credentials|unauthorized/i.test(
+        rawMessage,
+      )
+
+    if (isAuthFailure) {
+      throw new AiforgeError(
+        '无法访问仓库',
+        'AUTH_FAILED',
+        EXIT_AUTH_FAILURE,
+        'fatal',
+        `Git 服务器返回 401（认证失败）`,
+        [
+          ...(cleanupWarning
+            ? [`⚠️ 清理未完成目录也失败: ${cleanupWarning}，请手动删除: rm -rf ${targetDir}`]
+            : []),
+          'npx aiforge --ssh',
+          'npx aiforge --token <your-token>',
+          'npx aiforge init',
+        ],
+      )
+    }
+
     throw new AiforgeError(
       '克隆仓库失败',
       'CLONE_FAILED',
       EXIT_INSTALL_FAILURE,
       'fatal',
-      error instanceof Error ? error.message : '未知网络错误',
+      safeMessage,
       [
         ...(cleanupWarning
           ? [`⚠️ 清理未完成目录也失败: ${cleanupWarning}，请手动删除: rm -rf ${targetDir}`]
           : []),
-        'npx aiforge --ssh  # 尝试 SSH 认证',
-        'git clone <url>   # 手动测试 Git 连接',
+        'npx aiforge --ssh                  # 尝试 SSH 认证',
+        'npx aiforge --token <your-token>   # 使用 Token 认证',
+        'npx aiforge init                   # 重新配置认证',
+        'git clone <url>                    # 手动测试 Git 连接',
         '检查网络连接和防火墙设置',
       ],
     )
@@ -270,12 +300,32 @@ async function incrementalUpdate(source: AuthenticatedSource, targetDir: string)
   try {
     await repoGit.pull()
   } catch (error) {
+    const rawMessage = error instanceof Error ? error.message : '未知错误'
+    const safeMessage = sanitizeMessage(rawMessage)
+
+    // 识别认证失败
+    const isAuthFailure =
+      /Authentication failed|could not read Username|401|Invalid credentials|unauthorized/i.test(
+        rawMessage,
+      )
+
+    if (isAuthFailure) {
+      throw new AiforgeError(
+        '无法访问仓库',
+        'AUTH_FAILED',
+        EXIT_AUTH_FAILURE,
+        'fatal',
+        `Git 服务器返回 401（认证失败）`,
+        ['npx aiforge --ssh', 'npx aiforge --token <your-token>', 'npx aiforge init'],
+      )
+    }
+
     throw new AiforgeError(
       '增量更新失败',
       'PULL_FAILED',
       EXIT_INSTALL_FAILURE,
       'fatal',
-      error instanceof Error ? error.message : '未知错误',
+      safeMessage,
       ['git pull  # 手动测试 Git 更新', 'npx aiforge --ssh  # 尝试 SSH 认证', '检查网络连接'],
     )
   }

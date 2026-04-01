@@ -575,3 +575,136 @@ describe('cloneRepo', () => {
     })
   })
 })
+
+describe('Story 5-4: clone 错误文案审计', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(createGit).mockReturnValue(mockGit as never)
+  })
+
+  // Story 5-4 Task 2.2: CLONE_FAILED fix 包含认证修复命令
+  it('CLONE_FAILED fix 包含 --token 和 init 认证修复命令 (Story 5-4 Task 2.2)', async () => {
+    vi.mocked(access).mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
+    vi.mocked(rm).mockResolvedValue(undefined)
+    vi.mocked(mockGit.clone).mockRejectedValue(new Error('fatal: Authentication failed'))
+
+    // readdir 不会到达，但需要 mock 防止 hang
+    vi.mocked(readdir).mockResolvedValue([])
+
+    const args: ParsedArgs = { global: true }
+    const source: AuthenticatedSource = {
+      hostname: 'gitlab.example.com',
+      repoPath: 'org/repo',
+      protocol: 'https',
+      authMethod: 'token',
+      cloneUrl: 'https://oauth2:token@gitlab.example.com/org/repo.git',
+    }
+    const reporter: Reporter = {
+      startPhase: vi.fn(),
+      updatePhase: vi.fn(),
+      completePhase: vi.fn(),
+      reportResult: vi.fn(),
+      reportPlan: vi.fn(),
+      reportError: vi.fn(),
+      warn: vi.fn(),
+    }
+    const { UnixPathResolver } = await import('../../src/core/path-resolver.js')
+    const pathResolver = new UnixPathResolver()
+
+    let caughtError: AiforgeError | null = null
+    try {
+      await (
+        await import('../../src/stages/clone.js')
+      ).cloneRepo(source, args, reporter, pathResolver)
+    } catch (err) {
+      caughtError = err as AiforgeError
+    }
+
+    expect(caughtError).not.toBeNull()
+    expect(caughtError!.code).toBe('AUTH_FAILED')
+    expect(caughtError!.message).toBe('无法访问仓库')
+    // Task 2.2: fix 应包含 --ssh、--token 和 init
+    expect(caughtError!.fix.some((f) => f.includes('--ssh'))).toBe(true)
+    expect(caughtError!.fix.some((f) => f.includes('--token'))).toBe(true)
+    expect(caughtError!.fix.some((f) => f.includes('init'))).toBe(true)
+  })
+
+  // Story 5-4 Finding #1 修复：AUTH_FAILED 真实链路测试
+  it('clone 认证失败（401）时抛出 AUTH_FAILED，message=无法访问仓库，why 含 401', async () => {
+    vi.mocked(access).mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
+    vi.mocked(rm).mockResolvedValue(undefined)
+    vi.mocked(mockGit.clone).mockRejectedValue(
+      new Error(
+        'remote: HTTP Basic: Access denied\nfatal: Authentication failed for https://gitlab.example.com/org/repo.git',
+      ),
+    )
+    vi.mocked(readdir).mockResolvedValue([])
+
+    try {
+      await cloneRepo(mockSource, makeArgs(), mockReporter, mockPathResolver)
+      expect.unreachable('应抛出 AUTH_FAILED')
+    } catch (err) {
+      const e = err as AiforgeError
+      expect(e.code).toBe('AUTH_FAILED')
+      expect(e.message).toBe('无法访问仓库')
+      expect(e.why).toContain('401')
+      expect(e.fix.some((f) => f.includes('--ssh'))).toBe(true)
+      expect(e.fix.some((f) => f.includes('--token'))).toBe(true)
+      expect(e.fix.some((f) => f.includes('init'))).toBe(true)
+    }
+  })
+
+  // Story 5-4 Finding #2 修复：CLONE_FAILED why 脱敏测试（含 token 的 URL 不应出现在 why 中）
+  it('clone 失败（非认证）时 CLONE_FAILED.why 不包含原始 token', async () => {
+    vi.mocked(access).mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
+    vi.mocked(rm).mockResolvedValue(undefined)
+    const tokenUrl = 'https://oauth2:glpat-supersecret1234@gitlab.example.com/org/repo.git'
+    vi.mocked(mockGit.clone).mockRejectedValue(new Error(`Could not resolve host: ${tokenUrl}`))
+    vi.mocked(readdir).mockResolvedValue([])
+
+    try {
+      await cloneRepo(mockSource, makeArgs(), mockReporter, mockPathResolver)
+      expect.unreachable('应抛出 CLONE_FAILED')
+    } catch (err) {
+      const e = err as AiforgeError
+      expect(e.code).toBe('CLONE_FAILED')
+      expect(e.why).not.toContain('glpat-supersecret1234')
+    }
+  })
+
+  // Story 5-4 Finding #1 修复：PULL 认证失败路径
+  it('pull 认证失败（401）时抛出 AUTH_FAILED', async () => {
+    // hasLocalRepo: .git 存在（走 pull 路径）
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(readdir).mockResolvedValue([])
+    vi.mocked(mockGit.pull).mockRejectedValue(
+      new Error('fatal: Authentication failed for https://gitlab.example.com/'),
+    )
+
+    try {
+      await cloneRepo(mockSource, makeArgs(), mockReporter, mockPathResolver)
+      expect.unreachable('应抛出 AUTH_FAILED')
+    } catch (err) {
+      const e = err as AiforgeError
+      expect(e.code).toBe('AUTH_FAILED')
+      expect(e.message).toBe('无法访问仓库')
+    }
+  })
+
+  // Story 5-4 Finding #2 修复：PULL_FAILED why 脱敏
+  it('pull 失败（非认证）时 PULL_FAILED.why 不包含原始 token', async () => {
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(readdir).mockResolvedValue([])
+    const tokenUrl = 'https://oauth2:glpat-supersecret1234@gitlab.example.com/org/repo.git'
+    vi.mocked(mockGit.pull).mockRejectedValue(new Error(`network error: ${tokenUrl}`))
+
+    try {
+      await cloneRepo(mockSource, makeArgs(), mockReporter, mockPathResolver)
+      expect.unreachable('应抛出 PULL_FAILED')
+    } catch (err) {
+      const e = err as AiforgeError
+      expect(e.code).toBe('PULL_FAILED')
+      expect(e.why).not.toContain('glpat-supersecret1234')
+    }
+  })
+})
