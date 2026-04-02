@@ -1,8 +1,10 @@
 /**
  * dry-run.test.ts — 管道 dry-run 路径端到端测试
  *
- * 来源: Story 3.3 Task 4.2
- * 测试: 管道 dry-run 路径、detect+match 真实阶段接入、文件系统无副作用
+ * 来源: Story 3.3 Task 4.2 + Story 5.5b Task 4
+ * 测试:
+ *   Story 3.3 - 管道 dry-run 路径、detect+match 真实阶段接入、文件系统无副作用
+ *   Story 5.5b AC #3 - dry-run 输出的完整目标路径列表和安装模式与实际安装结果一致（NFR-U5）
  *
  * AC #1: 管道在 Match 后分叉，dry-run 调用 reportPlan，跳过 Install
  * AC #3: dry-run 不产生文件系统副作用
@@ -12,12 +14,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { mkdir, writeFile, rm, access } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, rm, access } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
+import { dirname as pathDirname } from 'node:path'
 import type { ParsedArgs, MatchedPlan } from '../../src/core/types.js'
+import { InstallType } from '../../src/core/types.js'
 import type { Reporter } from '../../src/core/reporter.js'
 import { createProductionStages } from '../../src/pipeline.js'
 import { runPipeline } from '../../src/pipeline.js'
 import type { PathResolver } from '../../src/core/path-resolver.js'
+
+// ── Fixture 仓库路径（Story 5.5b）────────────────────────────────────────────
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = pathDirname(__filename)
+const FIXTURE_REPO_5B = join(__dirname, '..', 'fixtures', 'sample-repo')
 
 // ── 测试辅助 ───────────────────────────────────────────────────────────────
 
@@ -408,5 +418,215 @@ describe('dry-run 文件系统无副作用（AC #3）', () => {
 
     // 目标目录不存在（未被创建）
     await expect(access(targetDir)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+})
+
+// ── Story 5.5b Task 4: dry-run 一致性测试（使用 createProductionStages 真实闭包）────
+// 覆盖 AC #3: dry-run 输出的完整目标路径列表和安装模式与实际安装结果一致（NFR-U5）
+// Mock 网络层（vi.mock hoist 到文件顶层，与上面的 mock stages 方式并存）
+
+// vi.mock 会被 hoist，影响整个文件，这里声明供 Story 5.5b E2E 测试使用
+const e2eCloneMockForDryRun = vi.hoisted(() => vi.fn())
+vi.mock('../../src/stages/clone.js', () => ({
+  cloneRepo: e2eCloneMockForDryRun,
+}))
+vi.mock('../../src/stages/resolve-source.js', () => ({
+  resolveSource: vi.fn(async () => ({
+    hostname: 'gitlab.example.com',
+    repoPath: 'org/repo',
+    protocol: 'https' as const,
+  })),
+}))
+vi.mock('../../src/stages/authenticate.js', () => ({
+  authenticate: vi.fn(async () => ({
+    hostname: 'gitlab.example.com',
+    repoPath: 'org/repo',
+    protocol: 'https' as const,
+    authMethod: 'token' as const,
+    cloneUrl: 'https://gitlab.example.com/org/repo.git',
+  })),
+}))
+
+function createDryRunPathResolver(homeDir: string): PathResolver {
+  return {
+    home: () => homeDir,
+    configDir: () => join(homeDir, '.aiforge'),
+    reposDir: () => join(homeDir, '.aiforge', 'repos'),
+    toolGlobalDir: (id: string) => join(homeDir, `.${id}`),
+    toolProjectDir: (id: string) => `.${id}`,
+  }
+}
+
+function createDryRunE2EArgs(partial: Partial<ParsedArgs> = {}): ParsedArgs {
+  return {
+    source: 'https://gitlab.example.com/org/repo',
+    global: true,
+    link: false,
+    tools: [],
+    dirs: [],
+    dryRun: false,
+    quiet: false,
+    force: false,
+    ssh: false,
+    symlink: false,
+    flatten: false,
+    ...partial,
+  }
+}
+
+describe('Story 5.5b AC #3: dry-run 一致性测试（真实安装流程）', () => {
+  let dryRunTmpDir: string
+  let dryRunHomeDir: string
+  let dryRunReporter: ReturnType<typeof createMockReporter>
+  let dryRunPathResolver: PathResolver
+  let dryRunOriginalCwd: string
+
+  beforeEach(async () => {
+    dryRunOriginalCwd = process.cwd()
+    dryRunTmpDir = await mkdtemp(join(tmpdir(), 'aiforge-dryrun5b-'))
+    dryRunHomeDir = join(dryRunTmpDir, 'home')
+    await mkdir(dryRunHomeDir, { recursive: true })
+    await mkdir(join(dryRunHomeDir, '.aiforge'), { recursive: true })
+
+    process.chdir(dryRunTmpDir)
+
+    dryRunPathResolver = createDryRunPathResolver(dryRunHomeDir)
+    dryRunReporter = createMockReporter()
+
+    // Mock clone 返回 fixture 仓库（Story 5.5b 使用 sample-repo）
+    e2eCloneMockForDryRun.mockResolvedValue({
+      repoDir: FIXTURE_REPO_5B,
+      isNew: true,
+      sourceFiles: [],
+    })
+  })
+
+  afterEach(async () => {
+    process.exitCode = undefined
+    process.chdir(dryRunOriginalCwd)
+    await rm(dryRunTmpDir, { recursive: true, force: true })
+    vi.clearAllMocks()
+  })
+
+  // Task 4.1/4.2/4.3: 对比 dry-run 计划与实际安装结果（Files 类型）
+
+  it('Task 4.3: dry-run 计划的 agents 完整目标路径与实际安装结果一致（Files 类型）', async () => {
+    const { basename: pathBasename, join: nodeJoin } = await import('node:path')
+
+    // Step 1: dry-run 获取安装计划
+    const stagesDry = createProductionStages(dryRunPathResolver)
+    const argsDry = createDryRunE2EArgs({ tools: ['claude'], global: true, dryRun: true })
+
+    const source1 = await stagesDry.resolve(argsDry, dryRunReporter)
+    const authed1 = await stagesDry.authenticate(source1, argsDry, dryRunReporter)
+    const repo1 = await stagesDry.clone(authed1, argsDry, dryRunReporter)
+    const env1 = await stagesDry.detect(repo1, argsDry, dryRunReporter)
+    const plan = await stagesDry.match(env1, argsDry, dryRunReporter)
+
+    // 从 plan 提取 Files 类型目标路径（agents 规则）
+    const fileItems = plan.items.filter((i) => i.rule.type === InstallType.Files)
+    const plannedAgentPaths = fileItems
+      .flatMap((item) =>
+        item.sourceFiles.map((srcFile) => ({
+          targetPath: nodeJoin(item.targetPath, pathBasename(srcFile)),
+          mode: item.mode,
+        })),
+      )
+      .filter((p) => p.targetPath.includes('agents'))
+
+    // Step 2: 实际安装获取结果
+    const stagesInstall = createProductionStages(dryRunPathResolver)
+    const argsInstall = createDryRunE2EArgs({ tools: ['claude'], global: true, dryRun: false })
+
+    const source2 = await stagesInstall.resolve(argsInstall, dryRunReporter)
+    const authed2 = await stagesInstall.authenticate(source2, argsInstall, dryRunReporter)
+    const repo2 = await stagesInstall.clone(authed2, argsInstall, dryRunReporter)
+    const env2 = await stagesInstall.detect(repo2, argsInstall, dryRunReporter)
+    const plan2 = await stagesInstall.match(env2, argsInstall, dryRunReporter)
+    const result = await stagesInstall.install(plan2, argsInstall, dryRunReporter)
+
+    const installedAgentPaths = result.items
+      .filter((i) => i.status !== 'skipped')
+      .filter((i) => i.targetPath.includes('agents'))
+      .map((i) => ({ targetPath: i.targetPath, mode: 'copy' as const }))
+
+    // Step 3: 对比完整目标路径+模式
+    const sortFn = (a: { targetPath: string }, b: { targetPath: string }) =>
+      a.targetPath.localeCompare(b.targetPath)
+
+    expect(plannedAgentPaths.sort(sortFn).map((p) => p.targetPath)).toEqual(
+      installedAgentPaths.sort(sortFn).map((p) => p.targetPath),
+    )
+    expect(plannedAgentPaths.sort(sortFn).map((p) => p.mode)).toEqual(
+      installedAgentPaths.sort(sortFn).map((p) => p.mode),
+    )
+  })
+
+  it('Task 4.3: dry-run 计划的 flatten 完整目标路径与实际安装结果一致（含重命名规则）', async () => {
+    const { basename: pathBasename, join: nodeJoin } = await import('node:path')
+
+    // Step 1: dry-run（cursor Flatten）
+    const stagesDry = createProductionStages(dryRunPathResolver)
+    const argsDry = createDryRunE2EArgs({ tools: ['cursor'], global: true, dryRun: true })
+
+    const source1 = await stagesDry.resolve(argsDry, dryRunReporter)
+    const authed1 = await stagesDry.authenticate(source1, argsDry, dryRunReporter)
+    const repo1 = await stagesDry.clone(authed1, argsDry, dryRunReporter)
+    const env1 = await stagesDry.detect(repo1, argsDry, dryRunReporter)
+    const plan = await stagesDry.match(env1, argsDry, dryRunReporter)
+
+    // 提取 Flatten 类型预期目标（重命名规则：basename(srcDir) + '.md'）
+    const flattenItems = plan.items.filter((i) => i.rule.type === InstallType.Flatten)
+    const plannedFlattenTargets = flattenItems.flatMap((item) =>
+      item.sourceFiles.map((srcDir) => ({
+        targetPath: nodeJoin(item.targetPath, pathBasename(srcDir) + '.md'),
+        mode: item.mode,
+      })),
+    )
+
+    // Step 2: 实际安装
+    const stagesInstall = createProductionStages(dryRunPathResolver)
+    const argsInstall = createDryRunE2EArgs({ tools: ['cursor'], global: true, dryRun: false })
+
+    const source2 = await stagesInstall.resolve(argsInstall, dryRunReporter)
+    const authed2 = await stagesInstall.authenticate(source2, argsInstall, dryRunReporter)
+    const repo2 = await stagesInstall.clone(authed2, argsInstall, dryRunReporter)
+    const env2 = await stagesInstall.detect(repo2, argsInstall, dryRunReporter)
+    const plan2 = await stagesInstall.match(env2, argsInstall, dryRunReporter)
+    const result = await stagesInstall.install(plan2, argsInstall, dryRunReporter)
+
+    const installedFlattenTargets = result.items
+      .filter((i) => i.status !== 'skipped')
+      .filter((i) => i.targetPath.endsWith('.md') && i.targetPath.includes('.cursor'))
+      .map((i) => ({ targetPath: i.targetPath, mode: 'copy' as const }))
+
+    const sortFn = (a: { targetPath: string }, b: { targetPath: string }) =>
+      a.targetPath.localeCompare(b.targetPath)
+
+    // 对比完整路径（含 flatten 重命名规则）
+    expect(plannedFlattenTargets.sort(sortFn).map((p) => p.targetPath)).toEqual(
+      installedFlattenTargets.sort(sortFn).map((p) => p.targetPath),
+    )
+  })
+
+  // Task 4.4: 验证 dry-run 不产生文件系统副作用（真实 createProductionStages）
+
+  it('Task 4.4: dry-run 执行到 match 阶段，目标目录不被创建（无文件系统副作用）', async () => {
+    const stages = createProductionStages(dryRunPathResolver)
+    const args = createDryRunE2EArgs({ tools: ['claude'], global: true, dryRun: true })
+
+    const source = await stages.resolve(args, dryRunReporter)
+    const authed = await stages.authenticate(source, args, dryRunReporter)
+    const repo = await stages.clone(authed, args, dryRunReporter)
+    const env = await stages.detect(repo, args, dryRunReporter)
+    const plan = await stages.match(env, args, dryRunReporter)
+
+    // plan 中有 items（规则匹配成功）
+    expect(plan.items.length).toBeGreaterThan(0)
+    expect(plan.items.some((i) => i.sourceFiles.length > 0)).toBe(true)
+
+    // 目标目录未被创建（dry-run 停在 match 阶段，不执行 install）
+    const agentTargetDir = join(dryRunHomeDir, '.claude', 'agents')
+    await expect(access(agentTargetDir)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 })

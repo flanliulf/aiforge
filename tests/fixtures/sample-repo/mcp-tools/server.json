@@ -1,0 +1,7 @@
+{
+  "name": "sample-mcp-server",
+  "version": "1.0.0",
+  "description": "Sample MCP tool server for testing",
+  "command": "node",
+  "args": ["server.js"]
+}

@@ -417,3 +417,321 @@ describe('pipeline 端到端集成测试 (Story 4.6a)', () => {
     })
   })
 })
+
+// ── Story 5.5b: 真实安装流程 E2E 测试 ───────────────────────────────────────
+// 使用 createProductionStages 真实闭包链，Mock Git 克隆，使用 fixture 仓库
+// 覆盖 AC #1: 按 BUILTIN_RULES 真实规则矩阵验证安装结果
+// 覆盖 AC #6: macOS 环境通过
+// (orchestration-only 描述块已在上面。此块使用真实闭包路径)
+
+import { mkdtemp, mkdir, readFile, rm, access as fsAccess } from 'node:fs/promises'
+import { join as pathJoin } from 'node:path'
+import { tmpdir as osTmpdir } from 'node:os'
+import type { PathResolver } from '../../src/core/path-resolver.js'
+import { createProductionStages } from '../../src/pipeline.js'
+import { BUILTIN_RULES } from '../../src/data/install-rules.js'
+
+// Mock 网络层阶段，避免真实 Git 操作
+vi.mock('../../src/stages/resolve-source.js', () => ({
+  resolveSource: vi.fn(async () => ({
+    hostname: 'gitlab.example.com',
+    repoPath: 'org/knowledge-repo',
+    protocol: 'https' as const,
+  })),
+}))
+
+vi.mock('../../src/stages/authenticate.js', () => ({
+  authenticate: vi.fn(async () => ({
+    hostname: 'gitlab.example.com',
+    repoPath: 'org/knowledge-repo',
+    protocol: 'https' as const,
+    authMethod: 'token' as const,
+    cloneUrl: 'https://gitlab.example.com/org/knowledge-repo.git',
+  })),
+}))
+
+// vi.hoisted 确保在 vi.mock 工厂中可引用
+const e2eCloneMock = vi.hoisted(() => vi.fn())
+vi.mock('../../src/stages/clone.js', () => ({
+  cloneRepo: e2eCloneMock,
+}))
+
+// ── fixture 仓库路径 ────────────────────────────────────────────────────────
+// 使用 tests/fixtures/sample-repo/ 静态 fixture（Task 1 创建）
+import { fileURLToPath } from 'node:url'
+import { dirname as pathDirname } from 'node:path'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = pathDirname(__filename)
+const FIXTURE_REPO = pathJoin(__dirname, '..', 'fixtures', 'sample-repo')
+
+// ── 测试辅助：创建 mock PathResolver ───────────────────────────────────────
+
+function createMockPathResolver(homeDir: string): PathResolver {
+  return {
+    home: () => homeDir,
+    configDir: () => pathJoin(homeDir, '.aiforge'),
+    reposDir: () => pathJoin(homeDir, '.aiforge', 'repos'),
+    toolGlobalDir: (id: string) => pathJoin(homeDir, `.${id}`),
+    toolProjectDir: (id: string) => `.${id}`,
+  }
+}
+
+function createE2ETestArgs(partial: Partial<ParsedArgs> = {}): ParsedArgs {
+  return {
+    source: 'https://gitlab.example.com/org/knowledge-repo',
+    global: true,
+    link: false,
+    tools: [],
+    dirs: [],
+    dryRun: false,
+    quiet: false,
+    force: false,
+    ssh: false,
+    symlink: false,
+    flatten: false,
+    ...partial,
+  }
+}
+
+function createE2EMockReporter() {
+  return {
+    startPhase: vi.fn(),
+    updatePhase: vi.fn(),
+    completePhase: vi.fn(),
+    reportResult: vi.fn(),
+    reportPlan: vi.fn(),
+    reportError: vi.fn(),
+    warn: vi.fn(),
+  }
+}
+
+// ── E2E 集成测试：全局安装（AC #1, #6）──────────────────────────────────────
+
+describe('Story 5.5b AC #1: 全局安装 — 按真实 BUILTIN_RULES 验证安装结果', () => {
+  let tmpDir: string
+  let homeDir: string
+  let mockReporter: ReturnType<typeof createE2EMockReporter>
+  let mockPathResolver: PathResolver
+  let originalCwd: string
+
+  beforeEach(async () => {
+    originalCwd = process.cwd()
+    tmpDir = await mkdtemp(pathJoin(osTmpdir(), 'aiforge-e2e-'))
+    homeDir = pathJoin(tmpDir, 'home')
+    await mkdir(homeDir, { recursive: true })
+    await mkdir(pathJoin(homeDir, '.aiforge'), { recursive: true })
+
+    // 切换 cwd 到临时目录（避免项目目录检测影响）
+    process.chdir(tmpDir)
+
+    mockPathResolver = createMockPathResolver(homeDir)
+    mockReporter = createE2EMockReporter()
+
+    // Mock clone 返回 fixture 仓库
+    e2eCloneMock.mockResolvedValue({
+      repoDir: FIXTURE_REPO,
+      isNew: true,
+      sourceFiles: [],
+    })
+  })
+
+  afterEach(async () => {
+    process.exitCode = undefined
+    process.chdir(originalCwd)
+    await rm(tmpDir, { recursive: true, force: true })
+    vi.clearAllMocks()
+  })
+
+  it('claude 全局安装：agents(Files) 和 skills(Directories) 按规则安装到正确目标目录', async () => {
+    // 使用 createProductionStages 真实闭包链（非全 mock）
+    const stages = createProductionStages(mockPathResolver)
+
+    // 手动指定 claude 工具，全局安装
+    const args = createE2ETestArgs({ tools: ['claude'], global: true })
+
+    // 执行真实阶段链
+    const source = await stages.resolve(args, mockReporter)
+    const authed = await stages.authenticate(source, args, mockReporter)
+    const repo = await stages.clone(authed, args, mockReporter)
+    const env = await stages.detect(repo, args, mockReporter)
+    const plan = await stages.match(env, args, mockReporter)
+
+    // 验证匹配到的规则与 BUILTIN_RULES 一致
+    // claude:global 有 2 条规则: agents(Files) + skills(Directories)
+    const claudeGlobalRules = BUILTIN_RULES.filter(
+      (r) => r.tool === 'claude' && r.scope === 'global',
+    )
+    expect(plan.items.length).toBe(claudeGlobalRules.length)
+
+    // 验证规则覆盖 agents 和 skills
+    const sourceDirs = plan.items.map((i) => i.rule.sourceDir).sort()
+    expect(sourceDirs).toContain('agents')
+    expect(sourceDirs).toContain('skills')
+
+    // 执行安装
+    const result = await stages.install(plan, args, mockReporter)
+
+    // 验证安装结果：agents 文件应被安装
+    expect(result.items.some((i) => i.targetPath.includes('agents'))).toBe(true)
+
+    // 验证实际文件存在于目标目录
+    const agentTargetDir = pathJoin(homeDir, '.claude', 'agents')
+    const codingAgentTarget = pathJoin(agentTargetDir, 'coding-agent.md')
+    const reviewAgentTarget = pathJoin(agentTargetDir, 'review-agent.md')
+
+    await expect(fsAccess(codingAgentTarget)).resolves.toBeUndefined()
+    await expect(fsAccess(reviewAgentTarget)).resolves.toBeUndefined()
+
+    // 验证安装状态
+    const agentResults = result.items.filter((i) => i.targetPath.includes('coding-agent.md'))
+    expect(agentResults[0]?.status).toBe('new')
+  })
+
+  it('claude 全局安装：skills(Directories) 安装子目录到目标目录', async () => {
+    const stages = createProductionStages(mockPathResolver)
+    const args = createE2ETestArgs({ tools: ['claude'], global: true })
+
+    const source = await stages.resolve(args, mockReporter)
+    const authed = await stages.authenticate(source, args, mockReporter)
+    const repo = await stages.clone(authed, args, mockReporter)
+    const env = await stages.detect(repo, args, mockReporter)
+    const plan = await stages.match(env, args, mockReporter)
+    const result = await stages.install(plan, args, mockReporter)
+
+    // skills 目录下有 code-review/ 和 refactor/ 子目录，应被安装
+    const skillTargetDir = pathJoin(homeDir, '.claude', 'skills')
+    const codeReviewTarget = pathJoin(skillTargetDir, 'code-review')
+    const refactorTarget = pathJoin(skillTargetDir, 'refactor')
+
+    await expect(fsAccess(codeReviewTarget)).resolves.toBeUndefined()
+    await expect(fsAccess(refactorTarget)).resolves.toBeUndefined()
+
+    // 验证 skills 安装结果
+    const skillResults = result.items.filter((i) => i.targetPath.includes('skills'))
+    expect(skillResults.length).toBeGreaterThan(0)
+    expect(skillResults.every((i) => i.status === 'new' || i.status === 'updated')).toBe(true)
+  })
+
+  it('项目级安装：claude agents(Files) 安装到 .claude/agents/', async () => {
+    const stages = createProductionStages(mockPathResolver)
+    const args = createE2ETestArgs({ tools: ['claude'], global: false })
+
+    const source = await stages.resolve(args, mockReporter)
+    const authed = await stages.authenticate(source, args, mockReporter)
+    const repo = await stages.clone(authed, args, mockReporter)
+    const env = await stages.detect(repo, args, mockReporter)
+    const plan = await stages.match(env, args, mockReporter)
+    const result = await stages.install(plan, args, mockReporter)
+
+    // 项目级安装：目标为 process.cwd()/.claude/agents/
+    const projectAgentTarget = pathJoin(tmpDir, '.claude', 'agents', 'coding-agent.md')
+    await expect(fsAccess(projectAgentTarget)).resolves.toBeUndefined()
+
+    // 全部安装结果为 new（首次安装）
+    expect(result.items.filter((i) => i.status === 'new').length).toBeGreaterThan(0)
+  })
+
+  it('排除列表：README.md 和 .gitkeep 不被安装', async () => {
+    const stages = createProductionStages(mockPathResolver)
+    const args = createE2ETestArgs({ tools: ['claude'], global: true })
+
+    const source = await stages.resolve(args, mockReporter)
+    const authed = await stages.authenticate(source, args, mockReporter)
+    const repo = await stages.clone(authed, args, mockReporter)
+    const env = await stages.detect(repo, args, mockReporter)
+    const plan = await stages.match(env, args, mockReporter)
+    await stages.install(plan, args, mockReporter)
+
+    // README.md 和 .gitkeep 不应出现在安装结果路径中
+    const agentTargetDir = pathJoin(homeDir, '.claude', 'agents')
+    const readmeTarget = pathJoin(agentTargetDir, 'README.md')
+    const gitkeepTarget = pathJoin(agentTargetDir, '.gitkeep')
+
+    await expect(fsAccess(readmeTarget)).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(fsAccess(gitkeepTarget)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('saveManifest：安装后 manifest.json 包含正确的 tool/scope/mode 字段', async () => {
+    // 使用 cursor 工具（skills=Flatten, agents=Files），避免 Directories 类型目录 hash 问题
+    // cursor:global 规则: skills[Flatten] → ~/.cursor/rules/ (无 Directories 类型)
+    const stages = createProductionStages(mockPathResolver)
+    const args = createE2ETestArgs({ tools: ['cursor'], global: true })
+
+    const source = await stages.resolve(args, mockReporter)
+    const authed = await stages.authenticate(source, args, mockReporter)
+    const repo = await stages.clone(authed, args, mockReporter)
+    const env = await stages.detect(repo, args, mockReporter)
+    const plan = await stages.match(env, args, mockReporter)
+    const result = await stages.install(plan, args, mockReporter)
+    await stages.saveManifest(result)
+
+    const manifestPath = pathJoin(homeDir, '.aiforge', 'manifest.json')
+    const content = await readFile(manifestPath, 'utf-8')
+    const entries = JSON.parse(content) as Array<{
+      tool: string
+      scope: string
+      mode: string
+      hash: string
+      source: string
+      target: string
+    }>
+
+    expect(entries.length).toBeGreaterThan(0)
+    for (const entry of entries) {
+      expect(entry.tool).toBe('cursor')
+      expect(entry.scope).toBe('global')
+      expect(['copy', 'symlink', 'flatten']).toContain(entry.mode)
+      expect(entry.hash).not.toBe('')
+      expect(entry.source).not.toBe('')
+      expect(entry.target).not.toBe('')
+    }
+  })
+
+  it('saveManifest：claude:global（含 Directories 类型 skills）全链路不抛 FILE_HASH_FAILED', async () => {
+    // 修复验证：Directories 类型目录路径不再调用 fileHash()，manifest 正常持久化
+    const stages = createProductionStages(mockPathResolver)
+    const args = createE2ETestArgs({ tools: ['claude'], global: true })
+
+    const source = await stages.resolve(args, mockReporter)
+    const authed = await stages.authenticate(source, args, mockReporter)
+    const repo = await stages.clone(authed, args, mockReporter)
+    const env = await stages.detect(repo, args, mockReporter)
+    const plan = await stages.match(env, args, mockReporter)
+    const result = await stages.install(plan, args, mockReporter)
+
+    // 修复前此处会抛出 FILE_HASH_FAILED（对 ~/.claude/skills/code-review 目录调用 fileHash）
+    await expect(stages.saveManifest(result)).resolves.not.toThrow()
+
+    const manifestPath = pathJoin(homeDir, '.aiforge', 'manifest.json')
+    const content = await readFile(manifestPath, 'utf-8')
+    const entries = JSON.parse(content) as Array<{
+      tool: string
+      scope: string
+      mode: string
+      hash: string
+      source: string
+      target: string
+    }>
+
+    expect(entries.length).toBeGreaterThan(0)
+
+    // Files 类型（agents）：hash 非空
+    const fileEntries = entries.filter((e) => e.target.includes('/agents/'))
+    expect(fileEntries.length).toBeGreaterThan(0)
+    for (const entry of fileEntries) {
+      expect(entry.hash).not.toBe('')
+    }
+
+    // Directories 类型（skills）：hash 为空字符串（目录型占位值）
+    const dirEntries = entries.filter((e) => e.target.includes('/skills/'))
+    expect(dirEntries.length).toBeGreaterThan(0)
+    for (const entry of dirEntries) {
+      expect(entry.tool).toBe('claude')
+      expect(entry.scope).toBe('global')
+      expect(entry.hash).toBe('')
+      expect(entry.source).not.toBe('')
+      expect(entry.target).not.toBe('')
+    }
+  })
+})

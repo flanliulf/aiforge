@@ -7,9 +7,9 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 10 |
+| 🔴 open | 11 |
 | 🟡 in-progress | 0 |
-| ✅ resolved | 2 |
+| ✅ resolved | 3 |
 
 ---
 
@@ -127,9 +127,31 @@
 - **状态**: open
 - **解决记录**:
 
+### TODO-013: 补充 copilot / vscode / cursor:project 规则矩阵 E2E 覆盖
+
+- **来源**: Story 5-5b CR round 1-2 (2026-04-02)
+- **优先级**: P2
+- **类别**: test-gap
+- **描述**: `BUILTIN_RULES` 共 16 条规则，Story 5-5b AC #1 E2E 测试仅覆盖 claude:global、claude:project、cursor:global（约 31% 覆盖率）。copilot（8 条规则）、vscode（1 条规则）、cursor:project（2 条规则）完全未覆盖。CR R1/R2 均评估为 P2 非阻塞 CR TODO（理由：copilot/vscode 与 claude/cursor 共享相同安装代码路径，三种 InstallType 代表性路径已覆盖）。建议后续补齐三类工具的 match + install 全链路断言，使 AC #1"按 BUILTIN_RULES 真实规则矩阵验证"真正落地。
+- **涉及文件**: `tests/integration/pipeline.test.ts`, `tests/fixtures/sample-repo/`
+- **建议时机**: Epic 5 收尾或 Story 5-5c（Go/No-Go 门禁）开发前，亦可在专项测试完整性 Story 中处理
+- **状态**: open
+- **解决记录**:
+
 ---
 
 <!-- 已解决事项归档于此，保留用于回顾 -->
+
+### TODO-014: 清理 Story 5-5b Dev Agent Record 中的过时"规避策略"描述
+
+- **来源**: Story 5-5b CR round 2 (2026-04-02)
+- **优先级**: P3
+- **类别**: other
+- **描述**: `_bmad-output/implementation-artifacts/5-5b-e2e-integration-tests.md` 的 Debug Log References 中记录了"使用 cursor 工具规避 Directories bug / 无需修改生产代码"的历史描述，但该 bug 已在 CR R1 修复阶段修复（`src/pipeline.ts` 已区分 Directories 类型跳过 fileHash）。当前描述与实际修复状态不一致，可能误导后续阅读者。建议将该描述更新为"已修复"，或移除规避说明并指向修复记录。
+- **涉及文件**: `_bmad-output/implementation-artifacts/5-5b-e2e-integration-tests.md`
+- **建议时机**: Story 5-5b 关闭流程中（bmenhance-06-cr-done 执行时）或下次触及该 Story 文档时
+- **状态**: resolved
+- **解决记录**: Story 5-5b cr-done 收尾时处理。Debug Log References 已更新：将"规避策略"描述替换为"已修复（CR R1）"说明，并指向修复记录。
 
 ### TODO-005: 质量门禁验证的完整执行流程规则增强
 

@@ -894,6 +894,40 @@ describe('authenticate', () => {
 
 > 来源：Story 5-5a CR R1/R3 — 新增测试只断言 `saveConfig()` 中的 `language` 字段值和 `select` 调用顺序，未验证英文模式下实际输出是否变为英文；阶段级测试也将中文输出固化为正确行为，无法在门禁中捕获运行时中文残留。
 
+**禁止通过选择性测试路径绕行已知缺陷——已知缺陷必须修复或显式豁免：**
+
+当开发阶段发现某条代码路径存在 bug，禁止通过"选用不触发该路径的测试工具/参数"使测试变绿。正确处理方式必须三选一：
+
+1. **修复缺陷**（推荐）：修复生产代码，补充覆盖该路径的回归测试
+2. **显式跳过**：用 `it.skip(...)` 标记，在描述中注明"已知缺陷，Issue #XXX"，并在 Story Dev Agent Record 中记录为已知限制
+3. **PR 阻塞**：在 Story Dev Agent Record 中明确记录为"阻塞项，不可交付"
+
+禁止隐式绕行，也禁止在 Dev Agent Record 中记录"规避策略"而不标注为技术债。**测试全绿不代表功能可用——隐式绕行只是将缺陷推迟到 CR 阶段发现，浪费审查资源。**
+
+```typescript
+✅ // 方式 1：修复生产代码并补充回归测试
+   // src/pipeline.ts — saveManifest 中区分 Directories 类型，跳过 fileHash()
+   if (isDirectoryType) {
+     hashes.set(item.targetPath, '')  // 目录型占位值，不调用 fileHash()
+   } else {
+     const hash = await fileHash(item.targetPath)
+     hashes.set(item.targetPath, hash)
+   }
+   // tests/integration/pipeline.test.ts — 补充全链路回归测试
+   it('saveManifest：claude:global（含 Directories 类型 skills）全链路不抛 FILE_HASH_FAILED', ...)
+
+✅ // 方式 2：显式跳过，明确标注技术债
+   it.skip('saveManifest：Directories 类型全链路（已知缺陷：fileHash 对目录失败，待修复）', ...)
+
+❌ // 隐式绕行：换用不触发缺陷路径的参数，测试全绿但生产缺陷未修复
+   // Story Dev Agent Record 注释："使用 cursor 工具（skills=Flatten, agents=Files），
+   // 避免 Directories 类型目录 hash 问题"
+   // → claude/copilot users 安装 skills 时生产路径仍然 fatal
+   const args = createE2ETestArgs({ tools: ['cursor'], global: true })  // ← 刻意规避
+```
+
+> 来源：Story 5-5b CR R1 — `saveManifest` 对 `InstallType.Directories` 目录路径调用 `fileHash()` 的已知缺陷，通过将 saveManifest E2E 测试改用只含 Flatten+Files 的 cursor 工具绕行，导致全量 691/691 全绿但 claude/copilot skills 安装链路在生产中 fatal。Round 1 Not Pass，修复后 Round 2 通过。
+
 ### CR Workflow Patterns
 
 **CR 修复后必须同步更新 Story Dev Agent Record：**

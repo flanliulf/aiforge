@@ -251,10 +251,35 @@ export function createProductionStages(pathResolver: PathResolver): PipelineStag
       }
 
       // 计算每个目标文件的 hash（安装后的最终状态）
+      // 注意：InstallType.Directories 的 targetPath 是目录路径，fileHash() 对目录失败
+      // 目录型安装条目使用空字符串作为 hash 占位值（表示"目录型，无文件 hash"）
       const hashes = new Map<string, string>()
       for (const item of installableItems) {
-        const hash = await fileHash(item.targetPath)
-        hashes.set(item.targetPath, hash)
+        // 检查此条目是否来自 Directories 规则
+        const isDirectoryType = (() => {
+          const directMatch = planItemsByTarget.get(item.targetPath)
+          if (directMatch) {
+            return directMatch.some((info) => info.ruleType === InstallType.Directories)
+          }
+          // 文件级路径：检查是否在某个 Directories 类型 plan item 的 targetPath 目录下
+          for (const [planTarget, infos] of planItemsByTarget) {
+            const normalizedPlanTarget = planTarget.replace(/\/$/, '')
+            if (item.targetPath.startsWith(normalizedPlanTarget + '/')) {
+              if (infos.some((info) => info.ruleType === InstallType.Directories)) {
+                return true
+              }
+            }
+          }
+          return false
+        })()
+
+        if (isDirectoryType) {
+          // Directories 类型：目标是目录，跳过 fileHash，使用空字符串占位
+          hashes.set(item.targetPath, '')
+        } else {
+          const hash = await fileHash(item.targetPath)
+          hashes.set(item.targetPath, hash)
+        }
       }
 
       // 构建新 manifest 条目
