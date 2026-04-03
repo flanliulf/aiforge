@@ -7,26 +7,15 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 13 |
+| 🔴 open | 8 |
 | 🟡 in-progress | 0 |
-| ✅ resolved | 3 |
+| ✅ resolved | 8 |
 
 ---
 
 ## Open Items
 
 <!-- 按优先级排序：P1 > P2 > P3 -->
-
-### TODO-001: 合并 `sanitizeTokenDisplay()` 与 `sanitizeToken()` 重复实现
-
-- **来源**: Story 2-5 CR round 1-4 (2026-03-24)
-- **优先级**: P2
-- **类别**: duplication
-- **描述**: `src/commands/init.ts` 中的 `sanitizeTokenDisplay()` 与 `src/core/sanitize.ts` 中的 `sanitizeToken()` 逻辑完全一致（前 8 + \*\*\*\* + 后 4 / 短 token 前 4 + \*\*\*\*），仅判断条件写法不同。应删除 `sanitizeTokenDisplay()` 并改为 `import { sanitizeToken } from '../core/sanitize.js'`，避免后续安全脱敏规则调整时出现实现漂移。
-- **涉及文件**: `src/commands/init.ts`, `src/core/sanitize.ts`
-- **建议时机**: 下次触及 `src/commands/init.ts` 时
-- **状态**: open
-- **解决记录**:
 
 ### TODO-003: CLI 入口接线 `createProductionStages()` 工厂函数
 
@@ -116,17 +105,6 @@
 - **状态**: open
 - **解决记录**:
 
-### TODO-012: `.agent` / `.agents` / `.gemini` 外部目录污染全仓 lint
-
-- **来源**: 5-5a CR round 2-6 (2026-04-01)
-- **优先级**: P3
-- **类别**: tech-debt
-- **描述**: `.agent`/`.agents`/`.gemini` 目录中的外部 agent/gemini 配置文件被 `prettier --check .` 扫描，导致 `npm run lint` 返回非零。R2 修复时已将 `_analysis_output/` 加入 `.prettierignore`，但上述三个目录未一并处理，问题持续存在至 R6 审查结论。R6 建议"将 `.agent`/`.agents`/`.gemini` 纳入 `.prettierignore`，或清理这些目录后再恢复全仓 lint 全绿"。当前 Story 范围内已接受此状态，但未彻底关闭。
-- **涉及文件**: `.prettierignore`
-- **建议时机**: 下次触及 `.prettierignore` 或全仓 lint 清理专项时
-- **状态**: open
-- **解决记录**:
-
 ### TODO-013: 补充 copilot / vscode / cursor:project 规则矩阵 E2E 覆盖
 
 - **来源**: Story 5-5b CR round 1-2 (2026-04-02)
@@ -141,6 +119,28 @@
 ---
 
 <!-- 已解决事项归档于此，保留用于回顾 -->
+
+### TODO-001: 合并 `sanitizeTokenDisplay()` 与 `sanitizeToken()` 重复实现
+
+- **来源**: Story 2-5 CR round 1-4 (2026-03-24)
+- **优先级**: P2
+- **类别**: duplication
+- **描述**: `src/commands/init.ts` 中的 `sanitizeTokenDisplay()` 与 `src/core/sanitize.ts` 中的 `sanitizeToken()` 逻辑完全一致（前 8 + \*\*\*\* + 后 4 / 短 token 前 4 + \*\*\*\*），仅判断条件写法不同。应删除 `sanitizeTokenDisplay()` 并改为 `import { sanitizeToken } from '../core/sanitize.js'`，避免后续安全脱敏规则调整时出现实现漂移。
+- **涉及文件**: `src/commands/init.ts`, `src/core/sanitize.ts`
+- **建议时机**: 下次触及 `src/commands/init.ts` 时
+- **状态**: resolved
+- **解决记录**: Story 5-6 Task 1 中解决。删除 `sanitizeTokenDisplay()` 函数定义，添加 `import { sanitizeToken } from '../core/sanitize.js'`，调用处从 `sanitizeTokenDisplay(token)` 改为 `sanitizeToken(token)`。692 条测试零回归。
+
+### TODO-012: `.agent` / `.agents` / `.gemini` 外部目录污染全仓 lint
+
+- **来源**: 5-5a CR round 2-6 (2026-04-01)
+- **优先级**: P3
+- **类别**: tech-debt
+- **描述**: `.agent`/`.agents`/`.gemini` 目录中的外部 agent/gemini 配置文件被 `prettier --check .` 扫描，导致 `npm run lint` 返回非零。R2 修复时已将 `_analysis_output/` 加入 `.prettierignore`，但上述三个目录未一并处理，问题持续存在至 R6 审查结论。
+- **涉及文件**: `.prettierignore`
+- **建议时机**: 下次触及 `.prettierignore` 或全仓 lint 清理专项时
+- **状态**: resolved
+- **解决记录**: Story 5-6 Task 2 中解决。`.prettierignore` 末尾追加 `.agent`、`.agents`、`.gemini` 三行，`npm run lint`（含 `prettier --check .`）退出码已恢复为 0。
 
 ### TODO-014: 清理 Story 5-5b Dev Agent Record 中的过时"规避策略"描述
 
@@ -175,6 +175,28 @@
 - **状态**: resolved
 - **解决记录**: Story 3-3 中通过 `createProductionStages(pathResolver)` 工厂函数解决，使用闭包适配 3 参数 `DetectFn` → 4 参数 `detectTools` 调用（`pipeline.ts:179`）。
 
+### TODO-015: 修正 mvp-go-nogo-checklist.md 中 W1/W2 汇总措辞
+
+- **来源**: Story 5-5c CR round 1 (2026-04-02)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: `mvp-go-nogo-checklist.md:35` 汇总写为 "4/4 已验证（W1/W2 依赖真实网络环境，本次为已知限制）"，但 W1/W2 状态为 "⚠️ 未验证"，存在语义冲突。建议改为 "2/4 通过，2/4 未验证（已知限制：W1/W2 依赖真实网络环境，无法在 E2E 中自动化验证）"，与各行状态保持一致。
+- **涉及文件**: `_bmad-output/implementation-artifacts/mvp-go-nogo-checklist.md`
+- **建议时机**: 下次更新发布门禁文档时
+- **状态**: resolved
+- **解决记录**: Story 5-6 Task 4 中解决。`mvp-go-nogo-checklist.md:35` 汇总行已改为 "2/4 通过，2/4 未验证（已知限制：W1/W2 依赖真实网络环境，无法在 E2E 中自动化验证）"，与表格中 W1/W2 的 ⚠️ 状态完全一致。
+
+### TODO-016: 定义"发布 lint 门禁"的明确检查范围脚本
+
+- **来源**: Story 5-5c CR round 1 (2026-04-02)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: 项目标准 lint 脚本 `npm run lint`（`eslint . && prettier --check .`）作用域为整个项目根目录，包含 `.gemini/**` 等 339 个非发布产物文件，导致 lint 返回退出码 1。建议新增一个专用于发布门禁的 lint 脚本（如 `npm run lint:src`，只检查 `src/` 和 `tests/`），并在门禁清单中明确标注使用哪个脚本。当前 Story Dev Agent Record 中的 "Lint：ESLint exit 0，Prettier src/tests 全绿" 描述的是局部范围检查，应在脚本名称中体现。
+- **涉及文件**: `package.json`, `_bmad-output/implementation-artifacts/mvp-go-nogo-checklist.md`
+- **建议时机**: 下次修改 package.json 时
+- **状态**: resolved
+- **解决记录**: Story 5-6 Task 3 中解决。`package.json` 新增 `"lint:src": "eslint src/ tests/ && prettier --check \"src/**/*.ts\" \"tests/**/*.ts\""`，`npm run lint:src` 退出码 0。同步将 lint 作用域规则写入 `project-context.md` 和 `04-implementation-patterns.md`（CR Workflow 章节）。
+
 ---
 
 ## 条目模板（不要删除）
@@ -191,25 +213,3 @@
 - **状态**: open / in-progress / resolved
 - **解决记录**: {解决时填写：在哪个 story 中解决，PR/commit 引用}
 -->
-
-### TODO-015: 修正 mvp-go-nogo-checklist.md 中 W1/W2 汇总措辞
-
-- **来源**: Story 5-5c CR round 1 (2026-04-02)
-- **优先级**: P2
-- **类别**: tech-debt
-- **描述**: `mvp-go-nogo-checklist.md:35` 汇总写为 "4/4 已验证（W1/W2 依赖真实网络环境，本次为已知限制）"，但 W1/W2 状态为 "⚠️ 未验证"，存在语义冲突。建议改为 "2/4 通过，2/4 未验证（已知限制：W1/W2 依赖真实网络环境，无法在 E2E 中自动化验证）"，与各行状态保持一致。
-- **涉及文件**: `_bmad-output/implementation-artifacts/mvp-go-nogo-checklist.md`
-- **建议时机**: 下次更新发布门禁文档时
-- **状态**: open
-- **解决记录**:
-
-### TODO-016: 定义"发布 lint 门禁"的明确检查范围脚本
-
-- **来源**: Story 5-5c CR round 1 (2026-04-02)
-- **优先级**: P2
-- **类别**: tech-debt
-- **描述**: 项目标准 lint 脚本 `npm run lint`（`eslint . && prettier --check .`）作用域为整个项目根目录，包含 `.gemini/**` 等 339 个非发布产物文件，导致 lint 返回退出码 1。建议新增一个专用于发布门禁的 lint 脚本（如 `npm run lint:src`，只检查 `src/` 和 `tests/`），并在门禁清单中明确标注使用哪个脚本。当前 Story Dev Agent Record 中的 "Lint：ESLint exit 0，Prettier src/tests 全绿" 描述的是局部范围检查，应在脚本名称中体现。
-- **涉及文件**: `package.json`, `_bmad-output/implementation-artifacts/mvp-go-nogo-checklist.md`
-- **建议时机**: 下次修改 package.json 时
-- **状态**: open
-- **解决记录**:

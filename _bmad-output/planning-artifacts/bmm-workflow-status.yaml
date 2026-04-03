@@ -61,7 +61,9 @@ current_activity:
     - 5-5a-i18n-language-selection: "done"  # 国际化语言选择与配置 — CR Approved（2026-04-01）
     - 5-5b-e2e-integration-tests: "done"  # E2E 集成测试 — CR Approved（2026-04-02）
     - 5-5c-mvp-go-nogo-gate: "done"  # MVP Go/No-Go 发布门禁验收 — CR Approved（2026-04-03）
-  notes: "Story 5-5c 完成 CR（2轮，无阻塞项），状态更新为 done。MVP Go/No-Go 结论：Go ✅。Epic 5 全部 7 个 Story 均已完成。"
+    - 5-6-tech-debt-cleanup: "done"  # 技术债快速清理与 lint 门禁修正 — CR Approved（2026-04-03）
+  notes: "Story 5-6 完成 CR（1轮，无阻塞项），状态更新为 done。技术债清理 Sprint 中 Story 5-6 已交付。"
   next_steps:
-    - "Epic 5 全部 Story 已完成，确认是否更新 epic-5 状态为 done"
+    - "Story 5-7 待开发（回归测试加固）"
+    - "5-7 完成后确认是否更新 epic-5 状态为 done"
     - "考虑启动 Epic 5 Retrospective"

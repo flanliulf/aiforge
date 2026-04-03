@@ -22,6 +22,7 @@ import type { AiforgeConfig } from '../core/types.js'
 import { loadConfig, saveConfig } from '../services/config.js'
 import { createGit, GitSourceResolver } from '../services/git.js'
 import { msg, setLanguage } from '../core/messages.js'
+import { sanitizeToken } from '../core/sanitize.js'
 
 export function registerInitCommand(program: import('commander').Command): void {
   program
@@ -215,7 +216,7 @@ async function verifyTokenConnection(tokenUrl: string, token: string): Promise<b
   try {
     await git.raw(['ls-remote', '--exit-code', tokenUrl])
     // Task 3.2: 成功，Token 脱敏显示
-    const sanitized = sanitizeTokenDisplay(token)
+    const sanitized = sanitizeToken(token)
     console.log(`${msg('init.tokenSuccessPrefix')} (${sanitized})`)
     return true
   } catch {
@@ -230,15 +231,3 @@ async function verifyTokenConnection(tokenUrl: string, token: string): Promise<b
 }
 
 // ── 内部工具函数 ──────────────────────────────────────────────
-
-/**
- * Token 脱敏显示
- * 格式: 前 8 位 + **** + 后 4 位；短 token (<= 12 位): 前 4 位 + ****
- * 来源: project-context.md Security Rules
- */
-function sanitizeTokenDisplay(token: string): string {
-  if (token.length <= 12) {
-    return token.slice(0, 4) + '****'
-  }
-  return token.slice(0, 8) + '****' + token.slice(-4)
-}

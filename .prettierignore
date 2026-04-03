@@ -17,3 +17,6 @@ README.md
 CLAUDE.md
 AGENTS.md
 _analysis_output/
+.agent
+.agents
+.gemini

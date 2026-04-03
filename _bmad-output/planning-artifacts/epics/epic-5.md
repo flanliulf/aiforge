@@ -227,3 +227,55 @@ So that 团队对产品是否达到发布标准有客观、一致、可追溯的
 **When** 复盘本次验收结果
 **Then** 团队可以明确知道 MVP 当前的已知风险、剩余限制和上线边界
 
+### Story 5.6: 技术债快速清理与 lint 门禁修正
+
+> **性质说明：** Epic 5 回顾追加 Story。清理跨 Epic 积累的极小技术债，修正 lint 门禁作用域。
+
+As a 开发者,
+I want 清理跨 Epic 积累的 4 个极小技术债项并修正 lint 门禁作用域,
+So that 发布前代码库干净、lint 全仓绿、门禁文档无自相矛盾。
+
+**Acceptance Criteria:**
+
+**Given** `src/commands/init.ts` 中存在 `sanitizeTokenDisplay()` 函数
+**When** 审查代码
+**Then** 该函数已被删除，调用处改为 `import { sanitizeToken }`，现有测试零回归（CR TODO-001）
+
+**Given** `.prettierignore`
+**When** 执行 `npm run lint`
+**Then** `.agent`、`.agents`、`.gemini` 目录被正确忽略，退出码为 0（CR TODO-012）
+
+**Given** `package.json`
+**When** 查看 scripts
+**Then** 存在 `lint:src` 脚本，作用域仅为 `src/` 和 `tests/`（CR TODO-016）
+
+**Given** `mvp-go-nogo-checklist.md` Warning 汇总行
+**When** 审查内容
+**Then** 措辞与各行状态一致，无自相矛盾（CR TODO-015）
+
+### Story 5.7: 回归防护测试补全与 preflight 增强
+
+> **性质说明：** Epic 5 回顾追加 Story。补全关键回归防护测试缺口，增强 preflight 诊断精度。
+
+As a 开发者,
+I want 补全 4 个关键的回归防护测试缺口并增强 preflight 诊断精度,
+So that 发布后代码变更有自动化测试守护，不会因回归而损害质量。
+
+**Acceptance Criteria:**
+
+**Given** `targetPath` 为普通文件（非目录）
+**When** preflight 阶段执行 `checkTargetWritability()`
+**Then** 提前抛出 `PATH_NOT_DIRECTORY` 错误（CR TODO-006）
+
+**Given** `pipeline.ts` 的 `report` 闭包
+**When** 执行集成测试
+**Then** 有测试断言 `items[].sourcePath` 为 repo-relative 路径（CR TODO-010）
+
+**Given** `process.stdout.isTTY = false` 且 `process.stderr.isTTY = true`
+**When** 入口层创建 Reporter
+**Then** 有测试断言选择 TtyReporter（CR TODO-011）
+
+**Given** `BUILTIN_RULES` 共 16 条规则
+**When** 执行 E2E 集成测试
+**Then** 覆盖率从 ~31% 提升到 80%+（CR TODO-013）
+

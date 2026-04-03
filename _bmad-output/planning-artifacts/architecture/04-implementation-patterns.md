@@ -1047,6 +1047,24 @@ CR 修复记录中的"验证通过"结论必须附带可独立复现的验证命
 
 > 来源：Story 5-2 CR R1 — `failed` 图标/统计行示例未同步；R2 — `InstallResult[]` 接口示例未同步，均属文字规则已同步但示例内容遗漏的模式。
 
+**lint 门禁作用域必须使用 `npm run lint:src`：**
+
+Story 开发及 CR 修复的质量门禁验证必须使用 `npm run lint:src`（作用域：`src/` + `tests/`），而非 `npm run lint`（全仓，包含外部 AI 工具目录等非发布产物）。Dev Agent Record 中声称 "lint 通过" 时，必须注明执行的是 `npm run lint:src`。`npm run lint` 用于确认全仓无 Prettier 污染，在发布前和 `.prettierignore` 修改后执行。
+
+```bash
+✅ # Story 开发和 CR 修复的质量门禁
+   npm test && npm run lint:src && npm run build
+
+✅ # 发布前或 .prettierignore 修改后，额外执行全仓检查
+   npm run lint   # 覆盖全仓（含外部工具目录）
+
+❌ # 以 npm run lint（全仓）作为 Story 开发的日常门禁
+   # → 外部 AI 工具目录（.agent/.agents/.gemini）的格式噪音影响退出码
+   # → Dev Agent Record 中的 "lint 通过" 语义模糊，无法精确复现
+```
+
+> 来源：Story 5-5c CR TODO-016 — `npm run lint` 全仓作用域包含 339 个非发布文件，导致退出码非零；Story 5-6 落地 `lint:src` 脚本后正式区分两种 lint 目标。
+
 ### Enforcement Guidelines
 
 **所有 AI Agent 必须遵守：**

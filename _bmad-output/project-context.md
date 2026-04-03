@@ -198,6 +198,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - **CR 修复后必须执行完整质量门禁三件套：** 每次 CR 修复完成后，必须按顺序执行 `npm test` → `npm run lint` → `npm run build`，并将每项结果逐行记录到修复记录中。禁止：(1) 只执行部分验证（如只跑 test 不跑 lint）；(2) 复用上轮验证结果（每次修复后必须重新执行）；(3) 在验证未全部通过时声称"通过"。Prettier 格式化应作为修复的最后一步自动执行：`npx prettier --write <修改过的文件>`。（来源：Story 4-2 CR — R2 和 R5 各出现一次 Prettier 格式未通过；Story 4-1 CR 也出现同类问题，共 3 次重复）
 - **CR 修复验证结论必须可独立复现：** CR 修复记录中的"验证通过"结论必须附带可独立复现的验证命令和输出摘要（如测试通过数、lint 状态）。禁止只写"✅ npm run lint 通过"而不附带任何证据。后续审查轮次必须能通过重新执行相同命令来验证结论的真实性。修复记录中如果声称验证通过，但下一轮审查独立执行后发现未通过，视为修复记录不合规。（来源：Story 4-6b CR R1→R2 — R1 修复记录声称"npm run lint ✅ 通过"，但 R2 审查独立执行后发现 lint 实际未通过，说明 R1 验证结论不可靠）
 - **Rule Document Registry 同步时必须扫描示例代码块和格式示例，不限于文字规则段落：** 执行 Rule Document Registry 三文档同步时，除更新文字规则段落外，还必须检查：(1) **示例代码块**（`` ``` `` 块内的接口签名、类型定义、枚举值）；(2) **格式示例/图标枚举**（如 Result icons 枚举列表、统计行格式示例）。搜索关键词：同步目标的字段名、枚举值、状态词（如 `failed`、`InstallResult`）。遗漏"非文字规则"内容是多轮 CR 中持续出现的同步缺口。（来源：Story 5-2 CR R1 — `failed` 图标/统计行示例未同步；R2 — `InstallResult[]` 接口示例未同步，均属文字规则已同步但示例内容遗漏的模式）
+- **lint 门禁作用域必须使用 `npm run lint:src`：** Story 开发及 CR 修复的质量门禁验证必须使用 `npm run lint:src`（作用域：`src/` + `tests/`），而非 `npm run lint`（全仓，包含外部 AI 工具目录等非发布产物）。Dev Agent Record 中声称 "lint 通过" 时，必须注明执行的是 `npm run lint:src`。`npm run lint` 用于确认全仓无 Prettier 污染，在发布前和 `.prettierignore` 修改后执行。（来源：Story 5-5c CR TODO-016，Story 5-6 落地 `lint:src` 脚本）
 
 ### Install Rules Data Architecture
 

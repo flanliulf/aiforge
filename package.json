@@ -14,6 +14,7 @@
     "dev": "tsx src/index.ts",
     "test": "vitest run",
     "lint": "eslint . && prettier --check .",
+    "lint:src": "eslint src/ tests/ && prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
     "lint:fix": "eslint . --fix && prettier --write ."
   },
   "files": [

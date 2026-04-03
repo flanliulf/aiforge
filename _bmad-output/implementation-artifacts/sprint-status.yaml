@@ -75,7 +75,7 @@ development_status:
   epic-4-retrospective: done
 
   # Epic 5: 端到端体验与发布就绪
-  epic-5: backlog
+  epic-5: in-progress
   5-1-phase-progress-and-spinner: done
   5-2-tree-result-summary-and-stats: done
   5-3-tty-adaptive-and-quiet-mode: done
@@ -83,4 +83,7 @@ development_status:
   5-5a-i18n-language-selection: done
   5-5b-e2e-integration-tests: done
   5-5c-mvp-go-nogo-gate: done
+  # 技术债清理 Sprint（Epic 5 回顾追加）
+  5-6-tech-debt-cleanup: done
+  5-7-regression-test-hardening: ready-for-dev
   epic-5-retrospective: optional
