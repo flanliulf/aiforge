@@ -6,3 +6,13 @@ node_modules/
 
 # OS
 .DS_Store
+
+# AI tool configurations (external, not part of project source)
+.agent/
+.agents/
+.augment/
+.claude/
+.cursor/skills/
+
+# BMad framework internals
+_bmad/
