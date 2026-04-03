@@ -82,5 +82,5 @@ development_status:
   5-4-three-part-error-messages: done
   5-5a-i18n-language-selection: done
   5-5b-e2e-integration-tests: done
-  5-5c-mvp-go-nogo-gate: ready-for-dev
+  5-5c-mvp-go-nogo-gate: done
   epic-5-retrospective: optional

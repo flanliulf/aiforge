@@ -88,7 +88,7 @@ aiforge [repo-url] [options]
 npx aiforge
 
 # 指定仓库 URL
-npx aiforge https://gitlab.example.com/team/ai-configs.git
+npx aiforge https://your-git-host.com/team/ai-configs.git
 
 # 全局 + 符号链接（推荐长期使用）
 npx aiforge -g -l
@@ -173,14 +173,14 @@ aiforge 按以下优先级解析认证信息：
 
 ```bash
 # SSH 方式
-npx aiforge https://gitlab.example.com/team/repo.git --ssh
+npx aiforge https://your-git-host.com/team/repo.git --ssh
 
 # Token 方式
-npx aiforge https://gitlab.example.com/team/repo.git --token glpat-xxxx
+npx aiforge https://your-git-host.com/team/repo.git --token <your-access-token>
 
 # 环境变量方式（适合 CI/CD）
-export GITLAB_TOKEN=glpat-xxxx
-npx aiforge https://gitlab.example.com/team/repo.git
+export GIT_TOKEN=<your-access-token>
+npx aiforge https://your-git-host.com/team/repo.git
 ```
 
 ## 配置文件
@@ -189,13 +189,13 @@ npx aiforge https://gitlab.example.com/team/repo.git
 
 ```jsonc
 {
-  "defaultRepo": "https://gitlab.example.com/team/ai-configs.git",
+  "defaultRepo": "https://your-git-host.com/team/ai-configs.git",
   "preferSSH": true,
   "cloneDir": "~/ai-configs",
   "auth": {
-    "gitlab.example.com": {
+    "your-git-host.com": {
       "method": "token",
-      "token": "glpat-xxxxxxxxxxxx"
+      "token": "<your-access-token>"
     }
   }
 }

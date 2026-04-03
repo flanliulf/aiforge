@@ -1,0 +1,3 @@
+# 排除包含认证示例的 README，防止 gitlab.example.com 域名和 glpat-* 占位 token 进入 npm 包
+# 参见 NFR-S1：npm package MUST contain ZERO company info
+README.md

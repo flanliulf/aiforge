@@ -149,7 +149,12 @@ index.ts → pipeline.ts → stages/* → services/*
 
 ### Security Rules
 
-- **npm package MUST contain ZERO company info** — no repo URLs, tokens, hostnames
+- **npm package MUST contain ZERO company info:**
+  - no company/internal repo URLs (generic placeholder URLs like `your-host.com` are allowed for documentation examples)
+  - no real tokens or credentials (placeholder tokens like `<your-token>` are allowed for documentation examples)
+  - no company hostnames or internal domain names
+  - no platform-specific token prefixes that reveal internal toolchain (e.g. `glpat-`, `ghp_`)
+- **npm 包安全验证方法必须扫描入包文件的实际内容：** 禁止仅扫描 `npm pack --dry-run` 的输出流（仅含文件名+大小）。必须用 `npm pack --json` 获取入包文件列表后，逐个 `grep -in <pattern> <file>` 扫描文件内容。`README.md` 是 npm 硬编码始终包含的文件，无法通过 `.npmignore` 或 `files` 字段排除，因此 README.md 的内容安全必须作为验证项。（来源：Story 5-5c CR R1 — B5 验证方法只扫 `npm pack` 输出流，README.md 中的 `gitlab.example.com` 和 `glpat-xxxx` 未被检出）
 - Token exists in memory ONLY during clone; cleared immediately after
 - All logs/errors use `sanitizeToken()` from `core/sanitize.ts`
 - config.json file permissions: `0o600` (user-only read/write)

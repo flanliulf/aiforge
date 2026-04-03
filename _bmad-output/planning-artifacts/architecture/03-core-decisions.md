@@ -166,6 +166,12 @@ interface Reporter {
 
 `sanitizeToken()` 适用于独立 token 字符串；`sanitizeUrl()` 适用于纯 URL 字符串（带 `^` 锚点正则）；`sanitizeMessage()` 适用于任意字符串（如 git 错误消息）中嵌入 token-bearing URL 的场景（全局替换正则，无锚点）。将底层异常的 `error.message` 写入 `AiforgeError.why` 时，**必须使用 `sanitizeMessage()` 而非 `sanitizeUrl()`**。（来源：Story 5-4 CR Round 1 — `CLONE_FAILED`/`PULL_FAILED` 的 `why` 直接透传 `error.message` 导致 token 泄露；修复时新增 `sanitizeMessage()` 处理此场景）
 
+**npm 包安全规则 — 公司信息零容忍 + 通用占位符豁免：**
+
+npm package MUST contain ZERO company info：no company/internal repo URLs、no real tokens or credentials、no company hostnames、no platform-specific token prefixes（如 `glpat-`、`ghp_`）。通用教学占位符（如 `your-git-host.com`、`<your-access-token>`）不包含公司身份信息，不在禁止范围内。（来源：Story 5-5c CR R2 评估 — 规则限定语为 "company info"，通用占位符不构成信息泄露）
+
+**npm 包安全验证方法必须扫描入包文件的实际内容：** 禁止仅扫描 `npm pack --dry-run` 的输出流（仅含文件名+大小）。必须用 `npm pack --json` 获取入包文件列表后，逐个 `grep -in <pattern> <file>` 扫描文件内容。`README.md` 是 npm 硬编码始终包含的文件，无法通过 `.npmignore` 或 `files` 字段排除，因此 README.md 的内容安全必须作为独立验证项。（来源：Story 5-5c CR R1 — B5 验证方法只扫 `npm pack` 输出流，README.md 中的敏感示例未被检出）
+
 #### D5: Tool Detection & Platform Abstraction
 
 **工具检测 — 数据驱动注册表：**

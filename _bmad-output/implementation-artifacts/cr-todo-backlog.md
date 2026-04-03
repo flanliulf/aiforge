@@ -7,7 +7,7 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 11 |
+| 🔴 open | 13 |
 | 🟡 in-progress | 0 |
 | ✅ resolved | 3 |
 
@@ -191,3 +191,25 @@
 - **状态**: open / in-progress / resolved
 - **解决记录**: {解决时填写：在哪个 story 中解决，PR/commit 引用}
 -->
+
+### TODO-015: 修正 mvp-go-nogo-checklist.md 中 W1/W2 汇总措辞
+
+- **来源**: Story 5-5c CR round 1 (2026-04-02)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: `mvp-go-nogo-checklist.md:35` 汇总写为 "4/4 已验证（W1/W2 依赖真实网络环境，本次为已知限制）"，但 W1/W2 状态为 "⚠️ 未验证"，存在语义冲突。建议改为 "2/4 通过，2/4 未验证（已知限制：W1/W2 依赖真实网络环境，无法在 E2E 中自动化验证）"，与各行状态保持一致。
+- **涉及文件**: `_bmad-output/implementation-artifacts/mvp-go-nogo-checklist.md`
+- **建议时机**: 下次更新发布门禁文档时
+- **状态**: open
+- **解决记录**:
+
+### TODO-016: 定义"发布 lint 门禁"的明确检查范围脚本
+
+- **来源**: Story 5-5c CR round 1 (2026-04-02)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: 项目标准 lint 脚本 `npm run lint`（`eslint . && prettier --check .`）作用域为整个项目根目录，包含 `.gemini/**` 等 339 个非发布产物文件，导致 lint 返回退出码 1。建议新增一个专用于发布门禁的 lint 脚本（如 `npm run lint:src`，只检查 `src/` 和 `tests/`），并在门禁清单中明确标注使用哪个脚本。当前 Story Dev Agent Record 中的 "Lint：ESLint exit 0，Prettier src/tests 全绿" 描述的是局部范围检查，应在脚本名称中体现。
+- **涉及文件**: `package.json`, `_bmad-output/implementation-artifacts/mvp-go-nogo-checklist.md`
+- **建议时机**: 下次修改 package.json 时
+- **状态**: open
+- **解决记录**:

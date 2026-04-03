@@ -722,6 +722,40 @@ CR 修复中如果修改了类型定义（interface/type/enum 的字段增删改
 
 > 来源：Story 4-2 CR R1 — `preflight()` 校验 `targetPath` 通过，但 `copyFile()` 操作的 `destPath` 可被预置 symlink 重定向到 `allowedRoot` 外部，导致 P0 安全漏洞。
 
+**npm 包安全规则 — 公司信息零容忍 + 通用占位符豁免：**
+
+npm package MUST contain ZERO company info：
+
+- no company/internal repo URLs（通用教学占位符如 `your-host.com` 允许）
+- no real tokens or credentials（占位符如 `<your-token>` 允许）
+- no company hostnames or internal domain names
+- no platform-specific token prefixes that reveal internal toolchain（如 `glpat-`、`ghp_`）
+
+关键澄清：规则的保护对象是**公司信息**（company info），不是"所有看起来像 URL 的字符串"。通用教学占位符（如 `your-git-host.com`、`<your-access-token>`）不包含任何公司身份信息，不在禁止范围内。
+
+> 来源：Story 5-5c CR R2 — GPT-5.4 将 `your-git-host.com` 判定为违反 "no repo URLs" 规则，Claude Opus 4.6 评估判定为误报：规则限定语为 "company info"，通用占位符不构成信息泄露。
+
+**npm 包安全验证方法必须扫描入包文件的实际内容：**
+
+禁止仅扫描 `npm pack --dry-run` 的输出流（仅含文件名+大小），必须扫描入包文件的实际内容。
+
+```bash
+✅ # 正确的验证方法：逐个扫描入包文件内容
+   npm pack --dry-run --json  # 获取入包文件列表
+   grep -in "gitlab\|wshoto\|glpat" README.md       # 扫描 README 内容
+   grep -in "wshoto\|glpat-" dist/index.js           # 扫描构建产物内容
+   grep -in "repository\|bugs\|homepage" package.json # 扫描包元数据
+
+❌ # 错误的验证方法：只扫描 npm pack 输出流（文件名+大小）
+   npm pack --dry-run 2>&1 | grep -i "gitlab|wshoto|token|glpat"
+   # → npm pack 输出流只含文件名，不含文件内容
+   # → grep 无匹配 ≠ 入包文件内容安全
+```
+
+**npm 硬编码行为：** `README.md`、`package.json`、`LICENSE` 是 npm 硬编码始终包含的文件，无法通过 `.npmignore` 或 `files` 字段排除。因此 README.md 的内容安全必须作为独立验证项覆盖。
+
+> 来源：Story 5-5c CR R1 — B5 验证方法 `npm pack --dry-run 2>&1 | grep` 只扫描了 npm 输出流中的文件名，README.md 中的 `gitlab.example.com` 和 `glpat-xxxx` 未被检出，产生假阴性。
+
 ### Testing Patterns
 
 **测试命名：** `describe` 用模块名，`it` 用行为描述
