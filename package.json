@@ -20,7 +20,19 @@
   "files": [
     "dist"
   ],
-  "keywords": [],
+  "keywords": [
+    "ai",
+    "copilot",
+    "claude",
+    "cursor",
+    "vscode",
+    "agents",
+    "skills",
+    "mcp",
+    "cli",
+    "installer",
+    "configuration"
+  ],
   "license": "MIT",
   "dependencies": {
     "@inquirer/prompts": "^8.3.2",

@@ -1,271 +1,273 @@
 # aiforge
 
-> 从任意 Git 仓库安装 AI 编码配置到 Copilot / Claude / Cursor 等工具 — 一条命令，多端生效。
+> Sync AI coding configurations from any Git repository to Copilot, Claude Code, Cursor, and more — one command, all tools.
 
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## 简介
+**English** | [中文](README.zh.md)
 
-**aiforge** 是一个通过 `npx` 运行的命令行工具，能够从任意 Git 仓库中读取 AI 编码辅助配置（Instructions、Skills、Agents、MCP Tools），并按照各 AI 工具的目录约定，自动安装到用户全局目录或项目目录。
+## What is aiforge?
+
+**aiforge** is a CLI tool (runs via `npx`) that reads AI coding configurations — Agents, Skills, Instructions, and MCP Tools — from any Git repository and installs them to the correct locations for each AI tool automatically.
 
 ```
-知识仓库（Git）             aiforge               本地 AI 工具
-┌──────────────┐     ┌──────────────┐     ┌────────────────┐
-│  agents/     │     │              │     │ GitHub Copilot │
-│  skills/     │────→│  自动检测     │────→│ Claude Code    │
-│  instructions│     │  规则匹配     │     │ Cursor         │
-│  mcp-tools/  │     │  安装分发     │     │ VS Code        │
-└──────────────┘     └──────────────┘     │ Windsurf       │
-                                          └────────────────┘
+Knowledge Repo (Git)            aiforge              Local AI Tools
+┌──────────────┐         ┌──────────────┐      ┌────────────────┐
+│  agents/     │         │              │      │ GitHub Copilot │
+│  skills/     │────────>│  Auto-detect │─────>│ Claude Code    │
+│  instructions│         │  Rule-match  │      │ Cursor         │
+│  mcp-tools/  │         │  Install     │      │ VS Code        │
+└──────────────┘         └──────────────┘      └────────────────┘
 ```
 
-## 特性
+**The problem:** Each AI coding tool has its own directory conventions — Copilot uses `~/.copilot/agents/`, Cursor uses `~/.cursor/rules/`, Claude uses `~/.claude/skills/`. Maintaining configurations across all tools is tedious and error-prone.
 
-- **多工具支持** — 自动检测并安装到 GitHub Copilot、Claude Code、Cursor、VS Code、Windsurf
-- **全局 + 项目** — 支持用户级全局安装（`-g`）和项目级安装（默认）
-- **复制 / 符号链接** — 默认复制文件；`-l` 使用符号链接，`git pull` 即可自动更新
-- **四类资源** — Agents、Skills、Instructions、MCP Tools 全覆盖
-- **自动检测** — 扫描本地环境，自动判断已安装的 AI 工具
-- **私有仓库** — 支持 SSH Key、Token、环境变量、系统凭据管理器四种认证方式
-- **安全优先** — npm 包不含任何仓库 URL 或 Token，配置仅存于本地
-- **预览模式** — `--dry-run` 查看安装计划，不写入任何文件
+**The solution:** aiforge acts as a **universal adapter** — your team maintains one knowledge repository, and aiforge handles the per-tool directory mapping, file placement, and update detection automatically.
 
-## 快速开始
+## Features
 
-### 前置要求
+- **Multi-tool support** — Auto-detects and installs to GitHub Copilot, Claude Code, Cursor, and VS Code
+- **Global + Project scope** — User-level global install (`-g`) or project-level install (default)
+- **Copy or Symlink** — Copy files by default; use `-l` for symlinks that auto-update with `git pull`
+- **Four resource types** — Agents, Skills, Instructions, and MCP Tools
+- **Smart detection** — Scans your environment to find installed AI tools automatically
+- **Private repos** — Supports SSH, Token, environment variables, and system credential managers
+- **Security-first** — npm package contains zero repository URLs or tokens; all credentials stay local
+- **Preview mode** — `--dry-run` shows the installation plan without writing any files
+- **Bilingual output** — Chinese and English interface (`zh-CN` / `en`)
+
+## Quick Start
+
+### Prerequisites
 
 - [Node.js](https://nodejs.org/) >= 18.0.0
 - [Git](https://git-scm.com/) >= 2.20
 
-### 首次配置
+### First-time Setup
 
 ```bash
 npx aiforge init
 ```
 
-交互式引导你完成默认仓库和认证方式的配置，信息保存到 `~/.aiforge/config.json`。
+Interactive wizard guides you through configuring your default repository and authentication method. Settings are saved to `~/.aiforge/config.json`.
 
-### 安装到全局（推荐）
+### Install Globally (Recommended)
 
 ```bash
-# 符号链接模式：持久化仓库 + 自动更新
+# Symlink mode: persistent repo + auto-updates via git pull
 npx aiforge -g -l
 ```
 
-### 安装到当前项目
+### Install to Current Project
 
 ```bash
 cd your-project
 npx aiforge
 ```
 
-## 使用方式
+## Usage
 
-### 主命令：安装
+### Main Command
 
 ```bash
-aiforge [repo-url] [options]
+npx aiforge [repo-url] [options]
 ```
 
-| 参数/选项 | 说明 |
-|----------|------|
-| `repo-url` | Git 仓库 URL 或 GitHub 简写（可省略，使用默认仓库） |
-| `-g, --global` | 安装到用户全局目录 |
-| `-l, --link` | 使用符号链接模式 |
-| `-t, --tools <tools...>` | 指定目标工具（如 `copilot claude cursor`） |
-| `-d, --dirs <dirs...>` | 指定源目录（如 `skills agents`） |
-| `--dry-run` | 预览模式，不写入文件 |
-| `--force` | 覆盖已存在文件，不备份 |
-| `--ssh` | 强制使用 SSH 协议 |
-| `--token <token>` | 使用 Personal Access Token |
-| `--clone-dir <path>` | 指定持久化克隆路径 |
+| Option | Description |
+|--------|-------------|
+| `repo-url` | Git repository URL (optional if default repo is configured) |
+| `-g, --global` | Install to user-level global directories |
+| `-l, --link` | Use symlink mode instead of copy |
+| `-t, --tools <tools...>` | Specify target tools (e.g., `copilot claude cursor`) |
+| `-d, --dirs <dirs...>` | Filter resource types (e.g., `skills agents`) |
+| `--dry-run` | Preview installation plan without writing files |
+| `--quiet` | Minimal output |
+| `--force` | Overwrite existing files without confirmation |
+| `--ssh` | Force SSH authentication |
+| `--token <token>` | Provide a personal access token |
+| `--clone-dir <path>` | Custom persistent clone directory |
 
-### 使用示例
+### Examples
 
 ```bash
-# 使用已配置的默认仓库
+# Use configured default repository
 npx aiforge
 
-# 指定仓库 URL
+# Specify a repository URL
 npx aiforge https://your-git-host.com/team/ai-configs.git
 
-# 全局 + 符号链接（推荐长期使用）
+# Global install with symlinks (recommended for long-term use)
 npx aiforge -g -l
 
-# 只安装 Skills 和 Agents 到 Copilot
+# Install only Skills and Agents for Copilot
 npx aiforge -t copilot -d skills agents
 
-# 预览安装计划
+# Preview what would be installed
 npx aiforge --dry-run
+
+# Force overwrite all existing files
+npx aiforge --force
+
+# Use SSH authentication
+npx aiforge --ssh
 ```
 
-### 子命令
+### Subcommands
 
 ```bash
-# 交互式初始化配置
-aiforge init
+# Interactive initial configuration
+npx aiforge init
 
-# 更新已持久化的仓库
-aiforge update
+# Update a previously cloned repository
+npx aiforge update
 
-# 查看支持的工具及路径映射
-aiforge list
+# List supported tools and their path mappings
+npx aiforge list
 ```
 
-## 支持的 AI 工具
+## Supported AI Tools
 
-| 工具 | 全局安装 | 项目安装 | 支持的资源类型 |
-|------|:------:|:------:|-------------|
-| GitHub Copilot | ✅ | ✅ | Agents, Skills, Instructions, MCP |
-| Claude Code | ✅ | ✅ | Skills |
-| Cursor | ✅ | ✅ | Skills, Agents, Instructions |
-| VS Code | ✅ | — | MCP |
-| Windsurf | — | ✅ | Skills |
+| Tool | Global | Project | Resource Types |
+|------|:------:|:-------:|----------------|
+| GitHub Copilot | ✅ | ✅ | Agents, Skills, Instructions, MCP Tools |
+| Claude Code | ✅ | ✅ | Agents, Skills |
+| Cursor | ✅ | ✅ | Skills, Agents |
+| VS Code | ✅ | — | MCP Tools |
 
-## 知识仓库结构
+### Detailed Install Rules
 
-任何遵循以下目录约定的 Git 仓库都可以作为 aiforge 的知识源：
+<details>
+<summary>Click to expand the full 16-rule matrix</summary>
+
+| Tool | Scope | Source Dir | Install Type | Target Dir |
+|------|-------|-----------|:------------:|------------|
+| Copilot | global | `agents/` | Files | `~/.copilot/agents/` |
+| Copilot | global | `skills/` | Directories | `~/.copilot/skills/` |
+| Copilot | global | `instructions/` | Files | `~/.copilot/` |
+| Copilot | global | `mcp-tools/` | Files | `~/.copilot/` |
+| Copilot | project | `agents/` | Files | `.github/agents/` |
+| Copilot | project | `skills/` | Directories | `.github/skills/` |
+| Copilot | project | `instructions/` | Files | `.github/` |
+| Copilot | project | `mcp-tools/` | Files | `.github/` |
+| Claude | global | `agents/` | Files | `~/.claude/agents/` |
+| Claude | global | `skills/` | Directories | `~/.claude/skills/` |
+| Claude | project | `agents/` | Files | `.claude/agents/` |
+| Claude | project | `skills/` | Directories | `.claude/skills/` |
+| Cursor | global | `skills/` | Flatten | `~/.cursor/rules/` |
+| Cursor | project | `skills/` | Flatten | `.cursor/rules/` |
+| Cursor | project | `agents/` | Files | `.cursor/rules/` |
+| VS Code | global | `mcp-tools/` | Files | `~/.vscode/` |
+
+</details>
+
+## Knowledge Repository Structure
+
+Any Git repository following this directory convention can be used as an aiforge knowledge source:
 
 ```
 your-knowledge-repo/
-├── aiforge.json            # 可选：自定义安装清单
-├── agents/                 # Agent 定义（专家角色）
-│   └── *.agent.md
-├── skills/                 # Skill 定义（操作手册）
-│   └── <skill-name>/
-│       └── skill.md
-├── instructions/           # 全局/场景化指令
+├── agents/                 # Agent definitions (expert roles)
+│   ├── coding-agent.md
+│   └── review-agent.md
+├── skills/                 # Skill definitions (operational guides)
+│   └── code-review/
+│       ├── skill.md        # Main file (used for Flatten mode)
+│       └── templates/
+├── instructions/           # Global/contextual instructions
 │   ├── copilot-instructions.md
-│   └── *.instructions.md
-└── mcp-tools/              # MCP 服务器配置
+│   └── security.instructions.md
+└── mcp-tools/              # MCP server configurations
     └── mcp.json
 ```
 
-## 安装模式
+## Install Modes
 
-### 复制模式（默认）
+### Copy Mode (Default)
 
-将文件从仓库复制到目标目录。适合项目级安装，文件作为独立副本存在。
+Copies files from the repository to target directories. Files are independent snapshots.
 
 ```bash
-npx aiforge          # 项目安装，复制文件
-npx aiforge -g       # 全局安装，复制文件
+npx aiforge          # Project install, copy mode
+npx aiforge -g       # Global install, copy mode
 ```
 
-### 符号链接模式
+### Symlink Mode
 
-将仓库持久化到本地，在目标目录创建符号链接。后续通过 `git pull` 或 `aiforge update` 即可自动更新。
+Persists the repository locally and creates symlinks in target directories. Updates automatically when you run `git pull` or `npx aiforge update`.
 
 ```bash
-npx aiforge -g -l    # 全局安装，符号链接
+npx aiforge -g -l    # Global install, symlink mode
 ```
 
-## 认证
+> **Note:** Symlink mode is available for global installs only. Project-level installs always use copy mode.
 
-aiforge 按以下优先级解析认证信息：
+### Flatten Mode
 
-1. **CLI 参数** — `--token <value>` 或 `--ssh`
-2. **环境变量** — `AIFORGE_TOKEN` / `GITLAB_TOKEN` / `GIT_TOKEN`
-3. **配置文件** — `~/.aiforge/config.json` 中的 `auth` 字段
-4. **全局偏好** — `config.json` 中的 `preferSSH`
-5. **系统凭据** — macOS Keychain / Windows 凭据管理器
+Automatically applied to specific rules (e.g., Cursor skills). Extracts the main file from each skill directory and renames it to the skill directory name — so `skills/code-review/skill.md` becomes `code-review.md` in the target directory.
+
+## Authentication
+
+aiforge resolves authentication in the following priority order:
+
+1. **CLI arguments** — `--token <value>` or `--ssh`
+2. **Environment variables** — `AIFORGE_TOKEN` / `GITLAB_TOKEN` / `GIT_TOKEN`
+3. **Config file** — `~/.aiforge/config.json` (`auth` field per hostname)
+4. **System credentials** — macOS Keychain / credential managers
 
 ```bash
-# SSH 方式
+# SSH authentication
 npx aiforge https://your-git-host.com/team/repo.git --ssh
 
-# Token 方式
+# Token authentication
 npx aiforge https://your-git-host.com/team/repo.git --token <your-access-token>
 
-# 环境变量方式（适合 CI/CD）
+# Environment variable (recommended for CI/CD)
 export GIT_TOKEN=<your-access-token>
 npx aiforge https://your-git-host.com/team/repo.git
 ```
 
-## 配置文件
+## Configuration
 
-首次运行 `aiforge init` 后，配置保存在 `~/.aiforge/config.json`：
+After running `npx aiforge init`, settings are saved to `~/.aiforge/config.json`:
 
 ```jsonc
 {
   "defaultRepo": "https://your-git-host.com/team/ai-configs.git",
   "preferSSH": true,
   "cloneDir": "~/ai-configs",
+  "language": "en",
   "auth": {
     "your-git-host.com": {
-      "method": "token",
-      "token": "<your-access-token>"
+      "method": "ssh"
     }
   }
 }
 ```
 
-## 项目架构
+| Field | Description |
+|-------|-------------|
+| `defaultRepo` | Default repository URL (used when no repo-url argument is provided) |
+| `preferSSH` | Global preference for SSH authentication |
+| `cloneDir` | Directory for persistent repository clones |
+| `language` | Output language: `zh-CN` (default) or `en` |
+| `auth` | Per-hostname authentication settings |
 
-```
-aiforge/
-├── bin/
-│   └── aiforge.js          # CLI 入口
-├── src/
-│   ├── auth.js             # 认证与配置管理
-│   ├── clone.js            # Git 仓库克隆/更新
-│   ├── config.js           # 工具定义 + 安装规则映射表
-│   ├── detect.js           # AI 工具检测
-│   ├── installer.js        # 安装引擎（核心协调器）
-│   └── utils.js            # 文件操作工具
-├── docs/
-│   ├── PRD.md              # 产品需求文档
-│   └── architect.md        # 架构设计文档
-└── test/                   # 测试
-```
+## Compatibility
 
-## 扩展新的 AI 工具
-
-只需在 `src/config.js` 中注册工具并添加安装规则，无需修改其他模块：
-
-```javascript
-// 1. 注册工具
-TOOLS.newTool = {
-  name: 'New AI Tool',
-  detect: {
-    global: [path.join(HOME, '.newtool')],
-    project: ['.newtool'],
-  },
-};
-
-// 2. 添加安装规则
-INSTALL_RULES.push({
-  tool: 'newTool',
-  scope: 'project',
-  sourceDir: 'skills',
-  type: 'flatten',
-  mainFile: 'skill.md',
-  targetDir: '.newtool/rules',
-  desc: 'New Tool 规则',
-});
-```
-
-## 技术栈
-
-| 技术 | 用途 |
-|------|------|
-| Node.js (ESM) | 运行时 |
-| [commander](https://www.npmjs.com/package/commander) | CLI 参数解析 |
-| [chalk](https://www.npmjs.com/package/chalk) | 终端彩色输出 |
-| [ora](https://www.npmjs.com/package/ora) | Spinner 动画 |
-| [inquirer](https://www.npmjs.com/package/inquirer) | 交互式提示 |
-| [simple-git](https://www.npmjs.com/package/simple-git) | Git 操作封装 |
-| [fs-extra](https://www.npmjs.com/package/fs-extra) | 增强文件操作 |
-| [vitest](https://www.npmjs.com/package/vitest) | 单元测试 |
-
-## 兼容性
-
-| 维度 | 要求 |
-|------|------|
+| Dimension | Requirement |
+|-----------|-------------|
 | Node.js | >= 18.0.0 |
 | Git | >= 2.20 |
-| 操作系统 | macOS、Linux（Windows 支持计划中） |
+| OS | macOS, Linux (Windows support planned) |
+
+## Documentation
+
+- [Getting Started](docs/getting-started.md) — Step-by-step first-use guide
+- [Configuration Reference](docs/configuration.md) — All settings and environment variables
+- [Troubleshooting](docs/troubleshooting.md) — Common errors and solutions
+- [Extending aiforge](docs/extending.md) — Adding support for new AI tools
+- [Install Rules Matrix](docs/install-rules-matrix.md) — Complete rule reference
 
 ## License
 

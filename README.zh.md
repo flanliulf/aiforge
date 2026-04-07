@@ -1,0 +1,360 @@
+# aiforge
+
+> 从任意 Git 仓库安装 AI 编码配置到 Copilot / Claude / Cursor 等工具 — 一条命令，多端生效。
+
+[![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+[English](README.md) | **中文**
+
+## 简介
+
+**aiforge** 是一个通过 `npx` 运行的命令行工具，能够从任意 Git 仓库中读取 AI 编码辅助配置（Agents、Skills、Instructions、MCP Tools），并按照各 AI 工具的目录约定，自动安装到用户全局目录或项目目录。
+
+```
+知识仓库（Git）             aiforge               本地 AI 工具
+┌──────────────┐     ┌──────────────┐     ┌────────────────┐
+│  agents/     │     │              │     │ GitHub Copilot │
+│  skills/     │────→│  自动检测     │────→│ Claude Code    │
+│  instructions│     │  规则匹配     │     │ Cursor         │
+│  mcp-tools/  │     │  安装分发     │     │ VS Code        │
+└──────────────┘     └──────────────┘     └────────────────┘
+```
+
+**问题**：每个 AI 编码工具都有独立的目录约定 — Copilot 使用 `~/.copilot/agents/`，Cursor 使用 `~/.cursor/rules/`，Claude 使用 `~/.claude/skills/`。跨工具维护配置既繁琐又容易出错。
+
+**方案**：aiforge 充当**通用适配器** — 团队只需维护一份知识仓库，aiforge 自动处理各工具的目录映射、文件放置和增量更新。
+
+## 特性
+
+- **多工具支持** — 自动检测并安装到 GitHub Copilot、Claude Code、Cursor、VS Code
+- **全局 + 项目** — 支持用户级全局安装（`-g`）和项目级安装（默认）
+- **复制 / 符号链接** — 默认复制文件；`-l` 使用符号链接，`git pull` 即可自动更新
+- **四类资源** — Agents、Skills、Instructions、MCP Tools 全覆盖
+- **自动检测** — 扫描本地环境，自动判断已安装的 AI 工具
+- **私有仓库** — 支持 SSH Key、Token、环境变量、系统凭据管理器四种认证方式
+- **安全优先** — npm 包不含任何仓库 URL 或 Token，配置仅存于本地
+- **预览模式** — `--dry-run` 查看安装计划，不写入任何文件
+- **中英双语** — 支持 `zh-CN` 和 `en` 输出语言
+
+## 快速开始
+
+### 前置要求
+
+- [Node.js](https://nodejs.org/) >= 18.0.0
+- [Git](https://git-scm.com/) >= 2.20
+
+### 首次配置
+
+```bash
+npx aiforge init
+```
+
+交互式引导你完成默认仓库和认证方式的配置，信息保存到 `~/.aiforge/config.json`。
+
+### 安装到全局（推荐）
+
+```bash
+# 符号链接模式：持久化仓库 + 自动更新
+npx aiforge -g -l
+```
+
+### 安装到当前项目
+
+```bash
+cd your-project
+npx aiforge
+```
+
+## 使用方式
+
+### 主命令：安装
+
+```bash
+npx aiforge [repo-url] [options]
+```
+
+| 参数/选项 | 说明 |
+|----------|------|
+| `repo-url` | Git 仓库 URL（可省略，使用默认仓库） |
+| `-g, --global` | 安装到用户全局目录 |
+| `-l, --link` | 使用符号链接模式 |
+| `-t, --tools <tools...>` | 指定目标工具（如 `copilot claude cursor`） |
+| `-d, --dirs <dirs...>` | 指定源目录（如 `skills agents`） |
+| `--dry-run` | 预览模式，不写入文件 |
+| `--quiet` | 极简输出 |
+| `--force` | 覆盖已存在文件，不备份 |
+| `--ssh` | 强制使用 SSH 协议 |
+| `--token <token>` | 使用 Personal Access Token |
+| `--clone-dir <path>` | 指定持久化克隆路径 |
+
+### 使用示例
+
+```bash
+# 使用已配置的默认仓库
+npx aiforge
+
+# 指定仓库 URL
+npx aiforge https://your-git-host.com/team/ai-configs.git
+
+# 全局 + 符号链接（推荐长期使用）
+npx aiforge -g -l
+
+# 只安装 Skills 和 Agents 到 Copilot
+npx aiforge -t copilot -d skills agents
+
+# 预览安装计划
+npx aiforge --dry-run
+
+# 强制覆盖所有文件
+npx aiforge --force
+
+# 使用 SSH 认证
+npx aiforge --ssh
+```
+
+### 子命令
+
+```bash
+# 交互式初始化配置
+npx aiforge init
+
+# 更新已持久化的仓库
+npx aiforge update
+
+# 查看支持的工具及路径映射
+npx aiforge list
+```
+
+## 支持的 AI 工具
+
+| 工具 | 全局安装 | 项目安装 | 支持的资源类型 |
+|------|:------:|:------:|-------------|
+| GitHub Copilot | ✅ | ✅ | Agents, Skills, Instructions, MCP Tools |
+| Claude Code | ✅ | ✅ | Agents, Skills |
+| Cursor | ✅ | ✅ | Skills, Agents |
+| VS Code | ✅ | — | MCP Tools |
+
+### 完整安装规则矩阵
+
+<details>
+<summary>点击展开 16 条规则详情</summary>
+
+| 工具 | 范围 | 源目录 | 安装类型 | 目标目录 |
+|------|------|-------|:------:|---------|
+| Copilot | 全局 | `agents/` | Files | `~/.copilot/agents/` |
+| Copilot | 全局 | `skills/` | Directories | `~/.copilot/skills/` |
+| Copilot | 全局 | `instructions/` | Files | `~/.copilot/` |
+| Copilot | 全局 | `mcp-tools/` | Files | `~/.copilot/` |
+| Copilot | 项目 | `agents/` | Files | `.github/agents/` |
+| Copilot | 项目 | `skills/` | Directories | `.github/skills/` |
+| Copilot | 项目 | `instructions/` | Files | `.github/` |
+| Copilot | 项目 | `mcp-tools/` | Files | `.github/` |
+| Claude | 全局 | `agents/` | Files | `~/.claude/agents/` |
+| Claude | 全局 | `skills/` | Directories | `~/.claude/skills/` |
+| Claude | 项目 | `agents/` | Files | `.claude/agents/` |
+| Claude | 项目 | `skills/` | Directories | `.claude/skills/` |
+| Cursor | 全局 | `skills/` | Flatten | `~/.cursor/rules/` |
+| Cursor | 项目 | `skills/` | Flatten | `.cursor/rules/` |
+| Cursor | 项目 | `agents/` | Files | `.cursor/rules/` |
+| VS Code | 全局 | `mcp-tools/` | Files | `~/.vscode/` |
+
+</details>
+
+## 知识仓库结构
+
+任何遵循以下目录约定的 Git 仓库都可以作为 aiforge 的知识源：
+
+```
+your-knowledge-repo/
+├── agents/                 # Agent 定义（专家角色）
+│   ├── coding-agent.md
+│   └── review-agent.md
+├── skills/                 # Skill 定义（操作手册）
+│   └── code-review/
+│       ├── skill.md        # 主文件（Flatten 模式使用）
+│       └── templates/
+├── instructions/           # 全局/场景化指令
+│   ├── copilot-instructions.md
+│   └── security.instructions.md
+└── mcp-tools/              # MCP 服务器配置
+    └── mcp.json
+```
+
+## 安装模式
+
+### 复制模式（默认）
+
+将文件从仓库复制到目标目录。文件作为独立副本存在，适合项目级安装。
+
+```bash
+npx aiforge          # 项目安装，复制文件
+npx aiforge -g       # 全局安装，复制文件
+```
+
+### 符号链接模式
+
+将仓库持久化到本地，在目标目录创建符号链接。后续通过 `git pull` 或 `npx aiforge update` 即可自动更新。
+
+```bash
+npx aiforge -g -l    # 全局安装，符号链接
+```
+
+> **注意：** 符号链接模式仅支持全局安装。项目级安装始终使用复制模式。
+
+### Flatten 模式
+
+特定规则（如 Cursor skills）自动使用。将子目录中的主文件提取并重命名 — 例如 `skills/code-review/skill.md` 会变为目标目录中的 `code-review.md`。
+
+## 认证
+
+aiforge 按以下优先级解析认证信息：
+
+1. **CLI 参数** — `--token <value>` 或 `--ssh`
+2. **环境变量** — `AIFORGE_TOKEN` / `GITLAB_TOKEN` / `GIT_TOKEN`
+3. **配置文件** — `~/.aiforge/config.json` 中的 `auth` 字段（按 hostname 索引）
+4. **系统凭据** — macOS Keychain / 系统凭据管理器
+
+```bash
+# SSH 方式
+npx aiforge https://your-git-host.com/team/repo.git --ssh
+
+# Token 方式
+npx aiforge https://your-git-host.com/team/repo.git --token <your-access-token>
+
+# 环境变量方式（适合 CI/CD）
+export GIT_TOKEN=<your-access-token>
+npx aiforge https://your-git-host.com/team/repo.git
+```
+
+## 配置文件
+
+首次运行 `npx aiforge init` 后，配置保存在 `~/.aiforge/config.json`：
+
+```jsonc
+{
+  "defaultRepo": "https://your-git-host.com/team/ai-configs.git",
+  "preferSSH": true,
+  "cloneDir": "~/ai-configs",
+  "language": "zh-CN",
+  "auth": {
+    "your-git-host.com": {
+      "method": "ssh"
+    }
+  }
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `defaultRepo` | 默认仓库 URL（省略 repo-url 参数时使用） |
+| `preferSSH` | 全局 SSH 偏好 |
+| `cloneDir` | 持久化克隆目录路径 |
+| `language` | 输出语言：`zh-CN`（默认）或 `en` |
+| `auth` | 按 hostname 索引的认证配置 |
+
+## 项目架构
+
+```
+aiforge/
+├── src/
+│   ├── index.ts              # CLI 入口 (commander.js)
+│   ├── pipeline.ts           # 管道编排器
+│   ├── core/                 # 核心模块（零外部依赖）
+│   │   ├── types.ts          # 类型定义
+│   │   ├── errors.ts         # AiforgeError 统一错误
+│   │   ├── reporter.ts       # 输出抽象（Tty/Plain/Quiet）
+│   │   ├── messages.ts       # i18n 消息字符串
+│   │   ├── path-resolver.ts  # 平台路径解析
+│   │   └── sanitize.ts       # Token 脱敏
+│   ├── stages/               # 管道阶段
+│   │   ├── resolve-source.ts # 解析仓库地址
+│   │   ├── authenticate.ts   # 四层认证链
+│   │   ├── clone.ts          # Git 克隆/增量更新
+│   │   ├── detect-tools.ts   # AI 工具检测
+│   │   ├── match-rules.ts    # 规则匹配引擎
+│   │   └── execute-install.ts# 安装执行（含 preflight）
+│   ├── services/             # 服务层
+│   │   ├── config.ts         # 配置管理
+│   │   ├── git.ts            # simple-git 封装
+│   │   ├── manifest.ts       # manifest.json 管理
+│   │   └── fs-utils.ts       # 文件系统工具
+│   ├── data/                 # 纯数据（零运行时依赖）
+│   │   ├── tool-registry.ts  # 工具检测注册表
+│   │   └── install-rules.ts  # 安装规则常量
+│   └── commands/
+│       └── init.ts           # aiforge init 子命令
+├── tests/                    # 708 测试（镜像 src/ 结构）
+└── dist/                     # 构建输出（ESM）
+```
+
+### 管道流程
+
+```
+Resolve → Auth → Clone → Detect → Match → [Install(含preflight)] → Report
+                                            ↑ dry-run 在此跳过
+```
+
+## 扩展新的 AI 工具
+
+只需在两个数据文件中添加配置，无需修改引擎代码：
+
+```typescript
+// 1. 在 src/data/tool-registry.ts 注册工具
+export const TOOL_DEFINITIONS: ToolDefinition[] = [
+  // ...existing tools...
+  {
+    id: 'newtool',
+    name: 'New AI Tool',
+    detect: {
+      global: ['~/.newtool'],
+      project: ['.newtool'],
+    },
+  },
+]
+
+// 2. 在 src/data/install-rules.ts 添加规则
+export const BUILTIN_RULES: InstallRule[] = [
+  // ...existing rules...
+  {
+    tool: 'newtool',
+    scope: 'project',
+    sourceDir: 'skills',
+    type: 'Flatten' as InstallType,
+    targetDir: '.newtool/rules/',
+  },
+]
+```
+
+## 技术栈
+
+| 技术 | 用途 |
+|------|------|
+| TypeScript (ESM) | 开发语言，严格模式 |
+| [tsup](https://www.npmjs.com/package/tsup) | 构建工具（esbuild-based） |
+| [commander](https://www.npmjs.com/package/commander) | CLI 参数解析 |
+| [chalk](https://www.npmjs.com/package/chalk) v5+ | 终端彩色输出 |
+| [ora](https://www.npmjs.com/package/ora) v8+ | Spinner 动画 |
+| [@inquirer/prompts](https://www.npmjs.com/package/@inquirer/prompts) | 交互式提示 |
+| [simple-git](https://www.npmjs.com/package/simple-git) ~3.32 | Git 操作封装 |
+| [vitest](https://www.npmjs.com/package/vitest) | 测试框架（708 测试） |
+
+## 兼容性
+
+| 维度 | 要求 |
+|------|------|
+| Node.js | >= 18.0.0 |
+| Git | >= 2.20 |
+| 操作系统 | macOS、Linux（Windows 支持计划中） |
+
+## 文档
+
+- [快速入门](docs/getting-started.zh.md) — 分步首次使用指南
+- [配置参考](docs/configuration.md) — 完整配置和环境变量
+- [故障排除](docs/troubleshooting.md) — 常见错误及解决方案
+- [扩展指南](docs/extending.md) — 添加新 AI 工具支持
+- [安装规则矩阵](docs/install-rules-matrix.md) — 完整规则参考
+
+## License
+
+[MIT](LICENSE)
