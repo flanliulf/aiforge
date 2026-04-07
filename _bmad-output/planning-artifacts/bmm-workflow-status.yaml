@@ -53,17 +53,9 @@ current_activity:
     - epic-2: "done"  # 知识仓库获取与认证 — 5/5 Stories 完成（2026-03-25）
     - epic-3: "done"  # 智能检测与安装规划 — 3/3 Stories 完成（2026-03-25）
     - epic-4: "done"  # 安装执行与冲突保护 — 7/7 Stories 完成（2026-03-31），Retrospective 完成（2026-03-31）
-  completed_stories:
-    - 5-1-phase-progress-and-spinner: "done"  # 阶段式进度与 spinner 动画 — CR Approved（2026-03-31）
-    - 5-2-tree-result-summary-and-stats: "done"  # 树形结果汇总与统计 — CR Approved（2026-03-31）
-    - 5-3-tty-adaptive-and-quiet-mode: "done"  # TTY 自适应与 quiet 模式 — CR Approved（2026-04-01）
-    - 5-4-three-part-error-messages: "done"  # 三段式错误提示完善 — CR Approved（2026-04-01）
-    - 5-5a-i18n-language-selection: "done"  # 国际化语言选择与配置 — CR Approved（2026-04-01）
-    - 5-5b-e2e-integration-tests: "done"  # E2E 集成测试 — CR Approved（2026-04-02）
-    - 5-5c-mvp-go-nogo-gate: "done"  # MVP Go/No-Go 发布门禁验收 — CR Approved（2026-04-03）
-    - 5-6-tech-debt-cleanup: "done"  # 技术债快速清理与 lint 门禁修正 — CR Approved（2026-04-03）
-  notes: "Story 5-6 完成 CR（1轮，无阻塞项），状态更新为 done。技术债清理 Sprint 中 Story 5-6 已交付。"
+    - epic-5: "done"  # 端到端体验与发布就绪 — 9/9 Stories 完成（2026-04-03），Retrospective 完成（2026-04-07）
+  completed_stories: []  # Epic 5 已全部完成并归档到 completed_epics
+  notes: "Epic 5 最终回顾完成（2026-04-07）。全项目 5 Epic / 27 Story 全部交付，MVP Go 状态。708 测试零回归，CR TODO 4 open / 12 resolved。"
   next_steps:
-    - "Story 5-7 待开发（回归测试加固）"
-    - "5-7 完成后确认是否更新 epic-5 状态为 done"
-    - "考虑启动 Epic 5 Retrospective"
+    - "MVP 发布准备"
+    - "M2 规划启动"

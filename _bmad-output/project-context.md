@@ -90,6 +90,23 @@ index.ts → pipeline.ts → stages/* → services/*
 - `commands/` may depend on `core/`, `services/`
 - **NEVER create circular dependencies**
 
+### Cross-Cutting Concern Checklist（横切关注点检查清单）
+
+当 Story 被识别为横切关注点（满足以下**任一**标准即触发）时，开发前**必须**执行三步检查清单，否则 CR 反复发现遗漏的轮数会显著增加。
+
+**识别标准：**
+- 改动涉及 ≥4 个 `src/` 子目录
+- 修改共享资源（`core/types.ts`、`core/messages.ts`、`data/` 下的常量注册表）
+- Story 描述含"全仓/跨模块/横切"类关键词
+
+**三步清单：**
+
+1. **影响面 grep 扫描**：`grep -rn "<关键函数/类型/字符串>" src/ --include="*.ts"` — 生成受影响文件列表
+2. **逐文件标注处置方式**：对每个受影响文件标注 `改动 / 审查无需改 / 不涉及`，形成核查清单
+3. **模块分组检查报告**：按 `core/ → data/ → services/ → stages/ → commands/` 顺序分组列出改动计划，每组完成后打勾确认，作为 CR 自查附件提交
+
+> 来源：Epic 5 Retrospective — Story 5-5a（i18n）经历 6 轮 CR，根因是横切关注点影响面跨 10 个生产代码文件，传统线性执行模式不适配，每轮 CR 逐个发现遗漏。
+
 <!-- PLACEHOLDER_APPEND -->
 
 ### Type Semantic Layers（类型语义分层）
