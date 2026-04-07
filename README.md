@@ -269,6 +269,79 @@ After running `npx aiforge init`, settings are saved to `~/.aiforge/config.json`
 - [Extending aiforge](docs/extending.md) — Adding support for new AI tools
 - [Install Rules Matrix](docs/install-rules-matrix.md) — Complete rule reference
 
+## Versioning
+
+aiforge follows [Semantic Versioning](https://semver.org/) during the `0.x` pre-release phase:
+
+| Version | Trigger | Example |
+|---------|---------|---------|
+| `v0.x.0` | New milestone / major feature set | `v0.2.0` — M2 first batch |
+| `v0.x.y` | Hotfix or patch within a milestone | `v0.1.1` — bug fix |
+
+Currently in the `0.x` stage: the minor version (`x`) increments with each milestone, and the patch version (`y`) is used for hotfixes.
+
+## Reporting Issues
+
+Found a bug or have a feature request? Please [open an issue](https://gitlab.wshmi.com/chunxiao/aiforge/-/issues/new) on GitLab.
+
+To help us resolve the issue quickly, please include:
+
+1. **aiforge version** — `npx aiforge --version`
+2. **Environment** — OS, Node.js version (`node -v`), Git version (`git -v`)
+3. **Steps to reproduce** — Exact commands you ran
+4. **Expected vs actual behavior** — What you expected to happen and what actually happened
+5. **Error output** — Full three-part error message (if applicable)
+
+> **Tip:** Running `npx aiforge --dry-run` and attaching the output can help us diagnose installation rule issues without any side effects.
+
+### Issue Template
+
+```markdown
+**Type:** Bug / Feature Request
+
+**Environment:**
+- aiforge: <version>
+- Node.js: <version>
+- Git: <version>
+- OS: <os and version>
+
+**Description:**
+<Clear description of the problem or feature request>
+
+**Steps to Reproduce:** (Bug only)
+1. Run `npx aiforge ...`
+2. ...
+
+**Expected Behavior:**
+<What you expected>
+
+**Actual Behavior:**
+<What actually happened>
+
+**Error Output:** (if applicable)
+<Paste the full three-part error message here>
+
+**Dry-run Output:** (if applicable)
+<Paste the output of `npx aiforge --dry-run` here>
+```
+
+### AI-Assisted Issue Writing
+
+If you use an AI assistant (e.g., Copilot, Claude, Cursor) to help draft issues, you can use the following prompt:
+
+> Help me write a GitLab issue for the **aiforge** project (an AI coding configuration installer CLI). Follow this format strictly:
+>
+> 1. Title: concise summary in imperative form (e.g., "Fix auth failure when using SSH with proxy")
+> 2. Type: Bug or Feature Request
+> 3. Environment: aiforge version, Node.js version, Git version, OS
+> 4. Description: 2-3 sentences explaining the problem or request
+> 5. Steps to Reproduce (bugs only): numbered list of exact commands
+> 6. Expected vs Actual Behavior: clearly separated
+> 7. Error Output: full three-part error (What / Why / How to fix) if available
+> 8. Dry-run Output: output of `npx aiforge --dry-run` if relevant to install rules
+>
+> Keep the tone factual, avoid speculation on root cause, and include only verifiable information.
+
 ## License
 
 [MIT](LICENSE)

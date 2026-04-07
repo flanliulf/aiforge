@@ -350,10 +350,83 @@ export const BUILTIN_RULES: InstallRule[] = [
 ## 文档
 
 - [快速入门](docs/getting-started.zh.md) — 分步首次使用指南
-- [配置参考](docs/configuration.md) — 完整配置和环境变量
-- [故障排除](docs/troubleshooting.md) — 常见错误及解决方案
-- [扩展指南](docs/extending.md) — 添加新 AI 工具支持
-- [安装规则矩阵](docs/install-rules-matrix.md) — 完整规则参考
+- [配置参考](docs/configuration.zh.md) — 完整配置和环境变量
+- [故障排除](docs/troubleshooting.zh.md) — 常见错误及解决方案
+- [扩展指南](docs/extending.zh.md) — 添加新 AI 工具支持
+- [安装规则矩阵](docs/install-rules-matrix.zh.md) — 完整规则参考
+
+## 版本号规则
+
+aiforge 在 `0.x` 预发布阶段遵循 [语义化版本](https://semver.org/)：
+
+| 版本 | 触发场景 | 示例 |
+|------|---------|------|
+| `v0.x.0` | 新 milestone / 重大功能集合 | `v0.2.0` — M2 第一批功能 |
+| `v0.x.y` | milestone 内的 hotfix | `v0.1.1` — bug 修复 |
+
+当前处于 `0.x` 阶段，次版本号（`x`）每个 milestone 递增，补丁号（`y`）用于 hotfix。
+
+## 提交 Issue
+
+发现 Bug 或有功能建议？请在 GitLab 上[创建 Issue](https://gitlab.wshmi.com/chunxiao/aiforge/-/issues/new)。
+
+为了帮助我们快速定位问题，请在 Issue 中包含以下信息：
+
+1. **aiforge 版本** — `npx aiforge --version`
+2. **运行环境** — 操作系统、Node.js 版本（`node -v`）、Git 版本（`git -v`）
+3. **复现步骤** — 你执行的完整命令
+4. **期望 vs 实际行为** — 你期望发生什么，实际发生了什么
+5. **错误输出** — 完整的三段式错误提示（如有）
+
+> **提示：** 运行 `npx aiforge --dry-run` 并附上输出，可以帮助我们在不产生副作用的情况下诊断安装规则问题。
+
+### Issue 模板
+
+```markdown
+**类型：** Bug / 功能建议
+
+**运行环境：**
+- aiforge: <版本号>
+- Node.js: <版本号>
+- Git: <版本号>
+- 操作系统: <系统及版本>
+
+**问题描述：**
+<清晰描述问题或功能建议>
+
+**复现步骤：**（仅 Bug）
+1. 运行 `npx aiforge ...`
+2. ...
+
+**期望行为：**
+<你期望发生什么>
+
+**实际行为：**
+<实际发生了什么>
+
+**错误输出：**（如有）
+<粘贴完整的三段式错误提示>
+
+**Dry-run 输出：**（如有）
+<粘贴 `npx aiforge --dry-run` 的输出>
+```
+
+### AI 辅助撰写 Issue
+
+如果你使用 AI 助手（如 Copilot、Claude、Cursor）辅助撰写 Issue，可以使用以下提示词：
+
+> 帮我为 **aiforge** 项目（一个 AI 编码配置安装 CLI 工具）撰写一个 GitLab Issue。请严格遵循以下格式：
+>
+> 1. 标题：祈使句式的简洁摘要（如"修复使用 SSH 代理时的认证失败"）
+> 2. 类型：Bug 或 功能建议
+> 3. 运行环境：aiforge 版本、Node.js 版本、Git 版本、操作系统
+> 4. 问题描述：2-3 句话说明问题或需求
+> 5. 复现步骤（仅 Bug）：编号列出确切命令
+> 6. 期望 vs 实际行为：明确区分
+> 7. 错误输出：如有，粘贴完整的三段式错误提示（发生了什么 / 为什么 / 怎么修）
+> 8. Dry-run 输出：如果与安装规则相关，附上 `npx aiforge --dry-run` 的输出
+>
+> 保持客观陈述，不要猜测根因，只包含可验证的信息。
 
 ## License
 

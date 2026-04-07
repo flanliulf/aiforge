@@ -109,7 +109,7 @@ npx aiforge -g -l
 npx aiforge --dry-run
 ```
 
-遇到认证问题？查看 [故障排除](troubleshooting.md)。
+遇到认证问题？查看 [故障排除](troubleshooting.zh.md)。
 
 ## 常见场景
 
@@ -147,6 +147,6 @@ npx aiforge --force
 
 ## 下一步
 
-- [配置参考](configuration.md) — 完整配置选项说明
-- [故障排除](troubleshooting.md) — 解决常见问题
-- [安装规则矩阵](install-rules-matrix.md) — 查看文件会被安装到哪里
+- [配置参考](configuration.zh.md) — 完整配置选项说明
+- [故障排除](troubleshooting.zh.md) — 解决常见问题
+- [安装规则矩阵](install-rules-matrix.zh.md) — 查看文件会被安装到哪里
