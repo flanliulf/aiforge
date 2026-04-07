@@ -156,6 +156,9 @@ interface MessageSet {
     fixCheckPathConflict: string
     fixCheckFileExists: string
     fixCheckFileReadable: string
+    pathNotDirectory: string
+    pathNotDirectoryWhy: string
+    fixRemoveFileAndRetry: string
   }
   pipeline: {
     stageNotImplemented: string
@@ -392,6 +395,9 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       fixCheckPathConflict: '检查路径是否与已存在的文件冲突',
       fixCheckFileExists: '检查文件是否存在: {path}',
       fixCheckFileReadable: '检查文件是否可读',
+      pathNotDirectory: '目标路径不是目录: {path}',
+      pathNotDirectoryWhy: '安装目标路径 {path} 是普通文件，无法作为安装目录',
+      fixRemoveFileAndRetry: '请先删除该文件，再重试: rm {path}',
     },
     pipeline: {
       stageNotImplemented: '阶段 "{stage}" 未实现',
@@ -627,6 +633,10 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       fixCheckPathConflict: 'Check if path conflicts with an existing file',
       fixCheckFileExists: 'Check if file exists: {path}',
       fixCheckFileReadable: 'Check if file is readable',
+      pathNotDirectory: 'Target path is not a directory: {path}',
+      pathNotDirectoryWhy:
+        'Install target path {path} is a plain file, cannot be used as an install directory',
+      fixRemoveFileAndRetry: 'Remove the file and retry: rm {path}',
     },
     pipeline: {
       stageNotImplemented: 'Stage "{stage}" not implemented',

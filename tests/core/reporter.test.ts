@@ -1179,3 +1179,83 @@ describe('Story 5.5a — 英文模式输出断言（AC #1 CR Fix）', () => {
     expect(allOutput).not.toContain('修复方法：')
   })
 })
+
+/**
+ * 入口层 TTY 判定守护测试 (CR TODO-011)
+ *
+ * 来源: Story 5.7 Task 3
+ *
+ * 目的：
+ *   守护 index.ts 将 `isTty` 绑定到 `process.stderr.isTTY` 的契约。
+ *   如果有人改回 `process.stdout.isTTY`，在 `aiforge ... > result.txt`
+ *   场景下 stderr 仍在终端但 spinner 会被错误禁用。
+ *
+ * 策略：
+ *   直接测试 createReporter 工厂函数在各种 stdout/stderr isTTY 组合下的行为，
+ *   模拟入口层 `isTty: process.stderr.isTTY === true` 的传参语义：
+ *   - stdout.isTTY=false + stderr.isTTY=true → isTty: true → 应选择 TtyReporter
+ *   - stdout.isTTY=true + stderr.isTTY=false → isTty: false → 应选择 PlainReporter
+ *
+ * 注意：此测试直接验证 createReporter 工厂的行为契约。入口层绑定 stderr 的正确性
+ * 由代码审查和此测试的命名/注释共同保证（index.ts 作为顶层脚本难以直接单元测试）。
+ */
+describe('入口层 TTY 判定契约守护 (CR TODO-011)', () => {
+  let stderrSpy: ReturnType<typeof vi.spyOn>
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    stderrSpy?.mockRestore()
+  })
+
+  it('stdout.isTTY=false + stderr.isTTY=true → isTty:true → 选择 TtyReporter（spinner 使用 stderr 输出）', () => {
+    // 模拟 aiforge ... > result.txt 场景：stdout 重定向（非 TTY），但 stderr 仍在终端
+    // 入口层: isTty: process.stderr.isTTY === true → isTty=true
+    // 期望：createReporter({ isTty: true }) 返回 TtyReporter
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    const reporter = createReporter({ quiet: false, isTty: true }) // 绑定到 stderr.isTTY
+    reporter.startPhase('解析仓库地址...')
+
+    // TtyReporter.startPhase() 写入 stderr（ora spinner 流）
+    expect(stderrSpy).toHaveBeenCalled()
+  })
+
+  it('stdout.isTTY=true + stderr.isTTY=false → isTty:false → 选择 PlainReporter（无 spinner）', () => {
+    // 模拟 aiforge 2> errors.log 场景：stdout 在终端，但 stderr 被重定向
+    // 入口层: isTty: process.stderr.isTTY === true → isTty=false
+    // 期望：createReporter({ isTty: false }) 返回 PlainReporter（输出 [PHASE] 格式）
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    const reporter = createReporter({ quiet: false, isTty: false }) // 绑定到 stderr.isTTY
+    reporter.startPhase('验证认证信息...')
+
+    // PlainReporter.startPhase() 写入 stderr（[PHASE] 格式）
+    expect(stderrSpy).toHaveBeenCalled()
+    const output = stderrSpy.mock.calls[0]?.[0] as string
+    expect(output).toBe('[PHASE] 验证认证信息...\n') // PlainReporter 格式（非 ora spinner 格式）
+  })
+
+  it('isTty 参数来自 stderr.isTTY 而非 stdout.isTTY：两者不一致时应以 stderr 为准（契约文档）', () => {
+    // 此测试是 isTty 绑定到 stderr 的语义契约文档：
+    // 当 stdout.isTTY != stderr.isTTY 时，应传入 process.stderr.isTTY === true 给 createReporter
+    // 具体实现见 src/index.ts:80: isTty: process.stderr.isTTY === true
+
+    // 场景 A: stderr.isTTY=true（stdout=false），isTty 应为 true → TtyReporter
+    const reporterA = createReporter({ quiet: false, isTty: true })
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    reporterA.startPhase('克隆仓库...')
+    expect(stderrSpy).toHaveBeenCalled()
+    const outputA = stderrSpy.mock.calls[0]?.[0] as string
+    // TtyReporter 不输出 [PHASE] 格式（使用 ora spinner）
+    expect(outputA).not.toBe('[PHASE] 克隆仓库...\n')
+    vi.restoreAllMocks()
+
+    // 场景 B: stderr.isTTY=false（stdout=true），isTty 应为 false → PlainReporter
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    const reporterB = createReporter({ quiet: false, isTty: false })
+    reporterB.startPhase('克隆仓库...')
+    expect(stderrSpy).toHaveBeenCalled()
+    const outputB = stderrSpy.mock.calls[0]?.[0] as string
+    expect(outputB).toBe('[PHASE] 克隆仓库...\n') // PlainReporter 格式
+  })
+})

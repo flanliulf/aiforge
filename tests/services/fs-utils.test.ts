@@ -372,12 +372,16 @@ describe('services/fs-utils', () => {
       expect(result.dirsToCreate).toContain(target)
     })
 
-    it('passes for existing writable target file (AC #2)', async () => {
+    it('throws PATH_NOT_DIRECTORY when targetPath is an ordinary file (AC #1, CR TODO-006)', async () => {
+      // targetPath 为普通文件 → preflight 应提前抛出 PATH_NOT_DIRECTORY，
+      // 而非延迟到 ensureDir 阶段以 ENSURE_DIR_FAILED 失败
       const target = join(tmpDir, 'existing.txt')
       await writeFile(target, 'content')
       const plan = makeMatchedPlan([target])
-      const result = await preflight(plan, pathResolver)
-      expect(result.ok).toBe(true)
+      await expect(preflight(plan, pathResolver)).rejects.toMatchObject({
+        code: 'PATH_NOT_DIRECTORY',
+        severity: 'fatal',
+      })
     })
 
     it('throws PERMISSION_DENIED when parent dir is not writable (AC #4)', async () => {
@@ -456,11 +460,12 @@ describe('services/fs-utils', () => {
     })
 
     it('returns empty dirsToCreate when all dirs already exist', async () => {
+      // 修正（AC#1 语义变更）: targetPath 应为目录，不能是普通文件
+      // 原测试使用文件路径，与"targetPath 是普通文件应抛 PATH_NOT_DIRECTORY"冲突
+      // 新版本：targetPath 指向一个已存在的目录 → preflight 通过，不加入 dirsToCreate
       const existingDir = join(tmpDir, 'existing-dir')
       await mkdir(existingDir)
-      const target = join(existingDir, 'file.txt')
-      await writeFile(target, 'content')
-      const plan = makeMatchedPlan([target])
+      const plan = makeMatchedPlan([existingDir])
       const result = await preflight(plan, pathResolver)
       expect(result.dirsToCreate).not.toContain(existingDir)
     })
@@ -564,6 +569,47 @@ describe('services/fs-utils', () => {
         })
       } finally {
         await rm(outsideDir, { recursive: true, force: true })
+      }
+    })
+
+    it('throws PATH_NOT_DIRECTORY when targetPath itself is a plain file — code and fix content (CR TODO-006)', async () => {
+      // 负向测试：验证真实生产错误码、severity、message、fix 数组内容
+      const target = join(tmpDir, 'file-not-dir.txt')
+      await writeFile(target, 'i am a plain file')
+      const plan = makeMatchedPlan([target])
+      try {
+        await preflight(plan, pathResolver)
+        expect.unreachable('应抛出 PATH_NOT_DIRECTORY')
+      } catch (err) {
+        expect(err).toBeInstanceOf(AiforgeError)
+        const e = err as AiforgeError
+        expect(e.code).toBe('PATH_NOT_DIRECTORY')
+        expect(e.severity).toBe('fatal')
+        // message 应包含路径
+        expect(e.message).toContain(target)
+        // fix 应包含删除该文件的指导
+        expect(e.fix.length).toBeGreaterThan(0)
+        expect(e.fix[0]).toContain(target)
+      }
+    })
+
+    it('throws PATH_NOT_DIRECTORY in English when targetPath is a plain file (i18n, CR TODO-006)', async () => {
+      setLanguage('en')
+      const target = join(tmpDir, 'file-not-dir-en.txt')
+      await writeFile(target, 'plain file')
+      const plan = makeMatchedPlan([target])
+      try {
+        await preflight(plan, pathResolver)
+        expect.unreachable('应抛出 PATH_NOT_DIRECTORY')
+      } catch (err) {
+        expect(err).toBeInstanceOf(AiforgeError)
+        const e = err as AiforgeError
+        expect(e.code).toBe('PATH_NOT_DIRECTORY')
+        // fix 应为英文，不含中文
+        expect(e.fix[0]).not.toContain('请')
+        expect(e.fix[0]).not.toContain('删除')
+      } finally {
+        setLanguage('zh-CN')
       }
     })
   })

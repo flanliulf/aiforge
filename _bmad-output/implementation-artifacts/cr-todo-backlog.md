@@ -7,48 +7,15 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 8 |
+| 🔴 open | 4 |
 | 🟡 in-progress | 0 |
-| ✅ resolved | 8 |
+| ✅ resolved | 12 |
 
 ---
 
 ## Open Items
 
 <!-- 按优先级排序：P1 > P2 > P3 -->
-
-### TODO-003: CLI 入口接线 `createProductionStages()` 工厂函数
-
-- **来源**: Story 3-3 CR evaluation round 1-2 (2026-03-25)
-- **优先级**: P2
-- **类别**: tech-debt
-- **描述**: `src/index.ts:49` 调用 `runPipeline(args, reporter)` 未传入第三参数 `stages`，因此使用 `DEFAULT_STAGES`（全占位）。`createProductionStages(pathResolver)` 工厂函数已就绪（`pipeline.ts:166-184`），但 resolve/auth/clone 阶段仍为占位，接线需等 Epic 2 实现前序阶段后一并完成。届时改为 `runPipeline(args, reporter, createProductionStages(new UnixPathResolver()))`。
-- **涉及文件**: `src/index.ts`, `src/pipeline.ts`
-- **建议时机**: Epic 2 中实现 resolve/auth/clone 真实阶段的 Story
-- **状态**: open
-- **解决记录**:
-
-### TODO-004: flatten 目标路径精度回补（dry-run 预览需体现重命名语义）
-
-- **来源**: Story 3-3 CR evaluation round 2 (2026-03-25)
-- **优先级**: P2
-- **类别**: tech-debt
-- **描述**: 当前 `reporter.ts` 的 `resolveFileTarget()` 对 flatten 类型使用 `join(targetPath, basename(srcFile))`，输出为 `~/.cursor/rules/code-review`（目录名），但 PRD 定义 flatten 应提取主文件并重命名为 `code-review.md`。精确输出需要 `InstallRule` 类型引入 `mainFile` 字段并实现主文件提取逻辑——这属于 Epic 4 Story 4.3 的核心能力。待 4.3 实现后，reporter 层需同步更新 flatten 的目标路径计算，并补充对应测试断言。
-- **涉及文件**: `src/core/reporter.ts`, `src/core/types.ts`, `tests/stages/report.test.ts`
-- **建议时机**: Epic 4 Story 4.3（符号链接与 flatten 模式）完成后
-- **状态**: open
-- **解决记录**:
-
-### TODO-006: `targetPath` 为普通文件时 preflight 未提前拒绝
-
-- **来源**: Story 4-2 CR round 1 (2026-03-26)
-- **优先级**: P2
-- **类别**: tech-debt
-- **描述**: `checkTargetWritability()` (fs-utils.ts) 对 `targetPath` 是普通文件的情况只检查 `W_OK` 可写性，不会抛出"不是目录"的错误。随后 `executeInstall()` 调用 `ensureDir(item.targetPath)` 时才因 `ENOTDIR` 失败，被包装为 `ENSURE_DIR_FAILED`。虽然安装最终仍会失败（非安全问题），但错误时机延迟且报错信息不够精确。改进方案：在 `checkTargetWritability()` 中增加 `targetStat.isFile()` 分支，提前抛出更精确的 `PATH_NOT_DIRECTORY` 错误，提升 fail-fast 诊断体验。
-- **涉及文件**: `src/services/fs-utils.ts`
-- **建议时机**: 下次触及 `checkTargetWritability` 时
-- **状态**: open
-- **解决记录**:
 
 ### TODO-007: `allowedRoot` 内部 broken symlink 被保守拒绝
 
@@ -72,25 +39,15 @@
 - **状态**: open
 - **解决记录**:
 
-### TODO-010: `createProductionStages().report` 闭包的 repo-relative 路径转换缺少直接集成测试覆盖
+### TODO-011: 补充入口层 stderr TTY 绑定的真实自动化回归守护
 
-- **来源**: Story 4-6b CR round 3 evaluation (2026-03-31)
+- **来源**: Story 5-1 CR round 2 evaluation (2026-03-31)；Story 5-7 CR evaluation round 1 (2026-04-03)
 - **优先级**: P2
 - **类别**: test-gap
-- **描述**: `pipeline.ts:348-360` 中的 `sourcePath` repo-relative 转换逻辑（`report` 闭包内，将绝对 clone 路径裁剪为 repo-relative 路径后再传给 Reporter）没有直接命中它的自动化测试。现有测试覆盖的是 Reporter 组件层（输入已经是 relative path 时的格式化）和 saveManifest（不涉及 report 闭包）。如果该段逻辑被删除或改坏，现有测试仍有较大概率全绿。建议补一条针对 `createProductionStages().report` 的集成测试，断言传给 `reporter.reportResult()` 的 `items[].sourcePath` 已是 repo-relative 路径（不以 `repoDir` 开头）。代码本身仅 12 行、结构简单，当前风险可控。
-- **涉及文件**: `src/pipeline.ts`, `tests/integration/pipeline-production-stages.test.ts`
-- **建议时机**: Epic 5（输出体验优化）或下次触及 `pipeline.ts` report 闭包时
-- **状态**: open
-- **解决记录**:
-
-### TODO-011: 补充 "stdout 非 TTY、stderr 为 TTY" 入口层自动化测试
-
-- **来源**: Story 5-1 CR round 2 evaluation (2026-03-31)
-- **优先级**: P2
-- **类别**: test-gap
-- **描述**: `src/index.ts` 中的 TTY 判定已修正为 `process.stderr.isTTY === true`，但缺少显式覆盖 "stdout 非 TTY、stderr 为 TTY" 组合场景的入口层集成测试。当前测试只验证 `createReporter` 工厂函数在 `isTty` 参数层面的行为（直接 mock 参数），未覆盖 `index.ts` 从 `process.stderr.isTTY` 读取的完整路径。若后续有人将判定改回 `process.stdout.isTTY`，现有测试仍全绿，无法守住回归。建议补一条入口层测试：mock `process.stdout.isTTY = false`、`process.stderr.isTTY = true`，断言 `createReporter` 被以 `isTty: true` 调用，即仍使用 `TtyReporter`。
-- **涉及文件**: `src/index.ts`, `tests/cli-args.test.ts`
-- **建议时机**: Epic 5 内下次触及 `src/index.ts` 时（Story 5-3 已完成未落地，Story 5-4 或 5-5 系列触及 index.ts 时处理）
+- **描述**: `src/index.ts:80` 将 `isTty` 绑定到 `process.stderr.isTTY === true`（正确）。此问题经历两轮 Story 均未彻底关闭，根本原因是 `src/index.ts` 为 ESM 顶层脚本，无法通过普通 import + spy 真正 mock `process.stderr.isTTY` 后驱动入口层代码路径。**Story 5-7 的工程折衷**：在 `tests/core/reporter.test.ts` 新增 `describe('入口层 TTY 判定契约守护 CR TODO-011')` 共 3 个测试，但这 3 个测试全部直接传入硬编码 `isTty: true/false`，完全绕过 `process.stderr.isTTY` 的读取——若将 `index.ts:80` 改回 `process.stdout.isTTY === true`，这 3 个测试仍全绿，回归守护目标**仍未达成**。**真正能关闭此 TODO 的方案**：将 `isTty` 推导逻辑从 `index.ts` action 回调中提取为独立窄辅助函数（如 `buildReporterOptions(stderr: NodeJS.WriteStream): { isTty: boolean }`），再对该辅助函数做单元测试，通过传入 mock 的 `{ isTTY: true }` / `{ isTTY: false }` 对象来真正覆盖推导链路，使入口层 wiring 变更可被自动化检出。
+- **涉及文件**: `src/index.ts`, `tests/core/reporter.test.ts`
+- **建议时机**: 下次触及 `src/index.ts` 时，采用辅助函数提取方案（将 `isTty: process.stderr.isTTY === true` 推导逻辑提取为可测函数）彻底关闭此项
+- **前置条件**: 需要先重构——将 `isTty` 推导逻辑从 `index.ts` action 回调提取为独立函数，然后才能编写有效的单元测试
 - **状态**: open
 - **解决记录**:
 
@@ -105,6 +62,56 @@
 - **状态**: open
 - **解决记录**:
 
+---
+
+## Resolved Items
+
+<!-- 已解决事项归档于此，保留用于回顾 -->
+
+### TODO-003: CLI 入口接线 `createProductionStages()` 工厂函数
+
+- **来源**: Story 3-3 CR evaluation round 1-2 (2026-03-25)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: `src/index.ts:49` 调用 `runPipeline(args, reporter)` 未传入第三参数 `stages`，因此使用 `DEFAULT_STAGES`（全占位）。`createProductionStages(pathResolver)` 工厂函数已就绪（`pipeline.ts:166-184`），但 resolve/auth/clone 阶段仍为占位，接线需等 Epic 2 实现前序阶段后一并完成。届时改为 `runPipeline(args, reporter, createProductionStages(new UnixPathResolver()))`。
+- **涉及文件**: `src/index.ts`, `src/pipeline.ts`
+- **建议时机**: Epic 2 中实现 resolve/auth/clone 真实阶段的 Story
+- **状态**: resolved
+- **解决记录**: Story 4-6a 中通过 `createProductionStages(pathResolver)` 工厂函数完整接线，所有 6 个占位阶段替换为真实 import。
+
+### TODO-004: flatten 目标路径精度回补（dry-run 预览需体现重命名语义）
+
+- **来源**: Story 3-3 CR evaluation round 2 (2026-03-25)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: 当前 `reporter.ts` 的 `resolveFileTarget()` 对 flatten 类型使用 `join(targetPath, basename(srcFile))`，输出为 `~/.cursor/rules/code-review`（目录名），但 PRD 定义 flatten 应提取主文件并重命名为 `code-review.md`。精确输出需要 `InstallRule` 类型引入 `mainFile` 字段并实现主文件提取逻辑——这属于 Epic 4 Story 4.3 的核心能力。待 4.3 实现后，reporter 层需同步更新 flatten 的目标路径计算，并补充对应测试断言。
+- **涉及文件**: `src/core/reporter.ts`, `src/core/types.ts`, `tests/stages/report.test.ts`
+- **建议时机**: Epic 4 Story 4.3（符号链接与 flatten 模式）完成后
+- **状态**: resolved
+- **解决记录**: Story 4-3 中完整实现 flatten mainFile 提取和重命名逻辑。
+
+### TODO-006: `targetPath` 为普通文件时 preflight 未提前拒绝
+
+- **来源**: Story 4-2 CR round 1 (2026-03-26)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: `checkTargetWritability()` (fs-utils.ts) 对 `targetPath` 是普通文件的情况只检查 `W_OK` 可写性，不会抛出"不是目录"的错误。随后 `executeInstall()` 调用 `ensureDir(item.targetPath)` 时才因 `ENOTDIR` 失败，被包装为 `ENSURE_DIR_FAILED`。虽然安装最终仍会失败（非安全问题），但错误时机延迟且报错信息不够精确。改进方案：在 `checkTargetWritability()` 中增加 `targetStat.isFile()` 分支，提前抛出更精确的 `PATH_NOT_DIRECTORY` 错误，提升 fail-fast 诊断体验。
+- **涉及文件**: `src/services/fs-utils.ts`
+- **建议时机**: 下次触及 `checkTargetWritability` 时
+- **状态**: resolved
+- **解决记录**: Story 5-7 Task 1 中解决。`checkTargetWritability()` 增加 `isFile()` 分支抛出 `PATH_NOT_DIRECTORY`，同步新增中英文 i18n 消息键，补 3 个测试（含负向和 i18n）。
+
+### TODO-010: `createProductionStages().report` 闭包的 repo-relative 路径转换缺少直接集成测试覆盖
+
+- **来源**: Story 4-6b CR round 3 evaluation (2026-03-31)
+- **优先级**: P2
+- **类别**: test-gap
+- **描述**: `pipeline.ts:348-360` 中的 `sourcePath` repo-relative 转换逻辑（`report` 闭包内，将绝对 clone 路径裁剪为 repo-relative 路径后再传给 Reporter）没有直接命中它的自动化测试。现有测试覆盖的是 Reporter 组件层（输入已经是 relative path 时的格式化）和 saveManifest（不涉及 report 闭包）。如果该段逻辑被删除或改坏，现有测试仍有较大概率全绿。建议补一条针对 `createProductionStages().report` 的集成测试，断言传给 `reporter.reportResult()` 的 `items[].sourcePath` 已是 repo-relative 路径（不以 `repoDir` 开头）。代码本身仅 12 行、结构简单，当前风险可控。
+- **涉及文件**: `src/pipeline.ts`, `tests/integration/pipeline-production-stages.test.ts`
+- **建议时机**: Epic 5（输出体验优化）或下次触及 `pipeline.ts` report 闭包时
+- **状态**: resolved
+- **解决记录**: Story 5-7 Task 2 中解决。在 `pipeline-production-stages.test.ts` 新增独立 describe 块，通过真实 clone mock 断言 `sourcePath` 为 repo-relative 路径，补 2 个测试（主路径+边界值）。
+
 ### TODO-013: 补充 copilot / vscode / cursor:project 规则矩阵 E2E 覆盖
 
 - **来源**: Story 5-5b CR round 1-2 (2026-04-02)
@@ -113,14 +120,8 @@
 - **描述**: `BUILTIN_RULES` 共 16 条规则，Story 5-5b AC #1 E2E 测试仅覆盖 claude:global、claude:project、cursor:global（约 31% 覆盖率）。copilot（8 条规则）、vscode（1 条规则）、cursor:project（2 条规则）完全未覆盖。CR R1/R2 均评估为 P2 非阻塞 CR TODO（理由：copilot/vscode 与 claude/cursor 共享相同安装代码路径，三种 InstallType 代表性路径已覆盖）。建议后续补齐三类工具的 match + install 全链路断言，使 AC #1"按 BUILTIN_RULES 真实规则矩阵验证"真正落地。
 - **涉及文件**: `tests/integration/pipeline.test.ts`, `tests/fixtures/sample-repo/`
 - **建议时机**: Epic 5 收尾或 Story 5-5c（Go/No-Go 门禁）开发前，亦可在专项测试完整性 Story 中处理
-- **状态**: open
-- **解决记录**:
-
----
-
-<!-- 已解决事项归档于此，保留用于回顾 -->
-
-### TODO-001: 合并 `sanitizeTokenDisplay()` 与 `sanitizeToken()` 重复实现
+- **状态**: resolved
+- **解决记录**: Story 5-7 Task 4 中解决。在 `pipeline.test.ts` 新增 10 个 E2E 测试覆盖 copilot:global（4）、copilot:project（2）、vscode:global（1）、cursor:project（2），E2E 覆盖率从 ~31% 提升到 87.5%（14/16 规则）。
 
 - **来源**: Story 2-5 CR round 1-4 (2026-03-24)
 - **优先级**: P2

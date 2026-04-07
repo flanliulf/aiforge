@@ -275,6 +275,10 @@ export async function preflight(
   const dirsToCreate: string[] = []
 
   for (const item of plan.items) {
+    // 空 sourceFiles 静默跳过：与 executeInstall 保持一致（CR R4-#1 约定）
+    // 空 sourceFiles 表示源目录不存在，整个 item 不会被安装，无需预检查 targetPath
+    if (item.sourceFiles.length === 0) continue
+
     const targetPath = item.targetPath
     // 根据 scope 推导 allowedRoot（全局 → home，项目 → cwd）
     const allowedRoot = item.rule.scope === 'global' ? pathResolver.home() : process.cwd()
@@ -482,7 +486,20 @@ async function checkTargetWritability(
     }
     // broken symlink 直接通过（symlink 模式会先 unlink 再创建）
   } else {
-    // 普通文件 → 检查目标本身可写
+    // 普通文件 → targetPath 应该是目录，文件不应该存在于此
+    // CR TODO-006: 提前拒绝"目标是普通文件"的情况，给出明确错误，
+    // 避免延迟到 ensureDir 阶段以 ENSURE_DIR_FAILED 失败（诊断信息不清晰）
+    if (targetStat.isFile()) {
+      throw new AiforgeError(
+        msg('fsUtils.pathNotDirectory').replace('{path}', targetPath),
+        'PATH_NOT_DIRECTORY',
+        EXIT_INSTALL_FAILURE,
+        'fatal',
+        msg('fsUtils.pathNotDirectoryWhy').replace('{path}', targetPath),
+        [msg('fsUtils.fixRemoveFileAndRetry').replace('{path}', targetPath)],
+      )
+    }
+    // 其他非目录/非文件/非 symlink 类型（设备文件、FIFO 等）→ 检查目标本身可写
     let writable: boolean
     try {
       await access(targetPath, constants.W_OK)

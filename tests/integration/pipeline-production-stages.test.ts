@@ -23,7 +23,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-import type { ParsedArgs } from '../../src/core/types.js'
+import type { ParsedArgs, InstallResult } from '../../src/core/types.js'
 import type { Reporter } from '../../src/core/reporter.js'
 import type { PathResolver } from '../../src/core/path-resolver.js'
 import type { ManifestEntry } from '../../src/core/types.js'
@@ -341,5 +341,154 @@ describe('createProductionStages — saveManifest 真实闭包集成测试 (CR R
       const stat = await lstat(entry.target)
       expect(stat.isSymbolicLink()).toBe(true) // 修复验证：安装结果为 symlink 而非 copy
     }
+  })
+})
+
+/**
+ * createProductionStages().report 闭包 repo-relative 路径集成测试
+ *
+ * 来源: Story 5.7 Task 2 — CR TODO-010
+ *
+ * 目的：
+ *   验证 report 闭包将 items[].sourcePath 从绝对 clone 路径裁剪为 repo-relative 路径
+ *   后再传给 reporter.reportResult()，守住"Story 约定输出 'agents/coding-agent.md'
+ *   而非 '/tmp/aiforge-xxx/agents/coding-agent.md'"的回归防护。
+ *
+ * 背景（pipeline.ts:374-387）：
+ *   - report 闭包使用共享变量 lastRepo.repoDir（由 clone 阶段填充）
+ *   - 若有人改动路径裁剪逻辑（或将 lastRepo 共享变量改错），现有测试不会报红
+ *   - 此测试直接验证 createProductionStages().report 的 sourcePath 裁剪语义
+ */
+describe('createProductionStages — report 闭包 repo-relative 路径测试 (CR TODO-010)', () => {
+  let tmpDir: string
+  let repoDir: string
+  let homeDir: string
+  let mockReporter: Reporter
+  let mockPathResolver: PathResolver
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'aiforge-report-test-'))
+    repoDir = join(tmpDir, 'repo')
+    homeDir = join(tmpDir, 'home')
+
+    await mkdir(repoDir, { recursive: true })
+    await mkdir(homeDir, { recursive: true })
+    await mkdir(join(homeDir, '.aiforge'), { recursive: true })
+
+    // 设置 clone mock 返回临时仓库目录
+    cloneMock.mockResolvedValue({
+      repoDir,
+      isNew: true,
+      sourceFiles: [],
+    })
+
+    mockReporter = createMockReporter()
+
+    mockPathResolver = {
+      home: () => homeDir,
+      configDir: () => join(homeDir, '.aiforge'),
+      reposDir: () => join(homeDir, '.aiforge', 'repos'),
+      toolGlobalDir: () => homeDir,
+      toolProjectDir: () => '',
+    }
+  })
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true })
+    vi.restoreAllMocks()
+  })
+
+  it('report 闭包传给 reportResult 的 items[].sourcePath 为 repo-relative 路径（不以 repoDir 开头）', async () => {
+    // AC #2: 验证 report 闭包的路径裁剪逻辑
+    // 测试策略：直接模拟 clone 阶段设置 lastRepo，然后调用 report 闭包，
+    // 断言传给 reporter.reportResult() 的 sourcePath 不包含 repoDir 绝对前缀
+    const stages = createProductionStages(mockPathResolver)
+
+    // 使用 clone 阶段设置 lastRepo.repoDir（通过真实 clone mock）
+    const args: ParsedArgs = {
+      source: 'https://github.com/test-org/test-repo',
+      global: true,
+      link: false,
+      tools: ['cursor'],
+      dirs: [],
+      dryRun: false,
+      quiet: false,
+      force: false,
+      ssh: false,
+      symlink: false,
+      flatten: false,
+    }
+    const source = await stages.resolve(args, mockReporter)
+    const authed = await stages.authenticate(source, args, mockReporter)
+    await stages.clone(authed, args, mockReporter) // 设置 lastRepo.repoDir = repoDir
+
+    // 构造一个 InstallResult，sourcePath 使用绝对路径（模拟 install 阶段产出的原始结果）
+    const absoluteSourcePath = join(repoDir, 'agents', 'coding-agent.md')
+    const mockInstallResult: InstallResult = {
+      items: [
+        {
+          status: 'new',
+          sourcePath: absoluteSourcePath,
+          targetPath: join(homeDir, '.cursor', 'rules', 'coding-agent.md'),
+          tool: 'cursor',
+        },
+      ],
+    }
+
+    // 调用 report 闭包（mode='result' 触发 reportResult 路径）
+    stages.report(mockInstallResult, mockReporter, 'result')
+
+    // 断言：reporter.reportResult 被调用，且 items[].sourcePath 不以 repoDir 绝对路径开头
+    expect(mockReporter.reportResult).toHaveBeenCalledOnce()
+    const calledWith = (mockReporter.reportResult as ReturnType<typeof vi.fn>).mock
+      .calls[0]![0] as InstallResult
+    expect(calledWith.items).toHaveLength(1)
+    const reportedSourcePath = calledWith.items[0]!.sourcePath
+
+    // 关键断言：sourcePath 应为 repo-relative 路径
+    expect(reportedSourcePath).not.toContain(repoDir)
+    expect(reportedSourcePath).not.toContain(tmpDir)
+    expect(reportedSourcePath).toBe('agents/coding-agent.md')
+  })
+
+  it('report 闭包对 sourcePath 不以 repoDir 开头的路径保持不变（边界值处理）', async () => {
+    const stages = createProductionStages(mockPathResolver)
+
+    const args: ParsedArgs = {
+      source: 'https://github.com/test-org/test-repo',
+      global: true,
+      link: false,
+      tools: ['cursor'],
+      dirs: [],
+      dryRun: false,
+      quiet: false,
+      force: false,
+      ssh: false,
+      symlink: false,
+      flatten: false,
+    }
+    const source = await stages.resolve(args, mockReporter)
+    const authed = await stages.authenticate(source, args, mockReporter)
+    await stages.clone(authed, args, mockReporter)
+
+    // sourcePath 不以 repoDir 开头 → 保持原值不变
+    const nonRepoDirPath = '/some/other/path/file.md'
+    const mockInstallResult: InstallResult = {
+      items: [
+        {
+          status: 'skipped',
+          sourcePath: nonRepoDirPath,
+          targetPath: join(homeDir, '.cursor', 'rules', 'file.md'),
+          tool: 'cursor',
+        },
+      ],
+    }
+
+    stages.report(mockInstallResult, mockReporter, 'result')
+
+    expect(mockReporter.reportResult).toHaveBeenCalledOnce()
+    const calledWith = (mockReporter.reportResult as ReturnType<typeof vi.fn>).mock
+      .calls[0]![0] as InstallResult
+    expect(calledWith.items[0]!.sourcePath).toBe(nonRepoDirPath)
   })
 })
