@@ -280,6 +280,50 @@ aiforge follows [Semantic Versioning](https://semver.org/) during the `0.x` pre-
 
 Currently in the `0.x` stage: the minor version (`x`) increments with each milestone, and the patch version (`y`) is used for hotfixes.
 
+## AI-Assisted Setup
+
+If you use an AI assistant (e.g., Copilot, Claude, Cursor) in your terminal or IDE, you can copy the following prompts to let it handle aiforge setup for you.
+
+### First-time Setup
+
+> I need to set up **aiforge** (an AI coding configuration installer CLI) for the first time on my machine.
+>
+> Context:
+> - aiforge is installed via `npx` (no global install needed), requires Node.js >= 18 and Git >= 2.20
+> - Configuration is stored at `~/.aiforge/config.json`
+> - Our team's knowledge repository is: `<paste your repo URL here>`
+> - Authentication method: SSH / Token (pick one)
+>
+> Please run the following steps in order:
+> 1. Verify prerequisites: check `node -v` (>= 18) and `git -v` (>= 2.20)
+> 2. Run `npx aiforge init` and guide me through the interactive setup
+> 3. Run `npx aiforge -g -l --dry-run` to preview the global symlink installation plan
+> 4. If the preview looks correct, run `npx aiforge -g -l` to install
+> 5. Show the installation summary and verify with `npx aiforge list`
+>
+> If any step fails, show the full error output and suggest a fix before proceeding.
+
+### Project-Level Install
+
+> Set up **aiforge** for the current project. Run these steps:
+> 1. Run `npx aiforge --dry-run` to preview what will be installed
+> 2. Show me the file list and target paths, ask for confirmation
+> 3. Run `npx aiforge` to install
+> 4. Show the summary of installed/updated/skipped files
+>
+> Do NOT use `--force` unless I explicitly ask for it.
+
+### Troubleshooting
+
+> I'm having an issue with **aiforge**. Help me diagnose it:
+> 1. Run `npx aiforge --version` and record the version
+> 2. Run `npx aiforge --dry-run` and check for errors in the output
+> 3. Check `~/.aiforge/config.json` for configuration issues
+> 4. If the error is authentication-related, test with `ssh -T git@<host>` or `git ls-remote <repo-url>`
+> 5. Summarize the findings and suggest a fix
+>
+> The error I'm seeing is: `<paste your error message here>`
+
 ## Reporting Issues
 
 Found a bug or have a feature request? Please [open an issue](https://gitlab.wshmi.com/chunxiao/aiforge/-/issues/new) on GitLab.
