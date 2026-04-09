@@ -66,6 +66,54 @@ cd your-project
 npx aiforge
 ```
 
+## 本地开发运行
+
+> **注意：** 本项目尚未发布到 npm，且包名 `aiforge` 已被 npm 上一个无关项目占用。下文所有 `npx aiforge` 命令**不会**运行本项目代码。请使用以下本地方式运行。
+
+### 源码运行（推荐用于开发）
+
+```bash
+# 安装依赖
+npm install
+
+# 通过 tsx 直接运行（无需构建）
+npm run dev -- [repo-url] [options]
+
+# 示例
+npm run dev -- init
+npm run dev -- -g -l --dry-run
+npm run dev -- --help
+```
+
+### 构建后运行
+
+```bash
+# 先构建
+npm run build
+
+# 运行编译后的 CLI
+node dist/index.js [repo-url] [options]
+
+# 示例
+node dist/index.js init
+node dist/index.js -g -l --dry-run
+```
+
+### 注册为全局命令
+
+```bash
+# 构建并注册为全局命令
+npm run build
+npm link
+
+# 之后可直接使用 aiforge 命令
+aiforge init
+aiforge -g -l
+
+# 不再需要时取消注册
+npm unlink -g aiforge
+```
+
 ## 使用方式
 
 ### 主命令：安装

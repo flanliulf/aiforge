@@ -66,6 +66,54 @@ cd your-project
 npx aiforge
 ```
 
+## Local Development
+
+> **Note:** This package has NOT been published to npm, and the name `aiforge` is already taken by an unrelated project on the npm registry. All `npx aiforge` commands shown below will **not** run this project's code. Use the following local methods instead.
+
+### Run from Source (Recommended for Development)
+
+```bash
+# Install dependencies
+npm install
+
+# Run directly via tsx (no build required)
+npm run dev -- [repo-url] [options]
+
+# Examples
+npm run dev -- init
+npm run dev -- -g -l --dry-run
+npm run dev -- --help
+```
+
+### Run from Build Output
+
+```bash
+# Build first
+npm run build
+
+# Run the compiled CLI
+node dist/index.js [repo-url] [options]
+
+# Examples
+node dist/index.js init
+node dist/index.js -g -l --dry-run
+```
+
+### Link as Global Command
+
+```bash
+# Build and register as a global command
+npm run build
+npm link
+
+# Now you can use `aiforge` directly
+aiforge init
+aiforge -g -l
+
+# Unlink when no longer needed
+npm unlink -g aiforge
+```
+
 ## Usage
 
 ### Main Command
