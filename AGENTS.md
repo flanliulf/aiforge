@@ -21,3 +21,34 @@
 ## 规则变更同步约束
 
 任何 story 执行、code review、或临时决策中，凡确认/修改/新增规则边界（包括豁免、约定变更），必须在同一次操作中同步更新 Rule Document Registry 中列出的所有文档，不得遗漏。
+
+## 文档归属规则
+
+新增或移动文档时，按以下规则判断目标目录：
+
+### docs/
+
+| 目录 | 归属条件 |
+|------|----------|
+| `docs/` 根目录 | README「文档」章节直接链接的核心用户文档（双语 `.md` + `.zh.md`） |
+| `docs/references/` | 早期草稿、调研报告、审核结论等已归档的过程性文档 |
+
+### _bmad-output/
+
+| 目录 | 归属条件 |
+|------|----------|
+| `analysis/` | 1-analysis 阶段产物：头脑风暴、市场调研、混沌工程等前置分析 |
+| `planning-artifacts/` | 2-plan + 3-solutioning 阶段产物：PRD、架构设计、Epic/Story 规划 |
+| `implementation-artifacts/` | 4-implementation 阶段产物（按下表细分子目录） |
+| `archive/` | 已归档的早期快照 |
+| 根目录 `project-context.md` | AI Agent 主规则文件（跨阶段持续更新） |
+
+### _bmad-output/implementation-artifacts/
+
+| 子目录 | 归属条件 |
+|--------|----------|
+| `stories/` | Story 规格文件 |
+| `code-reviews/` | 跨 LLM Code Review 各轮次 summary/evaluation |
+| `retrospectives/` | Epic 回顾、Story 审查总结、发布门禁 |
+| `cr-rules/` | CR 工作流的规则提炼、TODO 追踪等元文档 |
+| 根目录 | 跨子目录的全局跟踪文件（`sprint-status.yaml`、`index.md`） |
