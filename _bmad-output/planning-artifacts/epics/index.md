@@ -10,6 +10,7 @@ shards:
   - epic-3.md
   - epic-4.md
   - epic-5.md
+  - epic-6.md
 ---
 
 # ai-forge - Epic Breakdown
@@ -84,6 +85,15 @@ This document provides the complete epic and story breakdown for ai-forge, decom
 - FR-045: 系统支持全局排除文件列表（README.md、.gitkeep、.DS_Store 等）
 - FR-046: 用户可以在初始化时选择交互语言，并在安装后通过配置修改语言设置
 
+**精细化安装控制与通用目录（FR-047~053）：**
+- FR-047: 用户可以通过 `--list <dir>` 列出仓库指定顶层目录下所有可安装子目录，不执行安装
+- FR-048: 用户可以通过 `--filter <dir>/<glob>` 只安装名称匹配 glob 的子目录（单层匹配），零匹配时触发交互式询问
+- FR-049: `--filter` 与 `--dirs` 可联合使用：有 `--dirs` 时 `--filter` 在其范围内筛选；无 `--dirs` 时对所有顶层目录筛选
+- FR-050: 系统在执行安装时默认同时将资源完整复制到通用目标目录（`.agents/skills/`、`.agents/agents/`、`.agent/skills/`、`.agent/agents/`）
+- FR-051: 用户可以通过 `--no-universal` 参数跳过通用目标目录的安装
+- FR-052: 每次安装时检查通用目录中已安装文件是否有更新，有变更则重新同步
+- FR-053: `aiforge init` 交互流程新增通用目录偏好询问（默认 yes），持久化到 `config.json`（`universalDirs: boolean`），CLI 参数可覆盖
+
 ### NonFunctional Requirements
 
 **性能（NFR-P1~P5）：**
@@ -129,6 +139,11 @@ This document provides the complete epic and story breakdown for ai-forge, decom
 - NFR-U3: 进度展示使用 spinner 动画（TTY 环境）
 - NFR-U4: 非 TTY 环境自动禁用 spinner 和彩色
 - NFR-U5: `--dry-run` 输出与实际安装结果一致
+
+**精细化控制与通用目录（NFR-P6, NFR-U6, NFR-C7）：**
+- NFR-P6: `--list` 命令在持久化缓存命中场景下输出耗时 < 2 秒
+- NFR-U6: `--filter` 零匹配时展示可用子目录列表，帮助用户修正 pattern
+- NFR-C7: 通用目录写入复用现有安装引擎（复制模式），不引入新代码路径
 
 ### Additional Requirements
 
@@ -205,6 +220,13 @@ This document provides the complete epic and story breakdown for ai-forge, decom
 | FR-044 | Epic 3 | 三种安装类型规则 |
 | FR-045 | Epic 3 | 全局排除文件列表 |
 | FR-046 | Epic 5 | 国际化语言选择 |
+| FR-047 | Epic 6 | `--list <dir>` 列举指定顶层目录下子目录 |
+| FR-048 | Epic 6 | `--filter <dir>/<glob>` 精准安装，零匹配交互询问 |
+| FR-049 | Epic 6 | `--filter` 与 `--dirs` 联合语义 |
+| FR-050 | Epic 6 | 通用目录默认并行安装，完整结构复制 |
+| FR-051 | Epic 6 | `--no-universal` opt-out 参数 |
+| FR-052 | Epic 6 | 增量同步检查通用目录 |
+| FR-053 | Epic 6 | `init` 交互新增通用目录偏好，持久化到 config.json |
 
 ## Epic List
 
@@ -249,3 +271,11 @@ This document provides the complete epic and story breakdown for ai-forge, decom
 **FRs 覆盖：** FR-035~039, FR-046（共 7 条）
 **关键交付：** Reporter 三种实现完善 + `data/messages.ts` 完善 + 端到端集成测试 + 跨平台验证
 **NFRs：** NFR-U1~U5, NFR-C1~C2
+
+### [Epic 6: 精细化安装控制与通用目录适配](epic-6.md)
+
+用户可以通过 `--list` 探索仓库结构、通过 `--filter` 精准安装指定子目录；aiforge 同时默认将配置写入行业新兴通用目标目录（`.agents/`、`.agent/`），确保跨工具兼容性。
+
+**FRs 覆盖：** FR-047~053（共 7 条）
+**关键交付：** `--list` 子命令逻辑 + `--filter` 参数解析与 Match 阶段过滤 + `BUILTIN_RULES` 通用目录规则 + `config.json universalDirs` 字段 + `aiforge init` 新增偏好步骤
+**NFRs：** NFR-P6, NFR-U6, NFR-C7
