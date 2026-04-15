@@ -12,6 +12,7 @@ node_modules/
 .agents/
 .augment/
 .claude/
+.codex/
 .cursor/skills/
 
 # BMad framework internals
