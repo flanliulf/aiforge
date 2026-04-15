@@ -129,7 +129,7 @@ date: 2026-04-13
 
 **Given** `config.json` 中 `universalDirs: true`，用户执行 `aiforge install --no-universal`
 **When** 安装执行
-**Then** CLI 参数优先级高于配置文件，不写入通用目录（遵循四层优先级链：CLI > 环境变量 > config > 默认值）
+**Then** CLI 参数优先级高于配置文件，不写入通用目录（遵循三层优先级链：CLI > config > 默认值）
 
 **Given** 已有 `config.json` 但缺少 `universalDirs` 字段（升级兼容场景）
 **When** 执行 `aiforge install`
