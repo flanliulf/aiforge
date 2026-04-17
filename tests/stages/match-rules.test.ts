@@ -9,7 +9,10 @@ import { setLanguage } from '../../src/core/messages.js'
 vi.mock('node:fs/promises', () => ({
   readdir: vi.fn(),
 }))
-
+// Story 6-2: mock @inquirer/prompts 中的 select 函数（用于 TTY 零匹配交互测试）
+vi.mock('@inquirer/prompts', () => ({
+  select: vi.fn(),
+}))
 vi.mock('../../src/data/install-rules.js', () => ({
   RULE_INDEX: new Map([
     [
@@ -74,6 +77,9 @@ vi.mock('../../src/data/install-rules.js', () => ({
 
 import { matchRules } from '../../src/stages/match-rules.js'
 import { readdir } from 'node:fs/promises'
+import { AiforgeError } from '../../src/core/errors.js'
+import { FilterCancelledSignal } from '../../src/stages/filter-utils.js'
+import { select } from '@inquirer/prompts'
 
 // ── Fixtures ───────────────────────────────────────────────────
 
@@ -562,6 +568,362 @@ describe('matchRules', () => {
     const agentsItem = plan.items.find((i) => i.rule.sourceDir === 'agents')
     expect(agentsItem!.sourceFiles[0]).toContain('/tmp/repo')
     expect(agentsItem!.sourceFiles[0]).toContain('my-agent.md')
+  })
+
+  // ──────────────────────────────────────────────────────────────
+  // Story 6-2 — --filter 过滤测试
+  // ──────────────────────────────────────────────────────────────
+
+  it('AC #1 --filter skills/git* 只返回匹配的子目录（git-commit/git-push）', async () => {
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/skills')) {
+        return [
+          { name: 'git-commit', isFile: () => false, isDirectory: () => true },
+          { name: 'git-push', isFile: () => false, isDirectory: () => true },
+          { name: 'code-review', isFile: () => false, isDirectory: () => true },
+          { name: 'deploy', isFile: () => false, isDirectory: () => true },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['copilot'], 'global'),
+      makeArgs({ global: true, filter: 'skills/git*' }),
+      mockReporter,
+      mockPathResolver,
+    )
+
+    expect(plan.items).toHaveLength(1)
+    const skillsItem = plan.items[0]!
+    expect(skillsItem.rule.sourceDir).toBe('skills')
+    expect(skillsItem.sourceFiles).toHaveLength(2)
+    expect(skillsItem.sourceFiles.some((f) => f.endsWith('git-commit'))).toBe(true)
+    expect(skillsItem.sourceFiles.some((f) => f.endsWith('git-push'))).toBe(true)
+    expect(skillsItem.sourceFiles.some((f) => f.endsWith('code-review'))).toBe(false)
+    expect(skillsItem.sourceFiles.some((f) => f.endsWith('deploy'))).toBe(false)
+  })
+
+  it('AC #3 --filter git*（无前缀）跨所有顶层目录匹配 git* 子目录', async () => {
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/agents')) {
+        return [
+          { name: 'git-agent.md', isFile: () => true, isDirectory: () => false },
+          { name: 'other.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      if (p.endsWith('/skills')) {
+        return [
+          { name: 'git-skill', isFile: () => false, isDirectory: () => true },
+          { name: 'other-skill', isFile: () => false, isDirectory: () => true },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['copilot'], 'global'),
+      makeArgs({ global: true, filter: 'git*' }),
+      mockReporter,
+      mockPathResolver,
+    )
+
+    // agents 有 git-agent.md，skills 有 git-skill
+    const agentsItem = plan.items.find((i) => i.rule.sourceDir === 'agents')
+    const skillsItem = plan.items.find((i) => i.rule.sourceDir === 'skills')
+    expect(agentsItem).toBeDefined()
+    expect(skillsItem).toBeDefined()
+    expect(agentsItem!.sourceFiles).toHaveLength(1)
+    expect(agentsItem!.sourceFiles[0]).toContain('git-agent.md')
+    expect(skillsItem!.sourceFiles).toHaveLength(1)
+    expect(skillsItem!.sourceFiles[0]).toContain('git-skill')
+    // instructions 没有匹配的 -> 不在 items
+    expect(plan.items.find((i) => i.rule.sourceDir === 'instructions')).toBeUndefined()
+  })
+
+  it('AC #2 --dirs skills --filter skills/git* 联合语义与单独用 --filter 一致', async () => {
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/skills')) {
+        return [
+          { name: 'git-commit', isFile: () => false, isDirectory: () => true },
+          { name: 'code-review', isFile: () => false, isDirectory: () => true },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['copilot'], 'global'),
+      makeArgs({ global: true, dirs: ['skills'], filter: 'skills/git*' }),
+      mockReporter,
+      mockPathResolver,
+    )
+
+    expect(plan.items).toHaveLength(1)
+    expect(plan.items[0]!.rule.sourceDir).toBe('skills')
+    expect(plan.items[0]!.sourceFiles).toHaveLength(1)
+    expect(plan.items[0]!.sourceFiles[0]).toContain('git-commit')
+  })
+
+  it('AC #1 --filter 对 Files 类型有效（按文件 basename 匹配 glob）', async () => {
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/agents')) {
+        return [
+          { name: 'git-agent.md', isFile: () => true, isDirectory: () => false },
+          { name: 'other-agent.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['copilot'], 'global'),
+      makeArgs({ global: true, dirs: ['agents'], filter: 'agents/git*' }),
+      mockReporter,
+      mockPathResolver,
+    )
+
+    expect(plan.items).toHaveLength(1)
+    expect(plan.items[0]!.rule.type).toBe(InstallType.Files)
+    expect(plan.items[0]!.sourceFiles).toHaveLength(1)
+    expect(plan.items[0]!.sourceFiles[0]).toContain('git-agent.md')
+  })
+
+  it('AC #1 --filter 对 Flatten 类型有效（cursor:global skills）', async () => {
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/skills')) {
+        return [
+          { name: 'git-skill', isFile: () => false, isDirectory: () => true },
+          { name: 'other-skill', isFile: () => false, isDirectory: () => true },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['cursor'], 'global'),
+      makeArgs({ global: true, filter: 'git*' }),
+      mockReporter,
+      mockPathResolver,
+    )
+
+    expect(plan.items).toHaveLength(1)
+    expect(plan.items[0]!.rule.type).toBe(InstallType.Flatten)
+    expect(plan.items[0]!.sourceFiles).toHaveLength(1)
+    expect(plan.items[0]!.sourceFiles[0]).toContain('git-skill')
+  })
+
+  it('AC #5 dry-run: --filter skills/git* 只展示匹配条目，不含空 item', async () => {
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/skills')) {
+        return [
+          { name: 'git-commit', isFile: () => false, isDirectory: () => true },
+          { name: 'code-review', isFile: () => false, isDirectory: () => true },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['copilot'], 'global'),
+      makeArgs({ global: true, filter: 'skills/git*' }),
+      mockReporter,
+      mockPathResolver,
+    )
+
+    // agents/instructions 规则被 dirPrefix 过滤 → 空 item → 不在 plan
+    // skills 只有 git-commit 匹配
+    expect(plan.items).toHaveLength(1)
+    expect(plan.items[0]!.rule.sourceDir).toBe('skills')
+    expect(plan.items[0]!.sourceFiles).toHaveLength(1)
+    expect(plan.items[0]!.sourceFiles[0]).toContain('git-commit')
+    // 所有 items 都有非空 sourceFiles（保证 dry-run 不输出 emptySourceDir）
+    expect(plan.items.every((item) => item.sourceFiles.length > 0)).toBe(true)
+  })
+
+  it('AC #4 filter 零匹配时非 TTY 抛出 FILTER_NO_MATCH', async () => {
+    const origTTY = process.stdin.isTTY
+    Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true })
+
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/skills')) {
+        return [
+          // scanSourceFiles 和 scanAvailableTopDirs 共用同一 mock
+          // scanSourceFiles 用 isDirectory()，scanAvailableTopDirs 也用 isDirectory()
+          { name: 'git-commit', isFile: () => false, isDirectory: () => true },
+          { name: 'git-push', isFile: () => false, isDirectory: () => true },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    try {
+      await matchRules(
+        mockRepo,
+        makeEnv(['copilot'], 'global'),
+        makeArgs({ global: true, filter: 'skills/xyz*' }), // xyz* 不匹配任何目录
+        mockReporter,
+        mockPathResolver,
+      )
+      expect.unreachable('应抛出 FILTER_NO_MATCH')
+    } catch (err) {
+      expect(err).toBeInstanceOf(AiforgeError)
+      const e = err as AiforgeError
+      expect(e.code).toBe('FILTER_NO_MATCH')
+      expect(e.exitCode).toBe(3) // EXIT_ARG_ERROR
+      // fix[] 应列出可用子目录
+      expect(e.fix.some((f) => f.includes('git-commit'))).toBe(true)
+    } finally {
+      Object.defineProperty(process.stdin, 'isTTY', { value: origTTY, configurable: true })
+    }
+  })
+
+  it('AC #4 TTY 选择重试成功: select() 返回限定名 → items 包含 git-commit', async () => {
+    const origTTY = process.stdin.isTTY
+    Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/skills')) {
+        return [
+          { name: 'git-commit', isFile: () => false, isDirectory: () => true },
+          { name: 'git-push', isFile: () => false, isDirectory: () => true },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+    // select() 返回限定名（带 dirPrefix）
+    vi.mocked(select).mockResolvedValue('skills/git-commit')
+
+    try {
+      const plan = await matchRules(
+        mockRepo,
+        makeEnv(['copilot'], 'global'),
+        makeArgs({ global: true, filter: 'skills/xyz*' }),
+        mockReporter,
+        mockPathResolver,
+      )
+      // 重试逻辑生效：items 包含 git-commit
+      expect(plan.items).toHaveLength(1)
+      expect(plan.items[0]!.rule.sourceDir).toBe('skills')
+      expect(plan.items[0]!.sourceFiles.some((f) => f.endsWith('git-commit'))).toBe(true)
+    } finally {
+      Object.defineProperty(process.stdin, 'isTTY', { value: origTTY, configurable: true })
+    }
+  })
+
+  it('AC #4 TTY 取消抛出 FilterCancelledSignal（而非 AiforgeError，不返回空计划）', async () => {
+    const origTTY = process.stdin.isTTY
+    Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/skills')) {
+        return [
+          { name: 'git-commit', isFile: () => false, isDirectory: () => true },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+    vi.mocked(select).mockResolvedValue('__cancel__')
+
+    try {
+      await matchRules(
+        mockRepo,
+        makeEnv(['copilot'], 'global'),
+        makeArgs({ global: true, filter: 'skills/xyz*' }),
+        mockReporter,
+        mockPathResolver,
+      )
+      expect.unreachable('应抛出 FilterCancelledSignal')
+    } catch (err) {
+      expect(err).not.toBeInstanceOf(AiforgeError)
+      expect(err).toBeInstanceOf(FilterCancelledSignal)
+    } finally {
+      Object.defineProperty(process.stdin, 'isTTY', { value: origTTY, configurable: true })
+    }
+  })
+
+  it('AC #4 无前缀零匹配 TTY: 候选使用 sourceDir/itemName 格式，选择后重试成功（fix CR#1）', async () => {
+    const origTTY = process.stdin.isTTY
+    Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
+
+    // --filter git* (无前缀) — agents: Files, git-agent.md 不匹配 git* 初扫失败
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/agents')) {
+        return [
+          { name: 'git-agent.md', isFile: () => true, isDirectory: () => false },
+          { name: 'other.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+    // select() 返回限定名（带 sourceDir 前缀）
+    vi.mocked(select).mockResolvedValue('agents/git-agent.md')
+
+    try {
+      const plan = await matchRules(
+        mockRepo,
+        makeEnv(['copilot'], 'global'),
+        makeArgs({ global: true, filter: 'xyz*' }), // xyz* 不匹配任何条目
+        mockReporter,
+        mockPathResolver,
+      )
+      // 重试后 items 包含 git-agent.md
+      expect(plan.items).toHaveLength(1)
+      expect(plan.items[0]!.rule.sourceDir).toBe('agents')
+      expect(plan.items[0]!.sourceFiles.some((f) => f.endsWith('git-agent.md'))).toBe(true)
+    } finally {
+      Object.defineProperty(process.stdin, 'isTTY', { value: origTTY, configurable: true })
+    }
+  })
+
+  it('AC #4 Files 类型零匹配非 TTY: fixAvailable 包含文件候选（qualified name 格式）（fix CR#2）', async () => {
+    const origTTY = process.stdin.isTTY
+    Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true })
+
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/agents')) {
+        return [
+          { name: 'coding-agent.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    try {
+      await matchRules(
+        mockRepo,
+        makeEnv(['copilot'], 'global'),
+        makeArgs({ global: true, filter: 'agents/xyz*' }), // agents 是 Files 类型
+        mockReporter,
+        mockPathResolver,
+      )
+      expect.unreachable('应抛出 FILTER_NO_MATCH')
+    } catch (err) {
+      expect(err).toBeInstanceOf(AiforgeError)
+      const e = err as AiforgeError
+      expect(e.code).toBe('FILTER_NO_MATCH')
+      // fix[] 应包含文件候选，格式为 agents/xxx.md（而非纯目录名）
+      expect(e.fix.some((f) => f.includes('agents/coding-agent.md'))).toBe(true)
+    } finally {
+      Object.defineProperty(process.stdin, 'isTTY', { value: origTTY, configurable: true })
+    }
   })
 })
 

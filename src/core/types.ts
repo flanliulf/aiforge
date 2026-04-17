@@ -24,6 +24,7 @@ export interface ParsedArgs {
   token?: string
   cloneDir?: string
   list?: string
+  filter?: string
   // legacy aliases kept for internal use
   symlink: boolean
   flatten: boolean

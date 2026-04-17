@@ -261,6 +261,13 @@ interface MessageSet {
     invalidInputWhy: string
     fixUseSimpleName: string
   }
+  filter: {
+    noMatch: string
+    noMatchWhy: string
+    fixAvailable: string
+    selectPrompt: string
+    cancelled: string
+  }
 }
 
 // ── 双语消息集 ──────────────────────────────────────────────────
@@ -510,6 +517,13 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       invalidInput: '--list 参数 "{dir}" 不是有效的顶层目录名',
       invalidInputWhy: '顶层目录名不能包含路径分隔符（/、\\）或以点号（.）开头',
       fixUseSimpleName: '请使用简单的目录名，例如：skills、agents、prompts',
+    },
+    filter: {
+      noMatch: '没有子目录匹配 pattern: {pattern}',
+      noMatchWhy: '指定的 glob 模式未匹配到任何可安装内容',
+      fixAvailable: '可用子目录: {dirs}',
+      selectPrompt: '没有匹配结果，请选择一个子目录或取消：',
+      cancelled: '已取消',
     },
   },
   en: {
@@ -763,6 +777,13 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       invalidInputWhy:
         'A top-level directory name must not contain path separators (/, \\) or start with a dot (.)',
       fixUseSimpleName: 'Use a simple directory name such as: skills, agents, prompts',
+    },
+    filter: {
+      noMatch: 'No subdirectories match pattern: {pattern}',
+      noMatchWhy: 'The specified glob pattern did not match any installable content',
+      fixAvailable: 'Available subdirectories: {dirs}',
+      selectPrompt: 'No matches found. Select a subdirectory or cancel:',
+      cancelled: 'Cancelled',
     },
   },
 }

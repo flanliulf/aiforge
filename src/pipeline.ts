@@ -24,6 +24,7 @@ import { InstallType } from './core/types.js'
 import type { Reporter } from './core/reporter.js'
 import type { PathResolver } from './core/path-resolver.js'
 import { AiforgeError, EXIT_INSTALL_FAILURE } from './core/errors.js'
+import { FilterCancelledSignal } from './stages/filter-utils.js'
 import { msg } from './core/messages.js'
 import { resolveSource } from './stages/resolve-source.js'
 import { authenticate as authenticateStage } from './stages/authenticate.js'
@@ -62,6 +63,7 @@ export function mapOptsToArgs(
     token: opts['token'] as string | undefined,
     cloneDir: opts['cloneDir'] as string | undefined,
     list: opts['list'] as string | undefined,
+    filter: opts['filter'] as string | undefined,
     symlink: Boolean(opts['link']),
     flatten: false,
   }
@@ -432,6 +434,10 @@ export async function runPipeline(
       stages.report(plan, reporter, 'plan')
     }
   } catch (error) {
+    // FilterCancelledSignal：用户取消是正常流，以 exit code 0 静默退出
+    if (error instanceof FilterCancelledSignal) {
+      return
+    }
     if (error instanceof AiforgeError && error.severity === 'fatal') {
       reporter.reportError(error)
       process.exitCode = error.exitCode

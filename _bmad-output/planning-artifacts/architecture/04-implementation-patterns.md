@@ -90,6 +90,67 @@ grep -rn "console\.log\|硬编码中文" src/ --include="*.ts"
 
 > 来源：Epic 5 Retrospective — Story 5-5a（i18n）经历 6 轮 CR，根因是横切关注点影响面跨 10 个生产代码文件，传统线性执行模式不适配，每轮 CR 逐个发现遗漏。
 
+### Recovery/Fallback Path Patterns（恢复/回退路径模式）
+
+**恢复/回退路径必须与主路径的匹配空间语义对齐：**
+
+当功能包含"正常执行路径"和"恢复/回退/重试路径"两条执行链时，恢复路径的候选空间必须是主路径匹配空间的超集或等集，不能更窄。
+
+```typescript
+❌ // 恢复路径使用不同的扫描函数，候选空间比主路径更窄
+   const candidates = scanAvailableTopDirs(repoDir) // 只返回目录名
+   // 主路径匹配 basename（含文件），恢复路径候选仅含目录 → 语义不一致
+
+✅ // 恢复路径复用主路径的扫描逻辑，按类型区分
+   const candidates = rules.flatMap(rule =>
+     scanSourceFiles(rule.sourceDir, rule.type) // 与主路径一致
+       .map(entry => `${rule.sourceDir}/${entry.name}`)
+   )
+```
+
+禁止在恢复路径中引入主路径没有的额外过滤条件。实现恢复路径后，必须自查："主路径能匹配到的项，恢复路径的候选列表中是否都包含？"
+
+> 来源：Story 6-2 CR R1 — 3/5 条发现均源于恢复路径与主路径语义不一致。
+
+**恢复/重试路径必须包含二次成功校验：**
+
+每次恢复/重试后，必须对结果执行与首次尝试相同的成功条件校验。禁止假设"用户做了选择 → 重试一定成功"。
+
+```typescript
+❌ // 重试后直接返回，可能为空
+   const retryItems = retryMatch(userSelection)
+   return { items: retryItems } // 可能为空，用户无提示
+
+✅ // 重试后重新校验
+   const retryItems = retryMatch(userSelection)
+   if (retryItems.length === 0) {
+     throw new AiforgeError(msg('filter.noMatch'), ...)
+   }
+   return { items: retryItems }
+```
+
+> 来源：Story 6-2 CR R1 — TTY 零匹配恢复后未二次检查 items 是否仍为空，静默返回空计划。
+
+### Story Scope Discipline（Story 作用域纪律）
+
+**Story 作用域内的行为变更不得超出 AC 定义：**
+
+禁止将仅适用于新功能路径的守卫/优化"提升"为全局行为，除非 AC 明确要求。新增的代码守卫条件必须精确限定在 Story 功能的作用域内。
+
+```typescript
+❌ // 守卫条件无条件生效，影响非 Story 路径
+   if (sourceFiles.length === 0) continue  // 所有场景都跳过，回归既有语义
+
+✅ // 守卫条件限定在 Story 功能作用域内
+   if (args.filter && sourceFiles.length === 0) continue  // 仅 --filter 路径跳过
+```
+
+**修改既有测试必须证明为合法适配：**
+
+修改任何既有测试时，必须回答："该测试原本保护的行为是否应当被变更？"——如果答案是"否"，则旧测试应保持原样作为回归保护，新行为需要在不破坏旧行为的前提下实现。
+
+> 来源：Story 6-2 CR R1 — 空 item 守卫被提升为通用行为，超出 AC 要求，且 8 个既有测试被改写吸收回归而非保护回归。
+
 <!-- PATTERNS_APPEND_1 -->
 
 ### Pipeline Stage Patterns

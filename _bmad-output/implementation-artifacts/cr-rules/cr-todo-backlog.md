@@ -7,7 +7,7 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 6 |
+| 🔴 open | 8 |
 | 🟡 in-progress | 0 |
 | ✅ resolved | 12 |
 
@@ -70,6 +70,28 @@
 - **涉及文件**: `src/index.ts`, `tests/core/reporter.test.ts`
 - **建议时机**: 下次触及 `src/index.ts` 时，采用辅助函数提取方案（将 `isTty: process.stderr.isTTY === true` 推导逻辑提取为可测函数）彻底关闭此项
 - **前置条件**: 需要先重构——将 `isTty` 推导逻辑从 `index.ts` action 回调提取为独立函数，然后才能编写有效的单元测试
+- **状态**: open
+- **解决记录**:
+
+### TODO-019: 不可命中的 filter 语法（空 glob、多斜杠）未被前置拒绝
+
+- **来源**: 6-2 CR round 1 (2026-04-17)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: `src/stages/filter-utils.ts:27-35` 的 `parseFilterPattern()` 接受 `skills/`（空 glob，生成正则 `^$` 只能匹配空字符串）和 `skills/git/extra`（多斜杠，glob 含 `/` 但 basename 永远不含 `/`）等明显无效输入。这些 pattern 不可能命中任何候选但不会被立即拒绝，而是延后进入零匹配/交互分支，增加用户排查成本。最终仍会被零匹配流程捕获（非 TTY 抛错，TTY 进入交互），不存在数据丢失或安全风险。修复方案：在参数解析阶段校验 filter grammar，只接受 `<glob>` 或 `<topDir>/<glob>` 且 glob 非空、无额外斜杠的形式，并为非法 filter 输入补充单元测试。
+- **涉及文件**: `src/stages/filter-utils.ts`
+- **建议时机**: 下次触及 `filter-utils.ts` 时，或 filter 功能增强 Story 中
+- **状态**: open
+- **解决记录**:
+
+### TODO-020: 零匹配恢复候选对 dot-prefixed 条目过滤与主匹配不一致
+
+- **来源**: 6-2 CR round 2 (2026-04-17)
+- **优先级**: P3
+- **类别**: tech-debt
+- **描述**: `src/stages/match-rules.ts` 的零匹配恢复路径候选收集逻辑对 `entry.name.startsWith('.')` 直接跳过，而主匹配路径 `scanSourceFiles()` 在 Files/Directories/Flatten 分支下仅排除 `DEFAULT_EXCLUDES`（含 `.gitkeep`、`.DS_Store` 等 6 项），不额外排除所有 `.` 开头条目。导致恢复路径候选空间比主匹配空间更窄。触发条件极端：需同时满足 dot-prefixed 可安装项 + 零匹配 + 该项恰好是用户想要的候选，实际风险极低。修复方向：将候选枚举的过滤条件收敛到与 `scanSourceFiles()` 一致，或统一决策对 dot items 的处理策略后两处同步调整。
+- **涉及文件**: `src/stages/match-rules.ts`
+- **建议时机**: 后续统一 dot-item 处理策略时一并修复
 - **状态**: open
 - **解决记录**:
 

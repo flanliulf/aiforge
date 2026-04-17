@@ -146,4 +146,12 @@ describe('CLI 参数解析 → ParsedArgs 映射 (AC#3)', () => {
     expect(args.cloneDir).toBe('/tmp')
     expect(args.flatten).toBe(false)
   })
+
+  it('mapOptsToArgs: --filter 字段正确映射到 ParsedArgs.filter', () => {
+    const withFilter = mapOptsToArgs('https://example.com/repo', { filter: 'skills/git*' })
+    expect(withFilter.filter).toBe('skills/git*')
+
+    const withoutFilter = mapOptsToArgs('https://example.com/repo', {})
+    expect(withoutFilter.filter).toBeUndefined()
+  })
 })

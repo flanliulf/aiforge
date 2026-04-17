@@ -11,6 +11,7 @@ import type { ParsedArgs, MatchedPlan, InstallResult } from '../src/core/types.j
 import type { Reporter } from '../src/core/reporter.js'
 import type { PathResolver } from '../src/core/path-resolver.js'
 import { AiforgeError } from '../src/core/errors.js'
+import { FilterCancelledSignal } from '../src/stages/filter-utils.js'
 import {
   runPipeline,
   resolve,
@@ -244,6 +245,35 @@ describe('pipeline — 管道编排器', () => {
         'saveManifest',
         'report',
       ])
+    })
+
+    it('--filter + dryRun: 预览计划只包含匹配条目（Install 跳过，Report 以 plan 模式接收 match 输出）', async () => {
+      const filteredPlan: MatchedPlan = {
+        items: [
+          {
+            rule: { tool: 'copilot', scope: 'global', sourceDir: 'skills', type: 0, targetDir: '' },
+            sourceFiles: ['/repo/skills/git-commit'],
+            targetPath: '/home/user/.copilot/skills/',
+            mode: 'copy',
+          },
+        ],
+      }
+      const stages = createMockStages()
+      vi.mocked(stages.match).mockResolvedValue(filteredPlan)
+
+      const args = createTestArgs({ dryRun: true, filter: 'skills/git*' })
+      await runPipeline(args, mockReporter, stages)
+
+      // match 接收到含 filter 的 args
+      expect(stages.match).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ filter: 'skills/git*', dryRun: true }),
+        mockReporter,
+      )
+      // install 跳过
+      expect(stages.install).not.toHaveBeenCalled()
+      // report 以 plan 模式接收 filteredPlan
+      expect(stages.report).toHaveBeenCalledWith(filteredPlan, mockReporter, 'plan')
     })
 
     it('dryRun 为 true 时跳过 install 和 saveManifest 但仍调用 report（mode=plan）', async () => {
@@ -495,5 +525,55 @@ describe('runPipeline — --list 分叉', () => {
     expect(stages.detect).not.toHaveBeenCalled()
     expect(stages.install).not.toHaveBeenCalled()
     expect(reporter.reportError).toHaveBeenCalledWith(invalidError)
+  })
+})
+
+// ── Story 6-2: FilterCancelledSignal 管道编排测试 ─────────────────────────────
+
+describe('pipeline — FilterCancelledSignal 编排行为', () => {
+  let reporter: Reporter
+
+  beforeEach(() => {
+    reporter = createMockReporter()
+    vi.restoreAllMocks()
+    process.exitCode = undefined
+  })
+
+  it('match 阶段抛出 FilterCancelledSignal 时，runPipeline 正常返回（不 throw）', async () => {
+    const stages = createMockStages()
+    const signal = new FilterCancelledSignal()
+    vi.mocked(stages.match).mockRejectedValue(signal)
+
+    await expect(runPipeline(createTestArgs(), reporter, stages)).resolves.toBeUndefined()
+  })
+
+  it('match 阶段抛出 FilterCancelledSignal 时，reporter.reportError 未被调用', async () => {
+    const stages = createMockStages()
+    vi.mocked(stages.match).mockRejectedValue(new FilterCancelledSignal())
+
+    await runPipeline(createTestArgs(), reporter, stages)
+
+    expect(reporter.reportError).not.toHaveBeenCalled()
+  })
+
+  it('match 阶段抛出 FilterCancelledSignal 时，process.exitCode 为 0 或 undefined', async () => {
+    const stages = createMockStages()
+    vi.mocked(stages.match).mockRejectedValue(new FilterCancelledSignal())
+
+    await runPipeline(createTestArgs(), reporter, stages)
+
+    // 取消是正常流，exitCode 不应设为非零值
+    expect(process.exitCode ?? 0).toBe(0)
+  })
+
+  it('match 阶段抛出 FilterCancelledSignal 时，Install 和 Report 阶段未执行', async () => {
+    const stages = createMockStages()
+    vi.mocked(stages.match).mockRejectedValue(new FilterCancelledSignal())
+
+    await runPipeline(createTestArgs(), reporter, stages)
+
+    expect(stages.install).not.toHaveBeenCalled()
+    expect(stages.report).not.toHaveBeenCalled()
+    expect(stages.saveManifest).not.toHaveBeenCalled()
   })
 })

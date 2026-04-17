@@ -14,7 +14,7 @@
  *   7. 构建 MatchedPlan 返回
  */
 
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { readdir } from 'node:fs/promises'
 import type { LocalRepo, ParsedArgs, DetectedEnv, MatchedPlan, InstallRule } from '../core/types.js'
 import { InstallType } from '../core/types.js'
@@ -25,6 +25,7 @@ import { EXIT_ARG_ERROR } from '../core/errors.js'
 import { RULE_INDEX } from '../data/install-rules.js'
 import { DEFAULT_EXCLUDES } from '../data/excludes.js'
 import { msg } from '../core/messages.js'
+import { parseFilterPattern, matchesGlob, FilterCancelledSignal } from './filter-utils.js'
 
 // ── 安装模式推导 ─────────────────────────────────────────────────────────────
 
@@ -170,7 +171,23 @@ export async function matchRules(
 
     for (const rule of filteredRules) {
       // 扫描源文件（含排除过滤）
-      const sourceFiles = await scanSourceFiles(repo.repoDir, rule)
+      let sourceFiles = await scanSourceFiles(repo.repoDir, rule)
+
+      // --filter 文件级过滤（Story 6-2）
+      // 过滤位置：scanSourceFiles 返回后、items.push 之前
+      if (args.filter) {
+        const { dirPrefix, glob } = parseFilterPattern(args.filter)
+        // 如果 filter 指定了顶层目录前缀，且当前规则的 sourceDir 不匹配，跳过全部 sourceFiles
+        if (dirPrefix && dirPrefix !== rule.sourceDir) {
+          sourceFiles = []
+        } else {
+          sourceFiles = sourceFiles.filter((sf) => matchesGlob(basename(sf), glob))
+        }
+      }
+
+      // empty-item guard：仅 --filter 路径下，sourceFiles 为空则跳过，不 push 空 item
+      // 非 --filter 场景：空 item 照常 push，保留 reportPlan() 的 emptySourceDir 输出语义（fix CR#3）
+      if (args.filter && sourceFiles.length === 0) continue
 
       // 解析目标路径
       const targetPath = resolveTargetDir(rule, env.scope, pathResolver)
@@ -180,6 +197,116 @@ export async function matchRules(
       const mode = getInstallMode(args, env.scope)
 
       items.push({ rule, sourceFiles, targetPath, mode })
+    }
+  }
+
+  // 零匹配检测（Task 4）：全部 items 处理完毕后，若 args.filter 非空且 items 为空，触发交互式询问
+  if (args.filter && items.length === 0) {
+    const { dirPrefix } = parseFilterPattern(args.filter)
+
+    // 按 rule.type 收集真实可命中的候选安装项（fix CR#1 + CR#2）：
+    //   - Directories/Flatten 类型：枚举目录名
+    //   - Files 类型：枚举文件 basename
+    // prefixed case：只收集 rule.sourceDir === dirPrefix 的规则
+    // unprefixed case：收集所有相关规则（尊重 --dirs）
+    const candidateChoices: Array<{ name: string; value: string }> = []
+    const seen = new Set<string>()
+    for (const toolId of env.tools) {
+      const rules = RULE_INDEX.get(`${toolId}:${env.scope}`) ?? []
+      const relevantRules =
+        args.dirs && args.dirs.length > 0
+          ? rules.filter((r) => args.dirs!.includes(r.sourceDir))
+          : rules
+      for (const rule of relevantRules) {
+        if (dirPrefix && dirPrefix !== rule.sourceDir) continue
+        const ruleDir = join(repo.repoDir, rule.sourceDir)
+        try {
+          const entries = await readdir(ruleDir, { withFileTypes: true })
+          for (const entry of entries) {
+            if (DEFAULT_EXCLUDES.includes(entry.name) || entry.name.startsWith('.')) continue
+            const relevant = rule.type === InstallType.Files ? entry.isFile() : entry.isDirectory()
+            if (!relevant) continue
+            const value = dirPrefix
+              ? `${dirPrefix}/${entry.name}`
+              : `${rule.sourceDir}/${entry.name}`
+            if (!seen.has(value)) {
+              seen.add(value)
+              candidateChoices.push({ name: entry.name, value })
+            }
+          }
+        } catch {
+          // ENOENT/ENOTDIR: skip this sourceDir
+        }
+      }
+    }
+    candidateChoices.sort((a, b) => a.name.localeCompare(b.name))
+
+    if (process.stdin.isTTY) {
+      // 交互式选择
+      const { select } = await import('@inquirer/prompts')
+      const choices = [...candidateChoices, { name: msg('filter.cancelled'), value: '__cancel__' }]
+      const choice = await select({
+        message: msg('filter.selectPrompt'),
+        choices,
+      })
+      if (choice === '__cancel__') {
+        reporter.completePhase()
+        throw new FilterCancelledSignal()
+      }
+      // 使用局部变量 resolvedFilter（限定名），不改写 args.filter（ParsedArgs 只读原则）
+      const resolvedFilter = choice
+      const { dirPrefix: rPrefix, glob: rGlob } = parseFilterPattern(resolvedFilter)
+      // 重新扫描：基于 resolvedFilter 重新执行过滤，填充 items
+      for (const toolId of env.tools) {
+        const rules = RULE_INDEX.get(`${toolId}:${env.scope}`) ?? []
+        const filteredRules =
+          args.dirs && args.dirs.length > 0
+            ? rules.filter((r) => args.dirs!.includes(r.sourceDir))
+            : rules
+        for (const rule of filteredRules) {
+          let sourceFiles = await scanSourceFiles(repo.repoDir, rule)
+          if (rPrefix && rPrefix !== rule.sourceDir) {
+            sourceFiles = []
+          } else {
+            sourceFiles = sourceFiles.filter((sf) => matchesGlob(basename(sf), rGlob))
+          }
+          if (sourceFiles.length === 0) continue
+          const targetPath = resolveTargetDir(rule, env.scope, pathResolver)
+          const mode = getInstallMode(args, env.scope)
+          items.push({ rule, sourceFiles, targetPath, mode })
+        }
+      }
+      // 二次零匹配检查（fix CR#1）：重试后若 items 仍为空，抛出 FILTER_NO_MATCH
+      if (items.length === 0) {
+        throw new AiforgeError(
+          msg('filter.noMatch').replace('{pattern}', resolvedFilter),
+          'FILTER_NO_MATCH',
+          EXIT_ARG_ERROR,
+          'fatal',
+          msg('filter.noMatchWhy'),
+          [
+            msg('filter.fixAvailable').replace(
+              '{dirs}',
+              candidateChoices.map((c) => c.value).join(', '),
+            ),
+          ],
+        )
+      }
+    } else {
+      // 非 TTY：抛出三段式错误（fix CR#2：使用 candidateChoices 提供真实候选名）
+      throw new AiforgeError(
+        msg('filter.noMatch').replace('{pattern}', args.filter),
+        'FILTER_NO_MATCH',
+        EXIT_ARG_ERROR,
+        'fatal',
+        msg('filter.noMatchWhy'),
+        [
+          msg('filter.fixAvailable').replace(
+            '{dirs}',
+            candidateChoices.map((c) => c.value).join(', '),
+          ),
+        ],
+      )
     }
   }
 
