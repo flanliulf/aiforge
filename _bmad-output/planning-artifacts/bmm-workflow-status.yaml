@@ -54,8 +54,9 @@ current_activity:
     - epic-3: "done"  # 智能检测与安装规划 — 3/3 Stories 完成（2026-03-25）
     - epic-4: "done"  # 安装执行与冲突保护 — 7/7 Stories 完成（2026-03-31），Retrospective 完成（2026-03-31）
     - epic-5: "done"  # 端到端体验与发布就绪 — 9/9 Stories 完成（2026-04-03），Retrospective 完成（2026-04-07）
-  completed_stories: []  # Epic 5 已全部完成并归档到 completed_epics
-  notes: "Epic 5 最终回顾完成（2026-04-07）。全项目 5 Epic / 27 Story 全部交付，MVP Go 状态。708 测试零回归，CR TODO 4 open / 12 resolved。"
+  completed_stories:
+    - "6-1-list-subdirectory-contents: done"  # 2026-04-16 CR Approved (Round 3)
+  notes: "Epic 6 开发中。Story 6-1 完成（2026-04-16），CR 3 轮通过。737 测试零回归，CR TODO 6 open / 12 resolved。"
   next_steps:
-    - "MVP 发布准备"
-    - "M2 规划启动"
+    - "Story 6-2 filter-subdirectory-install 开发"
+    - "Epic 6 剩余 Stories 推进"

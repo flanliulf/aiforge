@@ -7,7 +7,7 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 4 |
+| 🔴 open | 6 |
 | 🟡 in-progress | 0 |
 | ✅ resolved | 12 |
 
@@ -16,6 +16,28 @@
 ## Open Items
 
 <!-- 按优先级排序：P1 > P2 > P3 -->
+
+### TODO-017: `--list` 顶层 symlink 可导向仓库外目录（纵深防御）
+
+- **来源**: 6-1 CR round 2 (2026-04-16)
+- **优先级**: P1
+- **类别**: tech-debt
+- **描述**: `src/stages/list-contents.ts:78` 的 `readdir(targetDir, { withFileTypes: true })` 会默认跟随 symlink。若仓库中存在 `skills -> /outside/dir` 的顶层 symlink，`readdir` 将枚举仓库外目录内容，泄漏外部目录名列表。Round 1 修复的字符串级校验（`LIST_INVALID_INPUT`）仅拦截输入参数中的路径分隔符和点号前缀，不覆盖文件系统层面的 symlink 跟随行为。威胁模型极窄：需恶意仓库放置 symlink + 用户主动 clone + 仅泄漏目录名（用户本身已有完整文件系统访问权）。修复需独立设计决策：拒绝所有 symlink（简单但可能破坏合法用例）vs 仅拒绝越界 symlink（`realpath` 后检查仍在 `repoDir` 下，更精确但增加复杂度）。
+- **涉及文件**: `src/stages/list-contents.ts`
+- **建议时机**: 安全加固 Story 中系统性处理，需先做 symlink 策略设计决策
+- **状态**: open
+- **解决记录**:
+
+### TODO-018: `--list` Commander 解析链路无端到端测试覆盖
+
+- **来源**: 6-1 CR round 1 (2026-04-16)
+- **优先级**: P2
+- **类别**: test-gap
+- **描述**: `src/index.ts:45` 新增了 `.option('--list <dir>', ...)`，但 `tests/cli-args.test.ts:23-35` 的本地 Commander program 定义仅覆盖到 `--clone-dir <path>`，未同步添加 `--list <dir>` 选项和对应测试场景。`tests/pipeline.test.ts:435-471` 使用手工构造的 `ParsedArgs`，不覆盖 Commander → `mapOptsToArgs()` 的真实解析链路。若后续选项名、取值名或映射逻辑发生漂移，当前测试集不会报警，CLI 入口存在回归盲区。修复方案：在 `tests/cli-args.test.ts` 的本地 Commander program 中增加 `.option('--list <dir>', ...)`，并添加 `--list skills` 和 `repo-url + --list skills` 两个测试场景。
+- **涉及文件**: `tests/cli-args.test.ts`, `src/index.ts`
+- **建议时机**: 下次触及 `tests/cli-args.test.ts` 时
+- **状态**: open
+- **解决记录**:
 
 ### TODO-007: `allowedRoot` 内部 broken symlink 被保守拒绝
 

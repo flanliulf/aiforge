@@ -622,6 +622,67 @@ CR 修复中如果修改了类型定义（interface/type/enum 的字段增删改
    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') { throw ... }
 ```
 
+**可选 CLI 分叉选项的条件判断必须使用 `!== undefined`：**
+
+当 CLI 选项触发命令行为分叉时，分叉条件必须使用严格的 `!== undefined` 判断，而非 truthy 判断。Commander 解析 `--list ""` 的结果为 `{ list: "", hasOwn: true }`——用户明确表达了操作意图，但值为空字符串。truthy 判断会将其误判为"未提供选项"，导致静默降级到默认流程，违反最小意外原则。
+
+```typescript
+✅ // 区分"选项未提供"与"选项已提供但值可能无效"
+   if (args.list !== undefined) {
+     await listContents(repo, args, reporter)  // listContents 内部负责值合法性校验
+     return
+   }
+
+❌ // truthy 判断：--list "" 被误判为"未提供"，静默降级为安装流程
+   if (args.list) {
+     await listContents(repo, args, reporter)
+     return
+   }
+   // → aiforge install repo-url --list ""  会触发安装而非报错
+   // → CI 脚本 $DIR_VAR 为空时：--list "$DIR_VAR" 展开为 --list "" → 误安装
+```
+
+> 来源：Story 6-1 CR R2 — `pipeline.ts` 中 `if (args.list)` 导致 `--list ""` 跳过 list 分叉直接进入安装流程；修复为 `if (args.list !== undefined)` 后，空字符串进入分叉由 `listContents` 统一抛出 `LIST_INVALID_INPUT`。
+
+**CLI 字符串参数（目录名/标识符类）必须同时执行三重防护校验：**
+
+接受"目录名/文件名/标识符"类字符串的 CLI 选项，在函数入口必须同时校验三重防护。三重防护缺一不可——只防路径字符而遗漏空字符串会被迂回，只防空字符串而遗漏路径字符会被路径穿越利用。
+
+```typescript
+✅ // 三重防护一次性到位
+   const val = args.list!  // 此处调用方已确保 list !== undefined
+   if (
+     !val.trim() ||              // 1. 空值防护：空字符串/纯空白字符串
+     /[/\\]/.test(val) ||        // 2. 路径分隔符防护：防路径穿越（/ 或 \）
+     val.startsWith('.')         // 3. 点号前缀防护：防 . / .. 相对引用
+   ) {
+     throw new AiforgeError(
+       msg('list.invalidInput').replace('{dir}', val),
+       'LIST_INVALID_INPUT',
+       EXIT_ARG_ERROR, 'fatal',
+       msg('list.invalidInputWhy'),
+       [msg('list.fixUseSimpleName')],
+     )
+   }
+
+❌ // 只防路径字符，遗漏空字符串
+   if (/[/\\]/.test(args.list!) || args.list!.startsWith('.')) { ... }
+   // → --list "" 被分叉条件 if (args.list) 过滤后，此校验永远不执行
+
+❌ // 只防空字符串，遗漏路径字符
+   if (!args.list!.trim()) { ... }
+   // → --list "../.." 通过校验，直接 readdir('/repo/../..')，枚举系统根目录
+```
+
+**实现清单（三重防护自查）：**
+1. `!val.trim()` — 空字符串和纯空白字符串被拒绝？
+2. `/[/\\]/.test(val)` — 含 `/` 或 `\` 的路径被拒绝？
+3. `val.startsWith('.')` — 以 `.` 开头（含 `.` 和 `..`）的路径被拒绝？
+4. 对应的分叉条件是否使用了 `!== undefined` 而非 truthy？
+5. 三种非法输入均有负向测试用例覆盖（确保 `readdir` 未被调用）？
+
+> 来源：Story 6-1 CR R1 — 首轮修复 `list-contents.ts` 只添加了路径分隔符和点号前缀校验，遗漏空字符串；R2 发现 `--list ""` 因 truthy 分叉条件绕过校验后直接进入安装流程，需再次修复。两次修复等效于首轮一并实施三重防护——规则提炼自此教训。
+
 ### Security Patterns
 
 **Token 脱敏规则：**

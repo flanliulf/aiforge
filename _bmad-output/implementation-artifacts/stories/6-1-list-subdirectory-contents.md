@@ -1,6 +1,6 @@
 # Story 6.1: `--list` 子目录内容列举
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -17,62 +17,62 @@ So that 我清楚地知道可以选择安装哪些内容，再决定是否使用
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 扩展 `ParsedArgs` 和 CLI 参数解析 (AC: #1)
-  - [ ] 1.1 在 `src/core/types.ts` 的 `ParsedArgs` 接口中添加 `list?: string` 字段（可选，值为用户指定的顶层目录名）
-  - [ ] 1.2 在 `src/index.ts` 的 commander 定义中添加 `--list <dir>` 选项：`.option('--list <dir>', 'list installable subdirectories under a top-level dir')`
-  - [ ] 1.3 在 `src/pipeline.ts` 的 `mapOptsToArgs()` 中映射 `list` 字段：`list: opts['list'] as string | undefined`
-  - [ ] 1.4 注意：CLI help 文案使用英文硬编码（不通过 `msg()` 获取，遵循项目规则 — Commander 在模块加载时求值 description）
+- [x] Task 1: 扩展 `ParsedArgs` 和 CLI 参数解析 (AC: #1)
+  - [x] 1.1 在 `src/core/types.ts` 的 `ParsedArgs` 接口中添加 `list?: string` 字段（可选，值为用户指定的顶层目录名）
+  - [x] 1.2 在 `src/index.ts` 的 commander 定义中添加 `--list <dir>` 选项：`.option('--list <dir>', 'list installable subdirectories under a top-level dir')`
+  - [x] 1.3 在 `src/pipeline.ts` 的 `mapOptsToArgs()` 中映射 `list` 字段：`list: opts['list'] as string | undefined`
+  - [x] 1.4 注意：CLI help 文案使用英文硬编码（不通过 `msg()` 获取，遵循项目规则 — Commander 在模块加载时求值 description）
 
-- [ ] Task 2: 实现 `--list` 命令的管道分叉逻辑 (AC: #1, #4)
-  - [ ] 2.1 在 `src/pipeline.ts` 的 `runPipeline()` 中，在 `clone` 阶段完成后检查 `args.list`：若非空，跳过 Detect/Match/Install/Report 阶段，转入 list 专用流程
-  - [ ] 2.2 list 流程：读取 `repo.repoDir` 下指定目录的子目录列表 → 通过 Reporter 输出 → 退出
-  - [ ] 2.3 管道分叉点在 `clone` 之后、`detect` 之前（`--list` 需要仓库内容但不需要工具检测）
-  - [ ] 2.4 分叉逻辑抽取为独立函数 `handleListCommand(repo, args, reporter)` 放在 `src/stages/list-contents.ts` 中，保持 pipeline.ts 的编排职责清晰
+- [x] Task 2: 实现 `--list` 命令的管道分叉逻辑 (AC: #1, #4)
+  - [x] 2.1 在 `src/pipeline.ts` 的 `runPipeline()` 中，在 `clone` 阶段完成后检查 `args.list`：若非空，跳过 Detect/Match/Install/Report 阶段，转入 list 专用流程
+  - [x] 2.2 list 流程：读取 `repo.repoDir` 下指定目录的子目录列表 → 通过 Reporter 输出 → 退出
+  - [x] 2.3 管道分叉点在 `clone` 之后、`detect` 之前（`--list` 需要仓库内容但不需要工具检测）
+  - [x] 2.4 分叉逻辑抽取为独立函数 `handleListCommand(repo, args, reporter)` 放在 `src/stages/list-contents.ts` 中，保持 pipeline.ts 的编排职责清晰
 
-- [ ] Task 3: 实现 `list-contents.ts` 阶段模块 (AC: #1, #2, #3)
-  - [ ] 3.1 创建 `src/stages/list-contents.ts`，导出 `listContents(repo: LocalRepo, args: ParsedArgs, reporter: Reporter): Promise<void>`
-  - [ ] 3.2 遵循 Reporter 生命周期契约：`reporter.startPhase(msg('phases.list'))` → 逻辑 → `reporter.completePhase()`
-  - [ ] 3.3 读取 `join(repo.repoDir, args.list!)` 目录，使用 `readdir({ withFileTypes: true })` 获取子目录列表
-  - [ ] 3.4 过滤：只保留 `isDirectory()` 且不在 `DEFAULT_EXCLUDES` 中的条目
-  - [ ] 3.5 目录不存在（ENOENT/ENOTDIR）处理：扫描 `repo.repoDir` 获取所有可用顶层目录列表，抛出 `AiforgeError`，错误码 `LIST_DIR_NOT_FOUND`，`fix[]` 中列出可用的顶层目录名建议用户用 `--list` 重试（AC #2）
-  - [ ] 3.6 目录存在但无子目录：调用 `reporter.completePhase()` 后调用 `reporter.reportList(args.list!, [])`，由 Reporter 以 stdout 输出"空目录"提示（成功态），正常退出（AC #3）——**禁止调用 `reporter.warn()`**（warn 走 stderr 通道，空目录是成功结果而非警告，CI 消费者会误判为错误）
-  - [ ] 3.7 正常输出：**只通过 `reporter.reportList(args.list!, subdirs)` 输出**带序号的子目录列表（AC #1）——禁止直接 `process.stdout.write()`，所有用户可见输出必须经过 Reporter 接口（Task 4 已设计完整的三种 Reporter 实现，正确路径已存在）
-  - [ ] 3.8 fs 错误处理遵循项目规则：ENOENT/ENOTDIR 降级，EACCES 等向上抛出
+- [x] Task 3: 实现 `list-contents.ts` 阶段模块 (AC: #1, #2, #3)
+  - [x] 3.1 创建 `src/stages/list-contents.ts`，导出 `listContents(repo: LocalRepo, args: ParsedArgs, reporter: Reporter): Promise<void>`
+  - [x] 3.2 遵循 Reporter 生命周期契约：`reporter.startPhase(msg('phases.list'))` → 逻辑 → `reporter.completePhase()`
+  - [x] 3.3 读取 `join(repo.repoDir, args.list!)` 目录，使用 `readdir({ withFileTypes: true })` 获取子目录列表
+  - [x] 3.4 过滤：只保留 `isDirectory()` 且不在 `DEFAULT_EXCLUDES` 中的条目
+  - [x] 3.5 目录不存在（ENOENT/ENOTDIR）处理：扫描 `repo.repoDir` 获取所有可用顶层目录列表，抛出 `AiforgeError`，错误码 `LIST_DIR_NOT_FOUND`，`fix[]` 中列出可用的顶层目录名建议用户用 `--list` 重试（AC #2）
+  - [x] 3.6 目录存在但无子目录：调用 `reporter.completePhase()` 后调用 `reporter.reportList(args.list!, [])`，由 Reporter 以 stdout 输出"空目录"提示（成功态），正常退出（AC #3）——**禁止调用 `reporter.warn()`**（warn 走 stderr 通道，空目录是成功结果而非警告，CI 消费者会误判为错误）
+  - [x] 3.7 正常输出：**只通过 `reporter.reportList(args.list!, subdirs)` 输出**带序号的子目录列表（AC #1）——禁止直接 `process.stdout.write()`，所有用户可见输出必须经过 Reporter 接口（Task 4 已设计完整的三种 Reporter 实现，正确路径已存在）
+  - [x] 3.8 fs 错误处理遵循项目规则：ENOENT/ENOTDIR 降级，EACCES 等向上抛出
 
-- [ ] Task 4: 扩展 Reporter 接口以支持 list 输出 (AC: #1)
-  - [ ] 4.1 在 `src/core/reporter.ts` 的 `Reporter` 接口中添加 `reportList(dirName: string, entries: string[]): void` 方法
-  - [ ] 4.2 `TtyReporter.reportList()`：输出标题行（带 chalk 着色）+ 带序号和图标的子目录列表
-  - [ ] 4.3 `PlainReporter.reportList()`：每行一个条目（制表符分隔 `<index>\t<name>`），CI 友好
-  - [ ] 4.4 `QuietReporter.reportList()`：仅输出目录名列表（无序号、无标题），极简模式
-  - [ ] 4.5 空列表场景（AC #3）：**`reportList` 需处理 `entries.length === 0` 的情况**，输出 `msg('list.empty')` 到 stdout（而非 stderr/warn 通道），各 Reporter 实现均需支持空列表态
+- [x] Task 4: 扩展 Reporter 接口以支持 list 输出 (AC: #1)
+  - [x] 4.1 在 `src/core/reporter.ts` 的 `Reporter` 接口中添加 `reportList(dirName: string, entries: string[]): void` 方法
+  - [x] 4.2 `TtyReporter.reportList()`：输出标题行（带 chalk 着色）+ 带序号和图标的子目录列表
+  - [x] 4.3 `PlainReporter.reportList()`：每行一个条目（制表符分隔 `<index>\t<name>`），CI 友好
+  - [x] 4.4 `QuietReporter.reportList()`：仅输出目录名列表（无序号、无标题），极简模式
+  - [x] 4.5 空列表场景（AC #3）：**`reportList` 需处理 `entries.length === 0` 的情况**，输出 `msg('list.empty')` 到 stdout（而非 stderr/warn 通道），各 Reporter 实现均需支持空列表态
 
-- [ ] Task 5: 添加 i18n 消息键 (AC: #1, #2, #3)
-  - [ ] 5.1 在 `src/core/messages.ts` 的 `MessageSet` 接口中添加 `list` 分组
-  - [ ] 5.2 添加中英文消息键：
+- [x] Task 5: 添加 i18n 消息键 (AC: #1, #2, #3)
+  - [x] 5.1 在 `src/core/messages.ts` 的 `MessageSet` 接口中添加 `list` 分组
+  - [x] 5.2 添加中英文消息键：
     - `phases.list`：`"列出子目录..."` / `"Listing subdirectories..."`
-    - `list.title`：`"📂 {dir}/ 下的可安装子目录："` / `"📂 Installable subdirectories under {dir}/:"` 
+    - `list.title`：`"📂 {dir}/ 下的可安装子目录："` / `"📂 Installable subdirectories under {dir}/:"`
     - `list.empty`：`"该目录下暂无可安装的子目录"` / `"No installable subdirectories found"`
     - `list.dirNotFound`：`"目录 {dir} 在仓库中不存在"` / `"Directory {dir} does not exist in the repository"`
     - `list.dirNotFoundWhy`：`"仓库中没有名为 {dir} 的顶层目录"` / `"The repository has no top-level directory named {dir}"`
     - `list.fixTryOther`：`"尝试 --list 搭配以下可用目录: {dirs}"` / `"Try --list with one of these available directories: {dirs}"`
 
-- [ ] Task 6: 编写单元测试 (AC: #1, #2, #3)
-  - [ ] 6.1 创建 `tests/stages/list-contents.test.ts`
-  - [ ] 6.2 测试用例：
+- [x] Task 6: 编写单元测试 (AC: #1, #2, #3)
+  - [x] 6.1 创建 `tests/stages/list-contents.test.ts`
+  - [x] 6.2 测试用例：
     - 正常列举子目录（多个子目录），验证 `reporter.reportList()` 被正确调用
     - 目录不存在时抛出 `LIST_DIR_NOT_FOUND`，`fix[]` 中包含可用顶层目录
     - 目录存在但为空，验证输出提示信息
     - DEFAULT_EXCLUDES 中的条目被正确过滤
     - 文件（非目录）被过滤掉
     - EACCES 错误向上透传（不被降级为"目录不存在"）
-  - [ ] 6.3 创建 `tests/core/reporter.test.ts` 扩展：测试 `reportList()` 在三种 Reporter 实现中的输出
-  - [ ] 6.4 扩展 `tests/pipeline.test.ts`：`--list` 参数导致管道在 clone 后分叉，不执行 detect/match/install
-  - [ ] 6.5 新增错误码 `LIST_DIR_NOT_FOUND` 必须有从真实创建模块入口触发的负向测试（禁止在 Reporter 层手工构造）
+  - [x] 6.3 创建 `tests/core/reporter.test.ts` 扩展：测试 `reportList()` 在三种 Reporter 实现中的输出
+  - [x] 6.4 扩展 `tests/pipeline.test.ts`：`--list` 参数导致管道在 clone 后分叉，不执行 detect/match/install
+  - [x] 6.5 新增错误码 `LIST_DIR_NOT_FOUND` 必须有从真实创建模块入口触发的负向测试（禁止在 Reporter 层手工构造）
 
-- [ ] Task 7: 质量门禁验证 (AC: #1-4)
-  - [ ] 7.1 `npm test` — 全绿
-  - [ ] 7.2 `npm run lint:src` — 退出码 0
-  - [ ] 7.3 `npm run build` — 构建通过
+- [x] Task 7: 质量门禁验证 (AC: #1-4)
+  - [x] 7.1 `npm test` — 全绿
+  - [x] 7.2 `npm run lint:src` — 退出码 0
+  - [x] 7.3 `npm run build` — 构建通过
 
 ## Dev Notes
 
@@ -248,8 +248,31 @@ git-commit
 
 ### Agent Model Used
 
+Claude Sonnet 4.6
+
 ### Debug Log References
+
+无
 
 ### Completion Notes List
 
+- 实现顺序：Task 5 (i18n) → Task 4 (Reporter) → Task 3 (list-contents.ts) → Task 2 (pipeline fork) → Task 1 (CLI/types) → Task 6 (tests) → Task 7 (gate)
+- `QuietReporter` 中 `reportList` 的 `dirName` 参数未使用，完全符合 Story Dev Notes 极简输出设计
+- `TtyReporter.reportList` 标题行使用 `chalk.bold` 着色，子目录使用 `📁` 图标+序号格式
+- `PlainReporter.reportList` 使用制表符（`\t`）分隔，与 `reportResult`/`reportPlan` 风格一致（CI friendly）
+- 测试新增 12 个（list-contents）+ 12 个（reporter.reportList）+ 4 个（pipeline fork）= 28 新测试，总计 729 通过
+
 ### File List
+
+新增文件：
+- `src/stages/list-contents.ts`
+- `tests/stages/list-contents.test.ts`
+
+修改文件：
+- `src/core/types.ts` — ParsedArgs 添加 `list?: string`
+- `src/index.ts` — CLI 添加 `--list <dir>` 选项
+- `src/pipeline.ts` — mapOptsToArgs 映射 list 字段；runPipeline 添加 clone 后分叉；导入 listContents
+- `src/core/reporter.ts` — Reporter 接口添加 reportList；TtyReporter/PlainReporter/QuietReporter 实现 reportList
+- `src/core/messages.ts` — MessageSet 接口添加 list 分组和 phases.list；zh-CN 和 en 双语消息添加对应键
+- `tests/core/reporter.test.ts` — 追加 reportList() 三种 Reporter 实现测试（28 个新用例）
+- `tests/pipeline.test.ts` — 添加 reportList 到 mockReporter；追加 --list 分叉测试套件
