@@ -42,6 +42,7 @@ program
   .option('--ssh', 'force SSH authentication', false)
   .option('--token <token>', 'provide token')
   .option('--clone-dir <path>', 'custom clone directory')
+  .option('--list <dir>', 'list installable subdirectories under a top-level dir')
   .action(async (repoUrl: string | undefined, opts: Record<string, unknown>) => {
     const args = mapOptsToArgs(repoUrl, opts)
     const pathResolver = new UnixPathResolver()

@@ -51,6 +51,7 @@ function createMockReporter(): Reporter {
     completePhase: vi.fn(),
     reportResult: vi.fn(),
     reportPlan: vi.fn(),
+    reportList: vi.fn(),
     reportError: vi.fn(),
     warn: vi.fn(),
   }
@@ -408,5 +409,91 @@ describe('pipeline — 管道编排器', () => {
       expect(stages.clone).not.toBe(clone)
       expect(stages.install).not.toBe(install)
     })
+  })
+})
+
+// ── Task 6.4: --list 管道分叉测试 ────────────────────────────────────────────
+
+vi.mock('../src/stages/list-contents.js', () => ({
+  listContents: vi.fn(),
+}))
+
+import { listContents } from '../src/stages/list-contents.js'
+
+describe('runPipeline — --list 分叉', () => {
+  let reporter: Reporter
+  let stages: PipelineStages & { callOrder: string[] }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    reporter = createMockReporter()
+    stages = createMockStages()
+  })
+
+  it('--list 参数存在时，clone 后分叉 — 不执行 detect/match/install', async () => {
+    vi.mocked(listContents).mockResolvedValueOnce(undefined)
+    const args = createTestArgs({ list: 'skills' })
+
+    await runPipeline(args, reporter, stages)
+
+    expect(stages.resolve).toHaveBeenCalled()
+    expect(stages.authenticate).toHaveBeenCalled()
+    expect(stages.clone).toHaveBeenCalled()
+    expect(listContents).toHaveBeenCalledTimes(1)
+
+    // detect/match/install/report 不应被调用
+    expect(stages.detect).not.toHaveBeenCalled()
+    expect(stages.match).not.toHaveBeenCalled()
+    expect(stages.install).not.toHaveBeenCalled()
+    expect(stages.report).not.toHaveBeenCalled()
+  })
+
+  it('--list 未设置时，正常执行 detect/match/report 流程', async () => {
+    const args = createTestArgs({ list: undefined })
+
+    await runPipeline(args, reporter, stages)
+
+    expect(listContents).not.toHaveBeenCalled()
+    expect(stages.detect).toHaveBeenCalled()
+    expect(stages.match).toHaveBeenCalled()
+  })
+
+  it('listContents 抛出 AiforgeError 时，pipeline 捕获并报告错误', async () => {
+    const listError = new AiforgeError(
+      'Directory bad-dir does not exist',
+      'LIST_DIR_NOT_FOUND',
+      3,
+      'fatal',
+      'The repository has no top-level directory named bad-dir',
+      ['Try --list with: agents, skills'],
+    )
+    vi.mocked(listContents).mockRejectedValueOnce(listError)
+    const args = createTestArgs({ list: 'bad-dir' })
+
+    await runPipeline(args, reporter, stages)
+
+    expect(reporter.reportError).toHaveBeenCalledWith(listError)
+    expect(process.exitCode).toBe(3)
+  })
+
+  it('--list "" 空字符串时，仍进入 list 分叉（不降级为安装流程）', async () => {
+    const invalidError = new AiforgeError(
+      '--list argument "" is not a valid top-level directory name',
+      'LIST_INVALID_INPUT',
+      3,
+      'fatal',
+      'A top-level directory name must not contain path separators or start with a dot',
+      ['Use a simple directory name such as: skills, agents, prompts'],
+    )
+    vi.mocked(listContents).mockRejectedValueOnce(invalidError)
+    const args = createTestArgs({ list: '' })
+
+    await runPipeline(args, reporter, stages)
+
+    // 空字符串应进入 list 分叉，而非安装流程
+    expect(listContents).toHaveBeenCalledTimes(1)
+    expect(stages.detect).not.toHaveBeenCalled()
+    expect(stages.install).not.toHaveBeenCalled()
+    expect(reporter.reportError).toHaveBeenCalledWith(invalidError)
   })
 })

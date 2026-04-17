@@ -1259,3 +1259,82 @@ describe('入口层 TTY 判定契约守护 (CR TODO-011)', () => {
     expect(outputB).toBe('[PHASE] 克隆仓库...\n') // PlainReporter 格式
   })
 })
+
+// ── reportList() 三种 Reporter 实现测试 (Task 6.3) ─────────────────────────
+
+describe('Reporter.reportList()', () => {
+  let stdoutSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    setLanguage('zh-CN')
+    stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  describe('TtyReporter', () => {
+    it('正常条目：输出标题行和带序号的子目录列表', () => {
+      const reporter = createReporter({ quiet: false, isTty: true })
+      reporter.reportList('skills', ['code-review', 'deploy', 'git-commit'])
+
+      const output = (stdoutSpy.mock.calls as [string][]).map((c) => c[0]).join('')
+      expect(output).toContain('skills')
+      expect(output).toContain('1.')
+      expect(output).toContain('code-review')
+      expect(output).toContain('2.')
+      expect(output).toContain('deploy')
+      expect(output).toContain('3.')
+      expect(output).toContain('git-commit')
+    })
+
+    it('空列表：输出 list.empty 消息到 stdout', () => {
+      const reporter = createReporter({ quiet: false, isTty: true })
+      reporter.reportList('skills', [])
+
+      const output = (stdoutSpy.mock.calls as [string][]).map((c) => c[0]).join('')
+      expect(output).toContain('暂无可安装的子目录')
+    })
+  })
+
+  describe('PlainReporter', () => {
+    it('正常条目：输出制表符分隔行（index\\tname）', () => {
+      const reporter = createReporter({ quiet: false, isTty: false })
+      reporter.reportList('skills', ['alpha', 'beta'])
+
+      const output = (stdoutSpy.mock.calls as [string][]).map((c) => c[0]).join('')
+      expect(output).toContain('1\talpha')
+      expect(output).toContain('2\tbeta')
+    })
+
+    it('空列表：输出 list.empty 消息到 stdout', () => {
+      const reporter = createReporter({ quiet: false, isTty: false })
+      reporter.reportList('skills', [])
+
+      const output = (stdoutSpy.mock.calls as [string][]).map((c) => c[0]).join('')
+      expect(output).toContain('暂无可安装的子目录')
+    })
+  })
+
+  describe('QuietReporter', () => {
+    it('正常条目：每行仅输出目录名（无序号、无标题）', () => {
+      const reporter = createReporter({ quiet: true, isTty: false })
+      reporter.reportList('skills', ['alpha', 'beta'])
+
+      const output = (stdoutSpy.mock.calls as [string][]).map((c) => c[0]).join('')
+      expect(output).toContain('alpha\n')
+      expect(output).toContain('beta\n')
+      expect(output).not.toContain('1.')
+      expect(output).not.toContain('skills')
+    })
+
+    it('空列表：输出 list.empty 消息到 stdout', () => {
+      const reporter = createReporter({ quiet: true, isTty: false })
+      reporter.reportList('skills', [])
+
+      const output = (stdoutSpy.mock.calls as [string][]).map((c) => c[0]).join('')
+      expect(output).toContain('暂无可安装的子目录')
+    })
+  })
+})

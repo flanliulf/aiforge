@@ -33,6 +33,7 @@ import { matchRules } from './stages/match-rules.js'
 import { executeInstall } from './stages/execute-install.js'
 import { loadManifest, saveManifest, mergeManifest } from './services/manifest.js'
 import { fileHash } from './services/fs-utils.js'
+import { listContents } from './stages/list-contents.js'
 
 // 重导出供 index.ts 使用，维持模块边界: index.ts → pipeline.ts + commands/
 export type { ParsedArgs } from './core/types.js'
@@ -60,6 +61,7 @@ export function mapOptsToArgs(
     ssh: Boolean(opts['ssh']),
     token: opts['token'] as string | undefined,
     cloneDir: opts['cloneDir'] as string | undefined,
+    list: opts['list'] as string | undefined,
     symlink: Boolean(opts['link']),
     flatten: false,
   }
@@ -410,6 +412,14 @@ export async function runPipeline(
     const source = await stages.resolve(args, reporter)
     const authed = await stages.authenticate(source, args, reporter)
     const repo = await stages.clone(authed, args, reporter)
+
+    // --list 分叉：列举子目录后退出，不进入 detect/match/install
+    // 使用 !== undefined 区分「未提供」与「提供了空值」，空字符串也会进入分叉由 listContents 校验报错
+    if (args.list !== undefined) {
+      await listContents(repo, args, reporter)
+      return
+    }
+
     const env = await stages.detect(repo, args, reporter)
     const plan = await stages.match(env, args, reporter)
 

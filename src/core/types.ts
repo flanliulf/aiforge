@@ -23,6 +23,7 @@ export interface ParsedArgs {
   ssh: boolean
   token?: string
   cloneDir?: string
+  list?: string
   // legacy aliases kept for internal use
   symlink: boolean
   flatten: boolean

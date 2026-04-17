@@ -12,6 +12,7 @@ export interface Reporter {
   completePhase(): void
   reportResult(results: InstallResult): void
   reportPlan(plan: MatchedPlan): void
+  reportList(dirName: string, entries: string[]): void
   reportError(error: AiforgeError): void
   warn(message: string): void
 }
@@ -253,6 +254,17 @@ class TtyReporter implements Reporter {
     process.stderr.write(lines + '\n')
   }
 
+  reportList(dirName: string, entries: string[]): void {
+    if (entries.length === 0) {
+      process.stdout.write(msg('list.empty') + '\n')
+      return
+    }
+    process.stdout.write(chalk.bold(msg('list.title').replace('{dir}', dirName)) + '\n\n')
+    entries.forEach((name, idx) => {
+      process.stdout.write(`  ${idx + 1}. 📁 ${name}\n`)
+    })
+  }
+
   warn(message: string): void {
     process.stderr.write(chalk.yellow(`⚠ ${message}\n`))
   }
@@ -368,6 +380,16 @@ class PlainReporter implements Reporter {
     }
   }
 
+  reportList(dirName: string, entries: string[]): void {
+    if (entries.length === 0) {
+      process.stdout.write(msg('list.empty') + '\n')
+      return
+    }
+    entries.forEach((name, idx) => {
+      process.stdout.write(`${idx + 1}\t${name}\n`)
+    })
+  }
+
   warn(message: string): void {
     process.stderr.write(`⚠ ${message}\n`)
   }
@@ -380,6 +402,16 @@ class QuietReporter implements Reporter {
   updatePhase(): void {}
   completePhase(): void {}
   warn(): void {}
+
+  reportList(dirName: string, entries: string[]): void {
+    if (entries.length === 0) {
+      process.stdout.write(msg('list.empty') + '\n')
+      return
+    }
+    entries.forEach((name) => {
+      process.stdout.write(`${name}\n`)
+    })
+  }
 
   reportResult(results: InstallResult): void {
     const installed = results.items.filter((i) => i.status === 'new').length

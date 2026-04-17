@@ -25,6 +25,7 @@ interface MessageSet {
     detect: string
     match: string
     install: string
+    list: string
   }
   icons: {
     new: string
@@ -250,6 +251,16 @@ interface MessageSet {
     unsupportedLanguage: string
     languageLoadFailed: string
   }
+  list: {
+    title: string
+    empty: string
+    dirNotFound: string
+    dirNotFoundWhy: string
+    fixTryOther: string
+    invalidInput: string
+    invalidInputWhy: string
+    fixUseSimpleName: string
+  }
 }
 
 // ── 双语消息集 ──────────────────────────────────────────────────
@@ -263,6 +274,7 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       detect: '检测 AI 工具...',
       match: '匹配安装规则...',
       install: '执行安装...',
+      list: '列出子目录...',
     },
     icons: {
       new: '✅',
@@ -489,6 +501,16 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       unsupportedLanguage: '⚠️ 不支持的语言 "{lang}"，使用默认中文',
       languageLoadFailed: '⚠️ 读取语言配置失败，使用默认中文: {err}',
     },
+    list: {
+      title: '📂 {dir}/ 下的可安装子目录：',
+      empty: '该目录下暂无可安装的子目录',
+      dirNotFound: '目录 {dir} 在仓库中不存在',
+      dirNotFoundWhy: '仓库中没有名为 {dir} 的顶层目录',
+      fixTryOther: '尝试 --list 搭配以下可用目录: {dirs}',
+      invalidInput: '--list 参数 "{dir}" 不是有效的顶层目录名',
+      invalidInputWhy: '顶层目录名不能包含路径分隔符（/、\\）或以点号（.）开头',
+      fixUseSimpleName: '请使用简单的目录名，例如：skills、agents、prompts',
+    },
   },
   en: {
     phases: {
@@ -498,6 +520,7 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       detect: 'Detecting AI tools...',
       match: 'Matching install rules...',
       install: 'Installing...',
+      list: 'Listing subdirectories...',
     },
     icons: {
       new: '✅',
@@ -729,6 +752,17 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
     index: {
       unsupportedLanguage: '⚠️ Unsupported language "{lang}", falling back to zh-CN',
       languageLoadFailed: '⚠️ Failed to load language config, falling back to zh-CN: {err}',
+    },
+    list: {
+      title: '📂 Installable subdirectories under {dir}/:',
+      empty: 'No installable subdirectories found',
+      dirNotFound: 'Directory {dir} does not exist in the repository',
+      dirNotFoundWhy: 'The repository has no top-level directory named {dir}',
+      fixTryOther: 'Try --list with one of these available directories: {dirs}',
+      invalidInput: '--list argument "{dir}" is not a valid top-level directory name',
+      invalidInputWhy:
+        'A top-level directory name must not contain path separators (/, \\) or start with a dot (.)',
+      fixUseSimpleName: 'Use a simple directory name such as: skills, agents, prompts',
     },
   },
 }
