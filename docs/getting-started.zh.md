@@ -27,6 +27,7 @@ npx aiforge init
 1. **默认仓库 URL** — 存放 AI 配置的 Git 仓库地址
 2. **认证方式** — SSH 密钥、个人访问令牌或系统凭据
 3. **语言偏好** — 中文（`zh-CN`）或英文（`en`）
+4. **通用目录** — 是否并行安装到 `.agents/` 和 `.agent/` 目录（默认：是）
 
 配置保存到 `~/.aiforge/config.json`。
 
@@ -109,7 +110,54 @@ npx aiforge -g -l
 npx aiforge --dry-run
 ```
 
+> **本地开发？** 项目未发布到 npm，请将上述 `npx aiforge` 替换为 `npm run dev --`，例如 `npm run dev -- init`。详见下方[本地开发运行](#本地开发运行)章节。
+
 遇到认证问题？查看 [故障排除](troubleshooting.zh.md)。
+
+## 本地开发运行
+
+> **注意：** 本项目尚未发布到 npm，且包名 `aiforge` 已被 npm 上一个无关项目占用。上文所有 `npx aiforge` 命令**不会**运行本项目代码。请使用以下本地方式运行。
+
+### 源码运行（推荐）
+
+```bash
+# 安装依赖
+npm install
+
+# 通过 tsx 直接运行（无需构建）
+npm run dev -- [repo-url] [options]
+
+# 示例
+npm run dev -- init
+npm run dev -- -g -l --dry-run
+npm run dev -- --list skills
+npm run dev -- --help
+```
+
+### 构建后运行
+
+```bash
+# 先构建
+npm run build
+
+# 运行编译后的 CLI
+node dist/index.js [repo-url] [options]
+```
+
+### 注册为全局命令
+
+```bash
+# 构建并注册为全局命令
+npm run build
+npm link
+
+# 之后可直接使用 aiforge 命令
+aiforge init
+aiforge -g -l
+
+# 不再需要时取消注册
+npm unlink -g aiforge
+```
 
 ## 常见场景
 
@@ -123,14 +171,24 @@ npx aiforge -d skills agents
 npx aiforge -t copilot
 ```
 
-### 场景二：不同项目用不同仓库
+### 场景二：浏览并选择特定子目录
+
+```bash
+# 列举 skills/ 下所有可安装的子目录
+npx aiforge --list skills
+
+# 只安装匹配模式的 skills
+npx aiforge --filter "skills/git*"
+```
+
+### 场景三：不同项目用不同仓库
 
 ```bash
 # 为当前项目使用特定仓库
 npx aiforge https://your-git-host.com/team-b/special-configs.git
 ```
 
-### 场景三：CI/CD 管道中使用
+### 场景四：CI/CD 管道中使用
 
 ```bash
 # 使用环境变量认证
@@ -138,7 +196,7 @@ export GIT_TOKEN=<your-access-token>
 npx aiforge --quiet
 ```
 
-### 场景四：强制更新所有文件
+### 场景五：强制更新所有文件
 
 ```bash
 # 覆盖所有已存在文件，不确认

@@ -29,6 +29,7 @@ The wizard will ask you:
 1. **Default repository URL** — The Git repository containing your AI configurations
 2. **Authentication method** — SSH key, personal access token, or system credentials
 3. **Language preference** — Chinese (`zh-CN`) or English (`en`)
+4. **Universal directories** — Whether to install to `.agents/` and `.agent/` alongside tool-specific directories (default: yes)
 
 Your settings are saved to `~/.aiforge/config.json`.
 
@@ -96,6 +97,51 @@ Installed: 2  Updated: 1  Skipped: 1
 
 Open your AI tool (e.g., VS Code with Copilot) and verify the configurations are available.
 
+## Local Development
+
+> **Note:** This package has NOT been published to npm, and the name `aiforge` is already taken on the npm registry. All `npx aiforge` commands above will **not** run this project's code. Use the following local methods instead.
+
+### Run from Source (Recommended)
+
+```bash
+# Install dependencies
+npm install
+
+# Run directly via tsx (no build required)
+npm run dev -- [repo-url] [options]
+
+# Examples
+npm run dev -- init
+npm run dev -- -g -l --dry-run
+npm run dev -- --list skills
+npm run dev -- --help
+```
+
+### Run from Build Output
+
+```bash
+# Build first
+npm run build
+
+# Run the compiled CLI
+node dist/index.js [repo-url] [options]
+```
+
+### Link as Global Command
+
+```bash
+# Build and register as a global command
+npm run build
+npm link
+
+# Now you can use `aiforge` directly
+aiforge init
+aiforge -g -l
+
+# Unlink when no longer needed
+npm unlink -g aiforge
+```
+
 ## Common Scenarios
 
 ### Scenario 1: Install Only Specific Resources
@@ -108,14 +154,24 @@ npx aiforge -d skills agents
 npx aiforge -t copilot
 ```
 
-### Scenario 2: Different Repository per Project
+### Scenario 2: Browse and Select Specific Subdirectories
+
+```bash
+# List all installable subdirectories under skills/
+npx aiforge --list skills
+
+# Install only skills matching a pattern
+npx aiforge --filter "skills/git*"
+```
+
+### Scenario 3: Different Repository per Project
 
 ```bash
 # Use a specific repository for this project
 npx aiforge https://your-git-host.com/team-b/special-configs.git
 ```
 
-### Scenario 3: CI/CD Pipeline
+### Scenario 4: CI/CD Pipeline
 
 ```bash
 # Use environment variable for authentication
@@ -123,7 +179,7 @@ export GIT_TOKEN=<your-access-token>
 npx aiforge --quiet
 ```
 
-### Scenario 4: Force Update Everything
+### Scenario 5: Force Update Everything
 
 ```bash
 # Overwrite all existing files without confirmation

@@ -35,6 +35,8 @@ Knowledge Repo (Git)            aiforge              Local AI Tools
 - **Private repos** — Supports SSH, Token, environment variables, and system credential managers
 - **Security-first** — npm package contains zero repository URLs or tokens; all credentials stay local
 - **Preview mode** — `--dry-run` shows the installation plan without writing any files
+- **Browse & filter** — `--list` browses installable subdirectories; `--filter` selects by glob pattern
+- **Universal directories** — Parallel install to `.agents/` and `.agent/` for tool-agnostic access (opt-out via `--no-universal`)
 - **Bilingual output** — Chinese and English interface (`zh-CN` / `en`)
 
 ## Quick Start
@@ -135,6 +137,9 @@ npx aiforge [repo-url] [options]
 | `--ssh` | Force SSH authentication |
 | `--token <token>` | Provide a personal access token |
 | `--clone-dir <path>` | Custom persistent clone directory |
+| `--list <dir>` | List installable subdirectories under a top-level dir |
+| `--filter <pattern>` | Filter subdirectories by glob pattern (e.g., `skills/git*`) |
+| `--no-universal` | Skip universal directory installation (`.agents/`, `.agent/`) |
 
 ### Examples
 
@@ -159,6 +164,15 @@ npx aiforge --force
 
 # Use SSH authentication
 npx aiforge --ssh
+
+# List installable subdirectories under skills/
+npx aiforge --list skills
+
+# Install only skills matching a glob pattern
+npx aiforge --filter "skills/git*"
+
+# Skip universal directory installation
+npx aiforge --no-universal
 ```
 
 ### Subcommands
@@ -169,9 +183,6 @@ npx aiforge init
 
 # Update a previously cloned repository
 npx aiforge update
-
-# List supported tools and their path mappings
-npx aiforge list
 ```
 
 ## Supported AI Tools
@@ -182,11 +193,12 @@ npx aiforge list
 | Claude Code | ✅ | ✅ | Agents, Skills |
 | Cursor | ✅ | ✅ | Skills, Agents |
 | VS Code | ✅ | — | MCP Tools |
+| Universal (`.agents/`, `.agent/`) | — | ✅ | Agents, Skills |
 
 ### Detailed Install Rules
 
 <details>
-<summary>Click to expand the full 16-rule matrix</summary>
+<summary>Click to expand the full 20-rule matrix (16 tool rules + 4 universal rules)</summary>
 
 | Tool | Scope | Source Dir | Install Type | Target Dir |
 |------|-------|-----------|:------------:|------------|
@@ -206,6 +218,12 @@ npx aiforge list
 | Cursor | project | `skills/` | Flatten | `.cursor/rules/` |
 | Cursor | project | `agents/` | Files | `.cursor/rules/` |
 | VS Code | global | `mcp-tools/` | Files | `~/.vscode/` |
+| Universal | project | `skills/` | Directories | `.agents/skills/` |
+| Universal | project | `agents/` | Files | `.agents/agents/` |
+| Universal | project | `skills/` | Directories | `.agent/skills/` |
+| Universal | project | `agents/` | Files | `.agent/agents/` |
+
+> **Note:** Universal rules run in parallel with tool-specific rules by default. Use `--no-universal` or set `universalDirs: false` in config to disable.
 
 </details>
 
@@ -285,6 +303,7 @@ After running `npx aiforge init`, settings are saved to `~/.aiforge/config.json`
   "preferSSH": true,
   "cloneDir": "~/ai-configs",
   "language": "en",
+  "universalDirs": true,
   "auth": {
     "your-git-host.com": {
       "method": "ssh"
@@ -299,6 +318,7 @@ After running `npx aiforge init`, settings are saved to `~/.aiforge/config.json`
 | `preferSSH` | Global preference for SSH authentication |
 | `cloneDir` | Directory for persistent repository clones |
 | `language` | Output language: `zh-CN` (default) or `en` |
+| `universalDirs` | Enable universal directory install (`.agents/`, `.agent/`). Default: `true` |
 | `auth` | Per-hostname authentication settings |
 
 ## Compatibility

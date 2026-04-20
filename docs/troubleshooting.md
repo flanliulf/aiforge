@@ -157,6 +157,69 @@ npx aiforge
 
 ---
 
+### LIST_DIR_NOT_FOUND — Directory Not Found in Repository | 仓库中未找到目录
+
+**Symptoms:**
+```
+❌ Directory 'xxx' not found in repository
+```
+
+**Cause:** The directory name passed to `--list` does not exist in the knowledge repository.
+
+**Solutions:**
+
+1. **Check the available top-level directories** — the error message includes a list of valid directory names.
+
+2. **Use a simple directory name** (no path separators):
+   ```bash
+   # Correct
+   npx aiforge --list skills
+
+   # Wrong
+   npx aiforge --list skills/code-review
+   ```
+
+---
+
+### LIST_INVALID_INPUT — Invalid List Input | 无效的列举输入
+
+**Symptoms:**
+```
+❌ Invalid directory name: '...'
+```
+
+**Cause:** The `--list` value contains path separators (`/`, `\`), starts with `.`, or is empty/whitespace.
+
+**Solution:** Provide a simple top-level directory name:
+```bash
+npx aiforge --list skills
+```
+
+---
+
+### FILTER_NO_MATCH — No Subdirectories Match Filter | 无匹配的子目录
+
+**Symptoms:**
+```
+❌ No subdirectories match filter pattern '...'
+```
+
+**Cause:** The glob pattern passed to `--filter` doesn't match any installable subdirectory.
+
+**Solutions:**
+
+1. **Browse available subdirectories first:**
+   ```bash
+   npx aiforge --list skills
+   ```
+
+2. **Check your glob pattern** — supported wildcards: `*` (any string), `?` (single char):
+   ```bash
+   npx aiforge --filter "skills/code*"
+   ```
+
+---
+
 ## FAQ | 常见问题
 
 ### Q: Will aiforge overwrite my custom configurations? | aiforge 会覆盖我的自定义配置吗？

@@ -12,6 +12,7 @@
   "preferSSH": true,
   "cloneDir": "~/ai-configs",
   "language": "zh-CN",
+  "universalDirs": true,
   "auth": {
     "your-git-host.com": {
       "method": "ssh"
@@ -28,6 +29,7 @@
 | `preferSSH` | `boolean` | `false` | 全局 SSH 偏好。可被按主机名配置的 `auth` 覆盖。 |
 | `cloneDir` | `string` | `~/.aiforge/repos/` | 持久化克隆目录（符号链接模式使用）。 |
 | `language` | `string` | `zh-CN` | 输出语言。支持：`zh-CN`、`en`。 |
+| `universalDirs` | `boolean` | `true` | 启用通用目录并行安装（`.agents/`、`.agent/`）。设为 `false` 禁用。 |
 | `auth` | `object` | `{}` | 按主机名索引的认证配置。 |
 | `auth[host].method` | `'ssh' \| 'token'` | — | 该主机的认证方式。 |
 | `auth[host].token` | `string` | — | 个人访问令牌（仅当 `method: 'token'` 时使用）。 |
@@ -81,6 +83,9 @@ npx aiforge [repo-url] [options]
 | `--ssh` | `boolean` | `false` | 强制使用 SSH 认证 |
 | `--token <token>` | `string` | — | 提供访问令牌 |
 | `--clone-dir <path>` | `string` | `config.cloneDir` | 自定义克隆目录 |
+| `--list <dir>` | `string` | — | 列举指定顶层目录下的可安装子目录 |
+| `--filter <pattern>` | `string` | — | 按 glob 模式筛选子目录（如 `skills/git*`） |
+| `--no-universal` | `boolean` | `false` | 跳过通用目录安装（`.agents/`、`.agent/`） |
 
 ### 子命令
 
@@ -88,7 +93,6 @@ npx aiforge [repo-url] [options]
 |------|------|
 | `aiforge init` | 交互式首次配置 |
 | `aiforge update` | 拉取已克隆仓库的最新变更 |
-| `aiforge list` | 显示支持的工具及路径映射 |
 
 ## Manifest 文件
 

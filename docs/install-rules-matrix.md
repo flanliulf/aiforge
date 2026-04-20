@@ -1,10 +1,10 @@
 # Install Rules Matrix | 安装规则矩阵
 
-Complete reference of all 16 built-in install rules in aiforge MVP.
+Complete reference of all built-in install rules in aiforge: 16 tool-specific rules + 4 universal directory rules.
 
 ## Overview | 概览
 
-aiforge maps **4 resource types** from the knowledge repository to **4 AI tools** across **2 scopes** (global/project), using **3 install modes** (Files/Directories/Flatten).
+aiforge maps **4 resource types** from the knowledge repository to **4 AI tools** across **2 scopes** (global/project), using **3 install modes** (Files/Directories/Flatten). Additionally, **4 universal directory rules** provide tool-agnostic access via `.agents/` and `.agent/`.
 
 ## Full Matrix | 完整矩阵
 
@@ -43,6 +43,17 @@ aiforge maps **4 resource types** from the knowledge repository to **4 AI tools*
 | Scope | Source Dir | Install Type | Target Dir | Description |
 |-------|-----------|:------------:|------------|-------------|
 | global | `mcp-tools/` | Files | `~/.vscode/` | MCP server configurations |
+
+### Universal Directories
+
+Universal directory rules run **in parallel** with tool-specific rules by default. They install to `.agents/` and `.agent/` in the project root, providing tool-agnostic access to resources. Use `--no-universal` or set `universalDirs: false` in config to disable.
+
+| Scope | Source Dir | Install Type | Target Dir | Description |
+|-------|-----------|:------------:|------------|-------------|
+| project | `skills/` | Directories | `.agents/skills/` | Skill packages in .agents/ |
+| project | `agents/` | Files | `.agents/agents/` | Agent files in .agents/ |
+| project | `skills/` | Directories | `.agent/skills/` | Skill packages in .agent/ |
+| project | `agents/` | Files | `.agent/agents/` | Agent files in .agent/ |
 
 ## Install Types Explained | 安装类型说明
 
@@ -93,7 +104,8 @@ skills/                          ~/.cursor/rules/
 | Claude Code | 2 | 2 | **4** |
 | Cursor | 1 | 2 | **3** |
 | VS Code | 1 | 0 | **1** |
-| **Total** | **8** | **8** | **16** |
+| Universal | 0 | 4 | **4** |
+| **Total** | **8** | **12** | **20** |
 
 ## Resource Type Coverage | 资源类型覆盖
 
@@ -105,3 +117,50 @@ skills/                          ~/.cursor/rules/
 | MCP Tools | ✅ G+P | — | — | ✅ G |
 
 G = Global, P = Project
+
+## Fine-grained Install Control | 精细化安装控制
+
+### Browse Subdirectories (`--list`)
+
+List installable subdirectories under a top-level resource directory:
+
+```bash
+# List all skills available in the knowledge repo
+npx aiforge --list skills
+
+# Output example:
+# skills/ 下的可安装子目录:
+#   1. code-review
+#   2. git-commit-convention
+#   3. testing
+```
+
+### Filter by Pattern (`--filter`)
+
+Install only subdirectories matching a glob pattern:
+
+```bash
+# Install only skills starting with "git"
+npx aiforge --filter "skills/git*"
+
+# Install all agent files
+npx aiforge --filter "agents/*"
+```
+
+Supported glob characters: `*` (match any string), `?` (match single character).
+
+### Disable Universal Directories (`--no-universal`)
+
+Skip the parallel install to `.agents/` and `.agent/`:
+
+```bash
+npx aiforge --no-universal
+```
+
+Or set permanently in `~/.aiforge/config.json`:
+
+```jsonc
+{
+  "universalDirs": false
+}
+```

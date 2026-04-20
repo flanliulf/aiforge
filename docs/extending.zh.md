@@ -148,3 +148,23 @@ src/
 ```
 
 **核心设计原则：** 检测引擎、规则匹配器和安装器都是通用的 — 它们基于数据数组运行，不包含硬编码的工具知识。这就是为什么添加新工具只需要修改数据。
+
+## 通用目录规则
+
+除了 `BUILTIN_RULES`，aiforge 还在 `install-rules.ts` 中单独定义了 `UNIVERSAL_RULES` 数组，用于安装到与具体工具无关的目录（`.agents/` 和 `.agent/`）。
+
+```typescript
+// 这些规则不加入 RULE_INDEX（不通过工具检测匹配）。
+// Match 阶段在工具规则匹配完成后单独追加。
+export const UNIVERSAL_RULES: InstallRule[] = [
+  { tool: 'universal', scope: 'project', sourceDir: 'skills', type: Directories, targetDir: '.agents/skills/' },
+  { tool: 'universal', scope: 'project', sourceDir: 'agents', type: Files,       targetDir: '.agents/agents/' },
+  { tool: 'universal', scope: 'project', sourceDir: 'skills', type: Directories, targetDir: '.agent/skills/' },
+  { tool: 'universal', scope: 'project', sourceDir: 'agents', type: Files,       targetDir: '.agent/agents/' },
+]
+```
+
+**要点：**
+- `tool: 'universal'` 是虚拟工具 ID — 不在 `TOOL_DEFINITIONS` 中注册，不会被自动检测
+- 通用规则由 `universalDirs` 配置项和 `--no-universal` CLI 选项控制
+- 它们与工具规则并行执行，而非替代

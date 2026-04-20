@@ -35,6 +35,8 @@
 - **私有仓库** — 支持 SSH Key、Token、环境变量、系统凭据管理器四种认证方式
 - **安全优先** — npm 包不含任何仓库 URL 或 Token，配置仅存于本地
 - **预览模式** — `--dry-run` 查看安装计划，不写入任何文件
+- **浏览与筛选** — `--list` 浏览可安装的子目录；`--filter` 按 glob 模式精准筛选
+- **通用目录** — 默认并行安装到 `.agents/` 和 `.agent/` 目录，与具体工具无关（可通过 `--no-universal` 禁用）
 - **中英双语** — 支持 `zh-CN` 和 `en` 输出语言
 
 ## 快速开始
@@ -135,6 +137,9 @@ npx aiforge [repo-url] [options]
 | `--ssh` | 强制使用 SSH 协议 |
 | `--token <token>` | 使用 Personal Access Token |
 | `--clone-dir <path>` | 指定持久化克隆路径 |
+| `--list <dir>` | 列举指定顶层目录下的可安装子目录 |
+| `--filter <pattern>` | 按 glob 模式筛选子目录（如 `skills/git*`） |
+| `--no-universal` | 跳过通用目录安装（`.agents/`、`.agent/`） |
 
 ### 使用示例
 
@@ -159,6 +164,15 @@ npx aiforge --force
 
 # 使用 SSH 认证
 npx aiforge --ssh
+
+# 列举 skills/ 下的可安装子目录
+npx aiforge --list skills
+
+# 只安装匹配 glob 模式的 skills
+npx aiforge --filter "skills/git*"
+
+# 跳过通用目录安装
+npx aiforge --no-universal
 ```
 
 ### 子命令
@@ -169,9 +183,6 @@ npx aiforge init
 
 # 更新已持久化的仓库
 npx aiforge update
-
-# 查看支持的工具及路径映射
-npx aiforge list
 ```
 
 ## 支持的 AI 工具
@@ -182,11 +193,12 @@ npx aiforge list
 | Claude Code | ✅ | ✅ | Agents, Skills |
 | Cursor | ✅ | ✅ | Skills, Agents |
 | VS Code | ✅ | — | MCP Tools |
+| 通用目录 (`.agents/`, `.agent/`) | — | ✅ | Agents, Skills |
 
 ### 完整安装规则矩阵
 
 <details>
-<summary>点击展开 16 条规则详情</summary>
+<summary>点击展开 20 条规则详情（16 条工具规则 + 4 条通用目录规则）</summary>
 
 | 工具 | 范围 | 源目录 | 安装类型 | 目标目录 |
 |------|------|-------|:------:|---------|
@@ -206,6 +218,12 @@ npx aiforge list
 | Cursor | 项目 | `skills/` | Flatten | `.cursor/rules/` |
 | Cursor | 项目 | `agents/` | Files | `.cursor/rules/` |
 | VS Code | 全局 | `mcp-tools/` | Files | `~/.vscode/` |
+| 通用 | 项目 | `skills/` | Directories | `.agents/skills/` |
+| 通用 | 项目 | `agents/` | Files | `.agents/agents/` |
+| 通用 | 项目 | `skills/` | Directories | `.agent/skills/` |
+| 通用 | 项目 | `agents/` | Files | `.agent/agents/` |
+
+> **注意：** 通用目录规则默认与工具规则并行执行。使用 `--no-universal` 或在配置中设置 `universalDirs: false` 可禁用。
 
 </details>
 
@@ -285,6 +303,7 @@ npx aiforge https://your-git-host.com/team/repo.git
   "preferSSH": true,
   "cloneDir": "~/ai-configs",
   "language": "zh-CN",
+  "universalDirs": true,
   "auth": {
     "your-git-host.com": {
       "method": "ssh"
@@ -299,6 +318,7 @@ npx aiforge https://your-git-host.com/team/repo.git
 | `preferSSH` | 全局 SSH 偏好 |
 | `cloneDir` | 持久化克隆目录路径 |
 | `language` | 输出语言：`zh-CN`（默认）或 `en` |
+| `universalDirs` | 启用通用目录安装（`.agents/`、`.agent/`）。默认：`true` |
 | `auth` | 按 hostname 索引的认证配置 |
 
 ## 项目架构

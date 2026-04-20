@@ -12,6 +12,7 @@ Created by `npx aiforge init`. Permissions: `0o600` (user-only read/write).
   "preferSSH": true,
   "cloneDir": "~/ai-configs",
   "language": "zh-CN",
+  "universalDirs": true,
   "auth": {
     "your-git-host.com": {
       "method": "ssh"
@@ -28,6 +29,7 @@ Created by `npx aiforge init`. Permissions: `0o600` (user-only read/write).
 | `preferSSH` | `boolean` | `false` | Global preference for SSH authentication. Overridden by per-host `auth` settings. |
 | `cloneDir` | `string` | `~/.aiforge/repos/` | Directory for persistent repository clones (symlink mode). |
 | `language` | `string` | `zh-CN` | Output language. Supported: `zh-CN`, `en`. |
+| `universalDirs` | `boolean` | `true` | Enable parallel install to universal directories (`.agents/`, `.agent/`). Set to `false` to disable. |
 | `auth` | `object` | `{}` | Per-hostname authentication settings. |
 | `auth[host].method` | `'ssh' \| 'token'` | — | Authentication method for this hostname. |
 | `auth[host].token` | `string` | — | Personal access token (only when `method: 'token'`). |
@@ -81,6 +83,9 @@ npx aiforge [repo-url] [options]
 | `--ssh` | `boolean` | `false` | Force SSH authentication |
 | `--token <token>` | `string` | — | Provide access token |
 | `--clone-dir <path>` | `string` | `config.cloneDir` | Custom clone directory |
+| `--list <dir>` | `string` | — | List installable subdirectories under a top-level dir |
+| `--filter <pattern>` | `string` | — | Filter subdirectories by glob pattern (e.g., `skills/git*`) |
+| `--no-universal` | `boolean` | `false` | Skip universal directory installation (`.agents/`, `.agent/`) |
 
 ### Subcommands | 子命令
 
@@ -88,7 +93,6 @@ npx aiforge [repo-url] [options]
 |---------|-------------|
 | `aiforge init` | Interactive first-time configuration |
 | `aiforge update` | Pull latest changes to cloned repository |
-| `aiforge list` | Show supported tools and path mappings |
 
 ## Manifest File | Manifest 文件
 

@@ -148,3 +148,23 @@ src/
 ```
 
 **Key design principle:** The detection engine, rule matcher, and installer are all generic — they operate on the data arrays without hardcoded tool knowledge. This is why adding a new tool is purely a data change.
+
+## Universal Directory Rules
+
+In addition to `BUILTIN_RULES`, aiforge has a separate `UNIVERSAL_RULES` array in `install-rules.ts` that installs to tool-agnostic directories (`.agents/` and `.agent/`).
+
+```typescript
+// These rules are NOT added to RULE_INDEX (not matched via tool detection).
+// Instead, the Match stage appends them separately after tool-specific matching.
+export const UNIVERSAL_RULES: InstallRule[] = [
+  { tool: 'universal', scope: 'project', sourceDir: 'skills', type: Directories, targetDir: '.agents/skills/' },
+  { tool: 'universal', scope: 'project', sourceDir: 'agents', type: Files,       targetDir: '.agents/agents/' },
+  { tool: 'universal', scope: 'project', sourceDir: 'skills', type: Directories, targetDir: '.agent/skills/' },
+  { tool: 'universal', scope: 'project', sourceDir: 'agents', type: Files,       targetDir: '.agent/agents/' },
+]
+```
+
+**Key points:**
+- `tool: 'universal'` is a virtual tool ID — it's not registered in `TOOL_DEFINITIONS` and won't be auto-detected
+- Universal rules are controlled by the `universalDirs` config flag and `--no-universal` CLI option
+- They run in parallel with tool-specific rules, not instead of them
