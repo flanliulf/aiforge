@@ -35,6 +35,7 @@ import { executeInstall } from './stages/execute-install.js'
 import { loadManifest, saveManifest, mergeManifest } from './services/manifest.js'
 import { fileHash } from './services/fs-utils.js'
 import { listContents } from './stages/list-contents.js'
+import { loadConfig } from './services/config.js'
 
 // 重导出供 index.ts 使用，维持模块边界: index.ts → pipeline.ts + commands/
 export type { ParsedArgs } from './core/types.js'
@@ -64,6 +65,7 @@ export function mapOptsToArgs(
     cloneDir: opts['cloneDir'] as string | undefined,
     list: opts['list'] as string | undefined,
     filter: opts['filter'] as string | undefined,
+    noUniversal: opts['universal'] === false,
     symlink: Boolean(opts['link']),
     flatten: false,
   }
@@ -203,7 +205,24 @@ export function createProductionStages(pathResolver: PathResolver): PipelineStag
     detect: (repo, args, reporter) => detectTools(repo, args, reporter, pathResolver),
 
     match: async (env, args, reporter) => {
-      const plan = await matchRules(lastRepo, env, args, reporter, pathResolver)
+      // Task 5 (Story 6-3)：加载 config 获取 universalDirs 偏好，与 CLI --no-universal 合并
+      // 优先级：CLI --no-universal > config.universalDirs > 默认值 true
+      let configUniversal = true
+      try {
+        const config = await loadConfig(pathResolver)
+        configUniversal = config.universalDirs !== false
+      } catch (error) {
+        // 仅对 AiforgeError(CONFIG_NOT_FOUND) 降级为默认启用（首次使用无配置）
+        // 使用 instanceof 守卫防止误判带 code 属性的 Node.js 原生 SystemError
+        if (error instanceof AiforgeError && error.code === 'CONFIG_NOT_FOUND') {
+          // CONFIG_NOT_FOUND = 首次使用，配置文件尚未创建，默认启用通用目录
+        } else {
+          throw error
+        }
+      }
+      const enableUniversal = !args.noUniversal && configUniversal
+
+      const plan = await matchRules(lastRepo, env, args, reporter, pathResolver, enableUniversal)
       lastPlan = plan
       return plan
     },
@@ -254,33 +273,26 @@ export function createProductionStages(pathResolver: PathResolver): PipelineStag
         }
       }
 
-      // 计算每个目标文件的 hash（安装后的最终状态）
-      // 注意：InstallType.Directories 的 targetPath 是目录路径，fileHash() 对目录失败
-      // 目录型安装条目使用空字符串作为 hash 占位值（表示"目录型，无文件 hash"）
+      // hash 计算策略：
+      // - 目录级条目（Directories + symlink 模式：targetPath 直接匹配 plan target 目录）→ 空字符串占位
+      // - 文件级条目（Files 类型 + Directories copy 模式的文件级条目）→ 计算真实 fileHash
+      // Story 6-3: Directories copy 模式改为文件级 hash 比对，resultItems 现在包含文件级路径
       const hashes = new Map<string, string>()
       for (const item of installableItems) {
-        // 检查此条目是否来自 Directories 规则
-        const isDirectoryType = (() => {
+        // 仅检查直接匹配（目录路径 === plan targetPath），不使用 startsWith
+        // startsWith 的情况（文件在目录内）属于文件级条目，需要计算真实 hash
+        const isDirectoryLevelEntry = (() => {
           const directMatch = planItemsByTarget.get(item.targetPath)
-          if (directMatch) {
-            return directMatch.some((info) => info.ruleType === InstallType.Directories)
-          }
-          // 文件级路径：检查是否在某个 Directories 类型 plan item 的 targetPath 目录下
-          for (const [planTarget, infos] of planItemsByTarget) {
-            const normalizedPlanTarget = planTarget.replace(/\/$/, '')
-            if (item.targetPath.startsWith(normalizedPlanTarget + '/')) {
-              if (infos.some((info) => info.ruleType === InstallType.Directories)) {
-                return true
-              }
-            }
-          }
-          return false
+          return directMatch
+            ? directMatch.some((info) => info.ruleType === InstallType.Directories)
+            : false
         })()
 
-        if (isDirectoryType) {
-          // Directories 类型：目标是目录，跳过 fileHash，使用空字符串占位
+        if (isDirectoryLevelEntry) {
+          // 目录级条目（Directories + symlink 模式）：目标是目录，跳过 fileHash，使用空字符串占位
           hashes.set(item.targetPath, '')
         } else {
+          // 文件级条目（含 Directories copy 模式的文件级 entries）：计算真实 hash
           const hash = await fileHash(item.targetPath)
           hashes.set(item.targetPath, hash)
         }

@@ -73,6 +73,36 @@ vi.mock('../../src/data/install-rules.js', () => ({
       ],
     ],
   ]),
+  UNIVERSAL_RULES: [
+    {
+      tool: 'universal',
+      scope: 'project',
+      sourceDir: 'skills',
+      type: InstallType.Directories,
+      targetDir: '.agents/skills/',
+    },
+    {
+      tool: 'universal',
+      scope: 'project',
+      sourceDir: 'agents',
+      type: InstallType.Files,
+      targetDir: '.agents/agents/',
+    },
+    {
+      tool: 'universal',
+      scope: 'project',
+      sourceDir: 'skills',
+      type: InstallType.Directories,
+      targetDir: '.agent/skills/',
+    },
+    {
+      tool: 'universal',
+      scope: 'project',
+      sourceDir: 'agents',
+      type: InstallType.Files,
+      targetDir: '.agent/agents/',
+    },
+  ],
 }))
 
 import { matchRules } from '../../src/stages/match-rules.js'
@@ -115,6 +145,7 @@ function makeArgs(overrides: Partial<ParsedArgs> = {}): ParsedArgs {
     ssh: false,
     symlink: false,
     flatten: false,
+    noUniversal: false,
     ...overrides,
   }
 }
@@ -968,6 +999,119 @@ describe('matchRules — LINK_PROJECT_REJECTED i18n', () => {
       expect(e.message).toBe('Symlink mode does not support project-scope installation')
     } finally {
       setLanguage('zh-CN')
+    }
+  })
+
+  // ────────────────────────────────────────────────────────────
+  // Story 6-3 — 通用目录默认安装测试
+  // ────────────────────────────────────────────────────────────
+
+  it('AC #1 enableUniversal=true + scope=project 时返回 4 条通用目录计划', async () => {
+    vi.mocked(readdir).mockResolvedValue([])
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['claude'], 'project'),
+      makeArgs({ global: false }),
+      mockReporter,
+      mockPathResolver,
+      true, // enableUniversal
+    )
+
+    const universalItems = plan.items.filter((i) => i.rule.tool === 'universal')
+    expect(universalItems).toHaveLength(4)
+
+    // 验证目标路径包含 .agents/ 和 .agent/
+    const targets = universalItems.map((i) => i.targetPath)
+    expect(targets.some((t) => t.includes('.agents/skills'))).toBe(true)
+    expect(targets.some((t) => t.includes('.agents/agents'))).toBe(true)
+    expect(targets.some((t) => t.includes('.agent/skills'))).toBe(true)
+    expect(targets.some((t) => t.includes('.agent/agents'))).toBe(true)
+  })
+
+  it('AC #2 enableUniversal=false 时不返回通用目录计划', async () => {
+    vi.mocked(readdir).mockResolvedValue([])
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['claude'], 'project'),
+      makeArgs({ global: false }),
+      mockReporter,
+      mockPathResolver,
+      false, // enableUniversal
+    )
+
+    const universalItems = plan.items.filter((i) => i.rule.tool === 'universal')
+    expect(universalItems).toHaveLength(0)
+  })
+
+  it('global scope 下即使 enableUniversal=true 也不返回通用目录计划', async () => {
+    vi.mocked(readdir).mockResolvedValue([])
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['copilot'], 'global'),
+      makeArgs({ global: true }),
+      mockReporter,
+      mockPathResolver,
+      true, // enableUniversal
+    )
+
+    const universalItems = plan.items.filter((i) => i.rule.tool === 'universal')
+    expect(universalItems).toHaveLength(0)
+  })
+
+  it('AC #3 默认 enableUniversal 参数缺省时不返回通用目录计划', async () => {
+    vi.mocked(readdir).mockResolvedValue([])
+
+    // 不传第6个参数，默认为 false
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['claude'], 'project'),
+      makeArgs({ global: false }),
+      mockReporter,
+      mockPathResolver,
+    )
+
+    const universalItems = plan.items.filter((i) => i.rule.tool === 'universal')
+    expect(universalItems).toHaveLength(0)
+  })
+
+  it('AC #1 通用目录计划的 mode 始终为 copy', async () => {
+    vi.mocked(readdir).mockResolvedValue([])
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['claude'], 'project'),
+      makeArgs({ global: false }),
+      mockReporter,
+      mockPathResolver,
+      true,
+    )
+
+    const universalItems = plan.items.filter((i) => i.rule.tool === 'universal')
+    for (const item of universalItems) {
+      expect(item.mode).toBe('copy')
+    }
+  })
+
+  it('AC #4 --dirs 过滤同样应用于通用目录：skills 过滤时 agents 容类将被排除', async () => {
+    vi.mocked(readdir).mockResolvedValue([])
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['claude'], 'project'),
+      makeArgs({ global: false, dirs: ['skills'] }), // 只安装 skills
+      mockReporter,
+      mockPathResolver,
+      true,
+    )
+
+    const universalItems = plan.items.filter((i) => i.rule.tool === 'universal')
+    // 只有 sourceDir=skills 的两条规则（.agents/skills/ + .agent/skills/）
+    expect(universalItems).toHaveLength(2)
+    for (const item of universalItems) {
+      expect(item.rule.sourceDir).toBe('skills')
     }
   })
 })

@@ -7,7 +7,7 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 8 |
+| 🔴 open | 11 |
 | 🟡 in-progress | 0 |
 | ✅ resolved | 12 |
 
@@ -81,6 +81,39 @@
 - **描述**: `src/stages/filter-utils.ts:27-35` 的 `parseFilterPattern()` 接受 `skills/`（空 glob，生成正则 `^$` 只能匹配空字符串）和 `skills/git/extra`（多斜杠，glob 含 `/` 但 basename 永远不含 `/`）等明显无效输入。这些 pattern 不可能命中任何候选但不会被立即拒绝，而是延后进入零匹配/交互分支，增加用户排查成本。最终仍会被零匹配流程捕获（非 TTY 抛错，TTY 进入交互），不存在数据丢失或安全风险。修复方案：在参数解析阶段校验 filter grammar，只接受 `<glob>` 或 `<topDir>/<glob>` 且 glob 非空、无额外斜杠的形式，并为非法 filter 输入补充单元测试。
 - **涉及文件**: `src/stages/filter-utils.ts`
 - **建议时机**: 下次触及 `filter-utils.ts` 时，或 filter 功能增强 Story 中
+- **状态**: open
+- **解决记录**:
+
+### TODO-021: Directories copy 模式静默覆盖同名用户文件，绕过冲突决策链路
+
+- **来源**: 6-3 CR round 1 (2026-04-20)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: `executeInstallForRule()` 的 Directories copy 分支通过 `walkDirFiles()` 展开目录后，对每个文件直接执行 `copyFileSync(srcFilePath, destFilePath)`，不经过 `shouldInstallFile()` 冲突检测。若目标目录中已存在同名用户文件，将被静默覆盖而无任何提示或差异比对，绕过了 Files 安装类型中已实现的冲突决策链路（overwrite/skip/diff 策略）。触发条件：Directories 类型规则的源目录内含同名文件，且目标目录已有用户修改过的同名文件。当前无用户报告，但随着 Directories 类型规则增多风险升高。修复方向：在 Directories copy 分支复用或适配 `shouldInstallFile()` 逻辑，或设计独立的目录级冲突处理策略。
+- **涉及文件**: `src/stages/execute-install.ts`
+- **建议时机**: 后续统一规划 Directories 冲突处理策略的 Story 中
+- **状态**: open
+- **解决记录**:
+
+### TODO-022: 无条件读取 config，使 global 安装和 `--no-universal` 也被无关配置错误阻断
+
+- **来源**: 6-3 CR round 1 (2026-04-20)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: `pipeline.ts` 的 `executePipeline()` 在入口处无条件调用 `loadConfig()` 解析工作区配置文件；若配置文件格式错误或包含无效字段，即使当前执行的是 `--global` 安装或 `--no-universal` 等完全不依赖配置的场景，也会直接抛出异常终止整个流程。`loadConfig()` 当前设计为找不到文件时返回空对象（不报错），但**找到文件后解析失败则抛出错误**。修复方向：将 `loadConfig()` 调用延迟到实际需要配置的分支中（如 workspace 安装 + 需要读取排除规则时），或对解析错误降级为警告而非致命异常。
+- **涉及文件**: `src/pipeline.ts`, `src/services/config.ts`
+- **建议时机**: 后续优化 pipeline 条件加载策略时
+- **状态**: open
+- **解决记录**:
+
+### TODO-023: Directories copy 的 `walkDirFiles` 静默丢失空目录和符号链接条目
+
+- **来源**: 6-3 CR round 2 (2026-04-20)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: `executeInstallForRule()` 的 Directories copy 分支使用 `walkDirFiles()` 递归枚举源目录内容，该函数仅 yield 常规文件（`entry.isFile()`），静默跳过空目录和符号链接条目。若规则包源目录中包含空子目录（作为占位结构）或符号链接文件，安装后目标目录将缺少这些条目，可能导致工具运行时找不到预期的目录结构或链接目标。当前规则包生态中尚无实际依赖空目录或 symlink 的场景，风险较低。修复方向：（1）空目录：在 walkDirFiles 或调用侧补充 `mkdirSync` 保证目录结构完整性；（2）符号链接：需先明确 symlink 策略决策（复制目标 vs 重建链接 vs 忽略），再统一实现。
+- **涉及文件**: `src/stages/execute-install.ts`
+- **建议时机**: 后续 symlink 策略设计决策时或空目录处理优化 Story 中
 - **状态**: open
 - **解决记录**:
 

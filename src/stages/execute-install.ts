@@ -32,8 +32,8 @@
  * 模块边界: stages/ → services/, core/
  */
 
-import { join, basename } from 'node:path'
-import { access, readlink, stat } from 'node:fs/promises'
+import { join, basename, dirname } from 'node:path'
+import { access, readdir, readlink, stat } from 'node:fs/promises'
 
 import type { MatchedPlan, ParsedArgs, InstallResult, ManifestEntry } from '../core/types.js'
 import { InstallType } from '../core/types.js'
@@ -43,7 +43,6 @@ import { TOOL_DEFINITIONS } from '../data/tool-registry.js'
 import {
   preflight,
   copyFile,
-  copyDir,
   createSymlink,
   ensureDir,
   fileHash,
@@ -88,21 +87,23 @@ async function determineStatus(
 }
 
 /**
- * 判断目录安装状态：
- * - 目标目录不存在 → 'new'
- * - 目标目录已存在 → 'updated'（目录整体覆盖，无 hash 对比）
+ * 递归遍历目录下所有文件，返回相对于 dir 的相对路径列表。
+ *
+ * Story 6-3 Task 6.4: 支持 Directories 类型文件级 hash 增量同步
  */
-async function determineDirStatus(destPath: string): Promise<'new' | 'updated'> {
-  try {
-    await access(destPath)
-    return 'updated'
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code
-    if (code === 'ENOENT' || code === 'ENOTDIR') {
-      return 'new'
+async function walkDirFiles(dir: string, base = ''): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true })
+  const files: string[] = []
+  for (const entry of entries) {
+    const relPath = base ? join(base, entry.name) : entry.name
+    if (entry.isDirectory()) {
+      const subFiles = await walkDirFiles(join(dir, entry.name), relPath)
+      files.push(...subFiles)
+    } else if (entry.isFile()) {
+      files.push(relPath)
     }
-    return 'new'
   }
+  return files
 }
 
 /**
@@ -330,6 +331,8 @@ export async function executeInstall(
 
   // 构建 tool id → display name 映射（CR Round-1 修复：supply toolDisplayName to InstallResult）
   const toolNameMap = new Map(TOOL_DEFINITIONS.map((t) => [t.id, t.name]))
+  // Story 6-3 Task 7: 'universal' 是虚拟工具 ID，不在 TOOL_DEFINITIONS 中，手动添加显示名称
+  toolNameMap.set('universal', msg('reporter.universalDirsLabel'))
 
   const resultItems: InstallResult['items'] = []
   // 记录每个 targetPath 的安装模式，用于断链检测
@@ -530,31 +533,31 @@ export async function executeInstall(
           // 目录级 symlink 逃逸校验（NFR-S5）
           await validateDestPathSecurity(destPath, allowedRoot)
 
-          // 冲突检测与处理（CR Round-1 修复）：目录级冲突不做文件级 hash 对比
-          const conflict = await detectDirConflict(destPath, manifestContext)
-          const conflictAction = await processConflict(
-            conflict,
-            srcPath,
-            destPath,
-            args.force,
-            reporter,
-          )
-          if (conflictAction === 'skip') {
-            resultItems.push({
-              status: 'skipped',
-              tool: item.rule.tool,
-              toolDisplayName: toolNameMap.get(item.rule.tool),
-              sourcePath: srcPath,
-              targetPath: destPath,
-            })
-            processedCount++
-            reporter.updatePhase(
-              `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
-            )
-            continue
-          }
-
           if (item.mode === 'symlink') {
+            // 冲突检测与处理（CR Round-1 修复）：symlink 模式目录级冲突
+            const conflict = await detectDirConflict(destPath, manifestContext)
+            const conflictAction = await processConflict(
+              conflict,
+              srcPath,
+              destPath,
+              args.force,
+              reporter,
+            )
+            if (conflictAction === 'skip') {
+              resultItems.push({
+                status: 'skipped',
+                tool: item.rule.tool,
+                toolDisplayName: toolNameMap.get(item.rule.tool),
+                sourcePath: srcPath,
+                targetPath: destPath,
+              })
+              processedCount++
+              reporter.updatePhase(
+                `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
+              )
+              continue
+            }
+
             // symlink 模式（Task 1.4）：创建指向源目录绝对路径的符号链接
             const status = await determineSymlinkStatus(srcPath, destPath)
             if (status !== 'skipped') {
@@ -573,20 +576,38 @@ export async function executeInstall(
               targetPath: destPath,
             })
           } else {
-            // copy 模式（Story 4.2 原逻辑）
-            const status = await determineDirStatus(destPath)
-            await copyDir(srcPath, destPath)
+            // copy 模式 — 文件级 hash 比对（Story 6-3 AC #3 增量同步）
+            // 遍历源目录内所有文件，逐文件比较 hash，只复制有变更的文件
+            // 不做目录级冲突检测：文件级 determineStatus 直接处理 new/updated/skipped
+            const relPaths = await walkDirFiles(srcPath)
+            await ensureDir(destPath)
+
+            for (const relPath of relPaths) {
+              const srcFilePath = join(srcPath, relPath)
+              const destFilePath = join(destPath, relPath)
+
+              // 嵌套文件路径边界校验（NFR-S5：防止中间 symlink 逃逸 allowedRoot）
+              await validateDestPathSecurity(destFilePath, allowedRoot)
+
+              // 确保中间目录存在（嵌套子目录）
+              await ensureDir(dirname(destFilePath))
+
+              const fileStatus = await determineStatus(srcFilePath, destFilePath)
+              if (fileStatus !== 'skipped') {
+                await copyFile(srcFilePath, destFilePath)
+              }
+              resultItems.push({
+                status: fileStatus,
+                tool: item.rule.tool,
+                toolDisplayName: toolNameMap.get(item.rule.tool),
+                sourcePath: srcFilePath,
+                targetPath: destFilePath,
+              })
+            }
             processedCount++
             reporter.updatePhase(
               `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
             )
-            resultItems.push({
-              status,
-              tool: item.rule.tool,
-              toolDisplayName: toolNameMap.get(item.rule.tool),
-              sourcePath: srcPath,
-              targetPath: destPath,
-            })
           }
         }
       }

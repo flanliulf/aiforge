@@ -154,4 +154,16 @@ describe('CLI 参数解析 → ParsedArgs 映射 (AC#3)', () => {
     const withoutFilter = mapOptsToArgs('https://example.com/repo', {})
     expect(withoutFilter.filter).toBeUndefined()
   })
+
+  // Story 6-3: --no-universal 映射
+  it('mapOptsToArgs: opts.universal=false → noUniversal: true', () => {
+    // Commander --no-universal 选项会将 opts.universal 设为 false
+    const args = mapOptsToArgs('https://example.com/repo', { universal: false })
+    expect(args.noUniversal).toBe(true)
+  })
+
+  it('mapOptsToArgs: universal 未指定 → noUniversal: false', () => {
+    const args = mapOptsToArgs('https://example.com/repo', {})
+    expect(args.noUniversal).toBe(false)
+  })
 })

@@ -44,6 +44,7 @@ program
   .option('--clone-dir <path>', 'custom clone directory')
   .option('--list <dir>', 'list installable subdirectories under a top-level dir')
   .option('--filter <pattern>', 'filter subdirectories by glob pattern')
+  .option('--no-universal', 'skip universal directory installation')
   .action(async (repoUrl: string | undefined, opts: Record<string, unknown>) => {
     const args = mapOptsToArgs(repoUrl, opts)
     const pathResolver = new UnixPathResolver()

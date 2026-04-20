@@ -57,7 +57,8 @@ current_activity:
   completed_stories:
     - "6-1-list-subdirectory-contents: done"  # 2026-04-16 CR Approved (Round 3)
     - "6-2-filter-subdirectory-install: done"  # 2026-04-17 CR Approved (Round 2)
-  notes: "Epic 6 开发中。Story 6-1 完成（2026-04-16），Story 6-2 完成（2026-04-17，CR 2 轮通过）。777 测试零回归，CR TODO 8 open / 12 resolved。"
+    - "6-3-universal-directory-install: done"  # 2026-04-20 CR Approved (Round 2)
+  notes: "Epic 6 开发中。Story 6-1 完成（2026-04-16），Story 6-2 完成（2026-04-17），Story 6-3 完成（2026-04-20，CR 2 轮通过）。CR TODO 11 open / 12 resolved。"
   next_steps:
-    - "Story 6-3 universal-directory-install 开发"
+    - "Story 6-4 init-universal-directory-preference 开发"
     - "Epic 6 剩余 Stories 推进"

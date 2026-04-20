@@ -127,6 +127,49 @@ export const BUILTIN_RULES: InstallRule[] = [
 ]
 
 /**
+ * 通用目录安装规则 — Story 6-3
+ *
+ * 安装到 .agents/ 和 .agent/ 目录，与具体 AI 工具无关。
+ * 规则来源: FR-050 — 通用目录默认并行安装
+ *
+ * 注意：UNIVERSAL_RULES 不加入 RULE_INDEX（不参与工具检测匹配），
+ * 由 Match 阶段在常规规则匹配完成后单独追加。
+ * tool: 'universal' 是虚拟工具 ID，不在 TOOL_DEFINITIONS 注册表中。
+ */
+export const UNIVERSAL_RULES: InstallRule[] = [
+  // .agents/ 目录
+  {
+    tool: 'universal',
+    scope: 'project',
+    sourceDir: 'skills',
+    type: Directories,
+    targetDir: '.agents/skills/',
+  },
+  {
+    tool: 'universal',
+    scope: 'project',
+    sourceDir: 'agents',
+    type: Files,
+    targetDir: '.agents/agents/',
+  },
+  // .agent/ 目录
+  {
+    tool: 'universal',
+    scope: 'project',
+    sourceDir: 'skills',
+    type: Directories,
+    targetDir: '.agent/skills/',
+  },
+  {
+    tool: 'universal',
+    scope: 'project',
+    sourceDir: 'agents',
+    type: Files,
+    targetDir: '.agent/agents/',
+  },
+]
+
+/**
  * 规则索引 — key 为 `${tool}:${scope}`，O(1) 查找
  */
 export const RULE_INDEX: Map<string, InstallRule[]> = (() => {

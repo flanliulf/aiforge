@@ -74,6 +74,7 @@ function createTestArgs(partial: Partial<ParsedArgs> = {}): ParsedArgs {
     ssh: false,
     symlink: false,
     flatten: false,
+    noUniversal: false,
     ...partial,
   }
 }
@@ -218,7 +219,12 @@ describe('createProductionStages — saveManifest 真实闭包集成测试 (CR R
   it('cursor 项目安装: skills[Flatten] 和 agents[Files] 共享 .cursor/rules/ 目录，manifest 条目各自正确', async () => {
     const stages = createProductionStages(mockPathResolver)
     // 项目级安装：cursor 的 skills[Flatten] 和 agents[Files] 共享 .cursor/rules/
-    const args = createTestArgs({ global: false, tools: ['cursor'], force: true })
+    const args = createTestArgs({
+      global: false,
+      tools: ['cursor'],
+      force: true,
+      noUniversal: true,
+    })
 
     const source = await stages.resolve(args, mockReporter)
     const authed = await stages.authenticate(source, args, mockReporter)

@@ -25,6 +25,7 @@ export interface ParsedArgs {
   cloneDir?: string
   list?: string
   filter?: string
+  noUniversal: boolean
   // legacy aliases kept for internal use
   symlink: boolean
   flatten: boolean
@@ -125,5 +126,6 @@ export interface AiforgeConfig {
   cloneDir?: string
   language?: string
   preferSSH?: boolean
+  universalDirs?: boolean
   auth: Record<string, HostAuth>
 }

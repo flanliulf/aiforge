@@ -109,7 +109,7 @@ index.ts → pipeline.ts → stages/* → services/*
 
 ### Recovery/Fallback Path Rules（恢复/回退路径规则）
 
-- **恢复/回退路径必须与主路径的匹配空间语义对齐：** 当功能包含"正常执行路径"和"恢复/回退/重试路径"两条执行链时，恢复路径的候选空间必须是主路径匹配空间的超集或等集，不能更窄。禁止在恢复路径中使用与主路径不同的数据收集函数（如主路径枚举文件+目录，恢复路径只枚举目录），禁止在恢复路径中引入主路径没有的额外过滤条件。实现恢复路径后，必须自查："主路径能匹配到的项，恢复路径的候选列表中是否都包含？"（来源：Story 6-2 CR R1 — 3/5 条发现均源于恢复路径与主路径语义不一致：零匹配恢复枚举仓库顶层目录名而非安装项 basename、Files 类型只扫描目录、额外排除 dot-prefixed 条目）
+- **恢复/回退路径必须与主路径的匹配空间语义对齐：** 当功能包含"正常执行路径"和"恢复/回退/重试路径"两条执行链时，恢复路径的候选空间必须是主路径匹配空间的超集或等集，不能更窄。禁止在恢复路径中使用与主路径不同的数据收集函数（如主路径枚举文件+目录，恢复路径只枚举目录），禁止在恢复路径中引入主路径没有的额外过滤条件。特别注意：当主路径在核心匹配循环之后还有**追加步骤**（如追加通用规则、附加默认配置等），恢复路径也必须包含等效的追加步骤——自查时不仅要比较"收集循环"的语义一致性，还要检查"循环后的追加逻辑"是否被一并复制。实现恢复路径后，必须自查："主路径能匹配到的项，恢复路径的候选列表中是否都包含？"（来源：Story 6-2 CR R1 — 3/5 条发现均源于恢复路径与主路径语义不一致：零匹配恢复枚举仓库顶层目录名而非安装项 basename、Files 类型只扫描目录、额外排除 dot-prefixed 条目；Story 6-3 CR R1-#4 — 交互恢复路径只重建了 RULE_INDEX 循环，遗漏了主路径循环后的 UNIVERSAL_RULES 追加步骤，导致通用目录静默漏装）
 - **恢复/重试路径必须包含二次成功校验：** 每次恢复/重试后，必须对结果执行与首次尝试相同的成功条件校验。禁止在重试逻辑完成后直接进入"成功路径"而不检查结果有效性；禁止假设"用户做了选择 → 重试一定成功"。若重试后仍不满足成功条件，应明确报错或进入下一级恢复，而非静默返回空结果。（来源：Story 6-2 CR R1 — TTY 零匹配恢复后未二次检查 items 是否仍为空，静默返回空计划）
 
 ### Story Scope Discipline（Story 作用域纪律）
@@ -194,6 +194,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - **脱敏函数必须覆盖边界形态输入：** sanitizeToken/sanitizeUrl 的正则/匹配逻辑必须覆盖用户可能构造的边界形态输入（如不完整 URL、缺少 host 的 URL、尾部截断的 token）。新增任何 `AiforgeError` 的 `why` 字段时，检查是否包含用户原始输入——如果是，必须通过 sanitizeUrl/sanitizeToken 处理，不能有"漏调"
 - **三种脱敏函数适用场景不可混用：** `sanitizeToken()` 适用于独立 token 字符串脱敏；`sanitizeUrl()` 适用于纯 URL 字符串脱敏（内部使用带 `^` 锚点的正则，仅匹配纯 URL 格式）；`sanitizeMessage()` 适用于**任意字符串**（如 git/simple-git 错误消息）中嵌入 token-bearing URL 的场景（使用全局替换正则，无锚点）。将底层异常的 `error.message` 写入 `AiforgeError.why` 时，**必须使用 `sanitizeMessage()` 而非 `sanitizeUrl()`**——git 错误消息中 URL 嵌入在任意位置，`sanitizeUrl()` 无法处理。（来源：Story 5-4 CR Round 1 — `CLONE_FAILED`/`PULL_FAILED` 的 `why` 直接透传 `error.message`，simple-git 错误回显完整 clone URL（含 token），导致 token 通过 reporter 输出到 stderr；修复时新增 `sanitizeMessage()` 函数专门处理此场景）
 - **安全校验必须在最终 I/O 操作路径上执行：** 当预检阶段的校验路径（如 `targetPath` = 目录）与实际 I/O 操作路径（如 `destPath` = `join(targetPath, basename(srcPath))`）不同时，必须在实际操作前对最终路径再次执行安全校验。"preflight 通过 ≠ 操作安全"——中间路径合法不代表最终路径合法（合法目录下可能存在指向外部的 symlink 文件）。此规则适用于所有涉及"先校验目录、再操作目录下文件"的场景。（来源：Story 4-2 CR R1 — `preflight()` 校验 `targetPath` 通过，但 `copyFile()` 操作的 `destPath` 可被预置 symlink 重定向到 `allowedRoot` 外部，导致 P0 安全漏洞）
+- **路径安全校验必须覆盖所有递归展开层级的最终写入路径：** 当安装/复制操作涉及递归目录遍历时，安全校验不能只在最外层目录路径上执行一次。对于递归展开的每个子文件/子目录路径（如 `join(destPath, relPath)`），在执行 I/O 操作前必须对该路径重新执行边界校验（如 `validateDestPathSecurity()`）。理由："外层目录合法 ≠ 内层文件合法"——目录内部的中间节点可能是指向外部的 symlink，只校验最外层目录无法防御内部 symlink 逃逸。此规则是上一条"安全校验必须在最终 I/O 操作路径上执行"的递归场景扩展。（来源：Story 6-3 CR R1-#2 — Directories copy 只对 `destPath` 校验了一次，嵌套文件路径 `destFilePath` 未经校验直接 `ensureDir`+`copyFile`，中间 symlink 可逃逸 `allowedRoot`）
 
 ### Data Format Rules
 

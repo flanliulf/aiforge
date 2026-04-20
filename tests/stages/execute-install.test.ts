@@ -9,7 +9,16 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { mkdtemp, writeFile, mkdir, rm, readFile, symlink, readlink } from 'node:fs/promises'
+import {
+  mkdtemp,
+  writeFile,
+  mkdir,
+  rm,
+  readFile,
+  symlink,
+  readlink,
+  access,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, basename } from 'node:path'
 
@@ -62,6 +71,7 @@ function makeArgs(overrides: Partial<ParsedArgs> = {}): ParsedArgs {
     ssh: false,
     symlink: false,
     flatten: false,
+    noUniversal: false,
     ...overrides,
   }
 }
@@ -189,6 +199,93 @@ describe('stages/execute-install', () => {
       // 目录实际被复制
       const content = await readFile(join(targetDir, basename(srcDir), 'README.md'), 'utf8')
       expect(content).toBe('# skill')
+    })
+
+    // ── Story 6-3: 文件级 hash 增量同步测试（AC #3）───────────────────────
+
+    it('AC #3 源目录含 2 个文件时返回 2 个 result items，均为 new', async () => {
+      const srcDir = join(tmpDir, 'code-review')
+      await mkdir(srcDir)
+      await writeFile(join(srcDir, 'index.md'), '# code review')
+      await writeFile(join(srcDir, 'examples.md'), '## examples')
+      const targetDir = join(tmpDir, 'skills-multi')
+
+      const plan = makeDirPlan([srcDir], targetDir)
+      const result = await executeInstall(plan, makeArgs(), reporter, pathResolver)
+
+      expect(result.items).toHaveLength(2)
+      expect(result.items.every((i) => i.status === 'new')).toBe(true)
+    })
+
+    it('AC #3 二次安装无文件变更时所有文件 status 为 skipped', async () => {
+      const srcDir = join(tmpDir, 'git-commit')
+      await mkdir(srcDir)
+      await writeFile(join(srcDir, 'guide.md'), '# guide')
+      const targetDir = join(tmpDir, 'skills-incremental')
+
+      const plan = makeDirPlan([srcDir], targetDir)
+
+      // 第一次安装
+      await executeInstall(plan, makeArgs(), reporter, pathResolver)
+
+      // 第二次安装：内容未变
+      const result2 = await executeInstall(plan, makeArgs(), reporter, pathResolver)
+      expect(result2.items.every((i) => i.status === 'skipped')).toBe(true)
+    })
+
+    it('AC #3 二次安装部分文件变更时只有变更文件为 updated，其余为 skipped', async () => {
+      const srcDir = join(tmpDir, 'mixed-skill')
+      await mkdir(srcDir)
+      const unchanged = join(srcDir, 'unchanged.md')
+      const changed = join(srcDir, 'changed.md')
+      await writeFile(unchanged, '# unchanged')
+      await writeFile(changed, '# v1')
+      const targetDir = join(tmpDir, 'skills-partial')
+
+      const plan = makeDirPlan([srcDir], targetDir)
+
+      // 第一次安装
+      await executeInstall(plan, makeArgs(), reporter, pathResolver)
+
+      // 修改一个源文件
+      await writeFile(changed, '# v2 updated content')
+
+      // 第二次安装
+      const result2 = await executeInstall(plan, makeArgs(), reporter, pathResolver)
+      expect(result2.items).toHaveLength(2)
+
+      const changedItem = result2.items.find((i) => i.targetPath.endsWith('changed.md'))
+      const unchangedItem = result2.items.find((i) => i.targetPath.endsWith('unchanged.md'))
+      expect(changedItem?.status).toBe('updated')
+      expect(unchangedItem?.status).toBe('skipped')
+    })
+
+    it('AC #1 universal 工具 → toolDisplayName 为 通用目录', async () => {
+      const srcDir = join(tmpDir, 'universal-skill')
+      await mkdir(srcDir)
+      await writeFile(join(srcDir, 'README.md'), '# universal')
+      const targetDir = join(tmpDir, 'universal-target')
+
+      const plan: MatchedPlan = {
+        items: [
+          {
+            rule: {
+              tool: 'universal',
+              scope: 'global', // global scope 让 preflight 以 home() 为边界，避免 PATH_TRAVERSAL
+              sourceDir: 'skills',
+              type: InstallType.Directories,
+              targetDir,
+            },
+            sourceFiles: [srcDir],
+            targetPath: targetDir,
+            mode: 'copy',
+          },
+        ],
+      }
+
+      const result = await executeInstall(plan, makeArgs({ global: true }), reporter, pathResolver)
+      expect(result.items).toHaveLength(1)
+      expect(result.items[0]!.toolDisplayName).toBe('通用目录')
     })
   })
 
@@ -1256,7 +1353,7 @@ describe('stages/execute-install', () => {
       conflictMocks.handleConflict.mockReset()
     })
 
-    it('Directories copy + user-file 冲突 + 用户选择 "跳过" → 目录不被覆盖', async () => {
+    it('Directories copy + 目标目录有用户文件 → 安装新文件，用户文件保留', async () => {
       const srcDir = join(tmpDir, 'dir-conflict-src')
       await mkdir(srcDir)
       await writeFile(join(srcDir, 'README.md'), '# from repo')
@@ -1266,22 +1363,21 @@ describe('stages/execute-install', () => {
       await mkdir(destDir, { recursive: true })
       await writeFile(join(destDir, 'custom.md'), 'user custom content')
 
-      conflictMocks.handleConflict.mockResolvedValueOnce('skip')
-
       const plan = makeDirPlan([srcDir], targetDir)
       const ctx: ManifestContext = { entries: [], degraded: false }
 
       const result = await executeInstall(plan, makeArgs(), reporter, pathResolver, ctx)
 
-      expect(conflictMocks.handleConflict).toHaveBeenCalledOnce()
+      // copy 模式不做目录级冲突检测：文件级 hash 比对，README.md 是 'new'，用户文件保留
+      expect(conflictMocks.handleConflict).not.toHaveBeenCalled()
       expect(result.items).toHaveLength(1)
-      expect(result.items[0]!.status).toBe('skipped')
-      // 用户目录未被覆盖
+      expect(result.items[0]!.status).toBe('new')
+      // 用户文件未被删除
       const content = await readFile(join(destDir, 'custom.md'), 'utf8')
       expect(content).toBe('user custom content')
     })
 
-    it('Directories copy + user-file 冲突 + 用户选择 "覆盖" → 目录被覆盖', async () => {
+    it('Directories copy + 目标目录有旧文件 → 只复制 src 中的文件', async () => {
       const srcDir = join(tmpDir, 'dir-overwrite-src')
       await mkdir(srcDir)
       await writeFile(join(srcDir, 'README.md'), '# from repo')
@@ -1290,22 +1386,21 @@ describe('stages/execute-install', () => {
       await mkdir(destDir, { recursive: true })
       await writeFile(join(destDir, 'old.md'), 'old content')
 
-      conflictMocks.handleConflict.mockResolvedValueOnce('overwrite')
-
       const plan = makeDirPlan([srcDir], targetDir)
       const ctx: ManifestContext = { entries: [], degraded: false }
 
       const result = await executeInstall(plan, makeArgs(), reporter, pathResolver, ctx)
 
-      expect(conflictMocks.handleConflict).toHaveBeenCalledOnce()
+      // copy 模式不做目录级冲突检测，直接按文件级 hash 安装
+      expect(conflictMocks.handleConflict).not.toHaveBeenCalled()
       expect(result.items).toHaveLength(1)
-      expect(result.items[0]!.status).toBe('updated')
-      // 目录被覆盖为源内容
+      // destDir 中无 README.md，所以为 'new'
+      expect(result.items[0]!.status).toBe('new')
       const content = await readFile(join(destDir, 'README.md'), 'utf8')
       expect(content).toBe('# from repo')
     })
 
-    it('Directories copy + user-file 冲突 + 用户选择 "备份后覆盖" → 备份目录存在 + 新目录被安装 (CR Round-2 修复)', async () => {
+    it('Directories copy + 目标目录有用户文件 + ctx → 文件级安装，无目录备份', async () => {
       const srcDir = join(tmpDir, 'dir-backup-src')
       await mkdir(srcDir)
       await writeFile(join(srcDir, 'README.md'), '# from repo')
@@ -1314,28 +1409,28 @@ describe('stages/execute-install', () => {
       await mkdir(destDir, { recursive: true })
       await writeFile(join(destDir, 'custom.md'), 'user custom skill')
 
-      conflictMocks.handleConflict.mockResolvedValueOnce('backup')
-
       const plan = makeDirPlan([srcDir], targetDir)
       const ctx: ManifestContext = { entries: [], degraded: false }
 
       const result = await executeInstall(plan, makeArgs(), reporter, pathResolver, ctx)
 
-      // handleConflict 被调用
-      expect(conflictMocks.handleConflict).toHaveBeenCalledOnce()
-      // 目录被安装
+      // copy 模式不做目录级冲突检测，无备份行为
+      expect(conflictMocks.handleConflict).not.toHaveBeenCalled()
+      // src 中的 README.md 被安装为 'new'
       expect(result.items).toHaveLength(1)
-      expect(result.items[0]!.status).toBe('updated')
+      expect(result.items[0]!.status).toBe('new')
       const installed = await readFile(join(destDir, 'README.md'), 'utf8')
       expect(installed).toBe('# from repo')
-      // 备份目录存在（命名: <dir>.aiforge-backup-YYYYMMDD）
+      // 用户文件被保留（非 src 中的文件不被删除）
+      const userFile = await readFile(join(destDir, 'custom.md'), 'utf8')
+      expect(userFile).toBe('user custom skill')
+      // 无备份目录
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
       const backupPath = `${destDir}.aiforge-backup-${today}`
-      const backupContent = await readFile(join(backupPath, 'custom.md'), 'utf8')
-      expect(backupContent).toBe('user custom skill')
+      await expect(access(backupPath)).rejects.toThrow()
     })
 
-    it('Directories copy + --force + user-file 冲突 → 直接覆盖', async () => {
+    it('Directories copy + --force + 目标目录有用户文件 → 文件级安装，忽略 force 标志', async () => {
       const srcDir = join(tmpDir, 'dir-force-src')
       await mkdir(srcDir)
       await writeFile(join(srcDir, 'README.md'), '# force')
@@ -1343,8 +1438,6 @@ describe('stages/execute-install', () => {
       const destDir = join(targetDir, basename(srcDir))
       await mkdir(destDir, { recursive: true })
       await writeFile(join(destDir, 'user.md'), 'user content')
-
-      conflictMocks.handleConflict.mockResolvedValueOnce('overwrite')
 
       const plan = makeDirPlan([srcDir], targetDir)
       const ctx: ManifestContext = { entries: [], degraded: false }
@@ -1357,8 +1450,10 @@ describe('stages/execute-install', () => {
         ctx,
       )
 
-      expect(conflictMocks.handleConflict).toHaveBeenCalledWith(destDir, srcDir, true, reporter)
-      expect(result.items[0]!.status).toBe('updated')
+      // copy 模式不做目录级冲突检测，--force 无额外效果
+      expect(conflictMocks.handleConflict).not.toHaveBeenCalled()
+      // destDir 中不存在 README.md（只有 user.md），所以 README.md 是 'new'
+      expect(result.items[0]!.status).toBe('new')
     })
 
     it('Directories copy + 目录不存在（无冲突）→ 正常安装', async () => {
@@ -1390,7 +1485,8 @@ describe('stages/execute-install', () => {
       const result = await executeInstall(plan, makeArgs(), reporter, pathResolver)
 
       expect(conflictMocks.handleConflict).not.toHaveBeenCalled()
-      expect(result.items[0]!.status).toBe('updated')
+      // 文件级 hash：destDir 存在但 README.md 不在其中，所以是 'new'
+      expect(result.items[0]!.status).toBe('new')
     })
 
     it('Directories symlink + 目标目录不存在 → 无冲突，正常创建 symlink', async () => {

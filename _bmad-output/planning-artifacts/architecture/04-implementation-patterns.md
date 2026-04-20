@@ -108,9 +108,11 @@ grep -rn "console\.log\|硬编码中文" src/ --include="*.ts"
    )
 ```
 
-禁止在恢复路径中引入主路径没有的额外过滤条件。实现恢复路径后，必须自查："主路径能匹配到的项，恢复路径的候选列表中是否都包含？"
+禁止在恢复路径中引入主路径没有的额外过滤条件。特别注意：当主路径在核心匹配循环之后还有**追加步骤**（如追加通用规则、附加默认配置等），恢复路径也必须包含等效的追加步骤——自查时不仅要比较"收集循环"的语义一致性，还要检查"循环后的追加逻辑"是否被一并复制。
 
-> 来源：Story 6-2 CR R1 — 3/5 条发现均源于恢复路径与主路径语义不一致。
+实现恢复路径后，必须自查："主路径能匹配到的项，恢复路径的候选列表中是否都包含？"
+
+> 来源：Story 6-2 CR R1 — 3/5 条发现均源于恢复路径与主路径语义不一致；Story 6-3 CR R1-#4 — 交互恢复路径只重建了 RULE_INDEX 循环，遗漏了主路径循环后的 UNIVERSAL_RULES 追加步骤，导致通用目录静默漏装。
 
 **恢复/重试路径必须包含二次成功校验：**
 
@@ -871,6 +873,34 @@ CR 修复中如果修改了类型定义（interface/type/enum 的字段增删改
 ```
 
 > 来源：Story 4-2 CR R1 — `preflight()` 校验 `targetPath` 通过，但 `copyFile()` 操作的 `destPath` 可被预置 symlink 重定向到 `allowedRoot` 外部，导致 P0 安全漏洞。
+
+**路径安全校验必须覆盖所有递归展开层级的最终写入路径：**
+
+当安装/复制操作涉及递归目录遍历时，安全校验不能只在最外层目录路径上执行一次。对于递归展开的每个子文件/子目录路径（如 `join(destPath, relPath)`），在执行 I/O 操作前必须对该路径重新执行边界校验。
+
+```typescript
+✅ // 对递归展开的每个嵌套文件路径逐一校验
+   const relPaths = await walkDirFiles(srcPath)
+   for (const relPath of relPaths) {
+     const destFilePath = join(destPath, relPath)
+     await validateDestPathSecurity(destFilePath, allowedRoot)  // ← 逐文件校验
+     await ensureDir(dirname(destFilePath))
+     await copyFile(srcFilePath, destFilePath)
+   }
+
+❌ // 只校验最外层目录，嵌套文件路径不校验
+   await validateDestPathSecurity(destPath, allowedRoot)  // ← 仅目录根
+   const relPaths = await walkDirFiles(srcPath)
+   for (const relPath of relPaths) {
+     const destFilePath = join(destPath, relPath)
+     await ensureDir(dirname(destFilePath))  // ← 中间 symlink 可逃逸
+     await copyFile(srcFilePath, destFilePath)
+   }
+```
+
+理由："外层目录合法 ≠ 内层文件合法"——目录内部的中间节点可能是指向外部的 symlink，只校验最外层目录无法防御内部 symlink 逃逸。此规则是上一条"安全校验必须在最终 I/O 操作路径上执行"的递归场景扩展。
+
+> 来源：Story 6-3 CR R1-#2 — Directories copy 只对 `destPath` 校验了一次，嵌套文件路径 `destFilePath` 未经校验直接 `ensureDir`+`copyFile`，中间 symlink 可逃逸 `allowedRoot`。
 
 **npm 包安全规则 — 公司信息零容忍 + 通用占位符豁免：**
 

@@ -22,7 +22,7 @@ import type { Reporter } from '../core/reporter.js'
 import type { PathResolver } from '../core/path-resolver.js'
 import { AiforgeError } from '../core/errors.js'
 import { EXIT_ARG_ERROR } from '../core/errors.js'
-import { RULE_INDEX } from '../data/install-rules.js'
+import { RULE_INDEX, UNIVERSAL_RULES } from '../data/install-rules.js'
 import { DEFAULT_EXCLUDES } from '../data/excludes.js'
 import { msg } from '../core/messages.js'
 import { parseFilterPattern, matchesGlob, FilterCancelledSignal } from './filter-utils.js'
@@ -141,6 +141,7 @@ async function scanSourceFiles(repoDir: string, rule: InstallRule): Promise<stri
  * @param args - 解析后的 CLI 参数（读取 dirs、link）
  * @param reporter - 输出报告器
  * @param pathResolver - 路径解析器（可注入 mock，便于测试）
+ * @param enableUniversal - 是否追加通用目录规则（Story 6-3, CLI + config 合并计算结果）
  */
 export async function matchRules(
   repo: LocalRepo,
@@ -148,6 +149,7 @@ export async function matchRules(
   args: ParsedArgs,
   reporter: Reporter,
   pathResolver: PathResolver,
+  enableUniversal: boolean = false,
 ): Promise<MatchedPlan> {
   reporter.startPhase(msg('phases.match'))
 
@@ -195,6 +197,39 @@ export async function matchRules(
       // 按 scope+link 推导安装模式（mode 只表示安装方式：copy/symlink）
       // Flatten 规则的 mode 在 manifest 写入时由 pipeline.ts 通过 rule.type 判断输出 'flatten'
       const mode = getInstallMode(args, env.scope)
+
+      items.push({ rule, sourceFiles, targetPath, mode })
+    }
+  }
+
+  // 通用目录追加（Story 6-3 Task 4）
+  // 仅在 project scope 且 enableUniversal 启用时追加；global 安装不写通用目录
+  if (env.scope === 'project' && enableUniversal) {
+    for (const rule of UNIVERSAL_RULES) {
+      // 防御性校验：UNIVERSAL_RULES 全部是 project scope
+      if (rule.scope !== env.scope) continue
+
+      // --dirs 过滤同样适用于通用规则（保持一致性）
+      if (args.dirs && args.dirs.length > 0 && !args.dirs.includes(rule.sourceDir)) continue
+
+      let sourceFiles = await scanSourceFiles(repo.repoDir, rule)
+
+      // --filter 同样适用于通用规则（AC 4.5）
+      if (args.filter) {
+        const { dirPrefix, glob } = parseFilterPattern(args.filter)
+        if (dirPrefix && dirPrefix !== rule.sourceDir) {
+          sourceFiles = []
+        } else {
+          sourceFiles = sourceFiles.filter((sf) => matchesGlob(basename(sf), glob))
+        }
+      }
+
+      // empty-item guard（与主循环的 --filter 逻辑一致）
+      if (args.filter && sourceFiles.length === 0) continue
+
+      const targetPath = resolveTargetDir(rule, env.scope, pathResolver)
+      // 通用目录始终 copy 模式（NFR-C7：复用现有安装引擎的复制模式）
+      const mode: 'copy' | 'symlink' = 'copy'
 
       items.push({ rule, sourceFiles, targetPath, mode })
     }
@@ -274,6 +309,26 @@ export async function matchRules(
           const targetPath = resolveTargetDir(rule, env.scope, pathResolver)
           const mode = getInstallMode(args, env.scope)
           items.push({ rule, sourceFiles, targetPath, mode })
+        }
+      }
+      // 通用目录补充（fix CR#4）：交互恢复后同步追加 UNIVERSAL_RULES，防止静默漏装（AC #1）
+      // 使用 resolvedFilter 的解析结果（rPrefix/rGlob）代替 args.filter，与主循环语义一致
+      if (env.scope === 'project' && enableUniversal) {
+        for (const rule of UNIVERSAL_RULES) {
+          if (rule.scope !== env.scope) continue
+          if (args.dirs && args.dirs.length > 0 && !args.dirs.includes(rule.sourceDir)) continue
+          let universalSourceFiles = await scanSourceFiles(repo.repoDir, rule)
+          if (rPrefix && rPrefix !== rule.sourceDir) {
+            universalSourceFiles = []
+          } else {
+            universalSourceFiles = universalSourceFiles.filter((sf) =>
+              matchesGlob(basename(sf), rGlob),
+            )
+          }
+          if (universalSourceFiles.length === 0) continue
+          const targetPath = resolveTargetDir(rule, env.scope, pathResolver)
+          const mode: 'copy' | 'symlink' = 'copy'
+          items.push({ rule, sourceFiles: universalSourceFiles, targetPath, mode })
         }
       }
       // 二次零匹配检查（fix CR#1）：重试后若 items 仍为空，抛出 FILTER_NO_MATCH

@@ -2,7 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { InstallType } from '../../src/core/types.js'
-import { BUILTIN_RULES, RULE_INDEX, loadRules } from '../../src/data/install-rules.js'
+import {
+  BUILTIN_RULES,
+  RULE_INDEX,
+  UNIVERSAL_RULES,
+  loadRules,
+} from '../../src/data/install-rules.js'
 
 describe('data/install-rules — BUILTIN_RULES (AC: #1)', () => {
   it('contains exactly 16 MVP rules', () => {
@@ -137,6 +142,38 @@ describe('data/install-rules — module boundary (AC: #5)', () => {
       .filter((l) => l.match(/^\s*import\s/) && !l.match(/^\s*import\s+type\s/))
     for (const line of importLines) {
       expect(line).not.toMatch(/from\s+['"]\.\.\/(?:core|stages|services|commands)/)
+    }
+  })
+})
+describe('data/install-rules — UNIVERSAL_RULES (Story 6-3)', () => {
+  it('UNIVERSAL_RULES 包含 4 条规则', () => {
+    expect(UNIVERSAL_RULES).toHaveLength(4)
+  })
+
+  it('所有规则的 tool 均为 universal', () => {
+    for (const rule of UNIVERSAL_RULES) {
+      expect(rule.tool).toBe('universal')
+    }
+  })
+
+  it('所有规则的 scope 均为 project', () => {
+    for (const rule of UNIVERSAL_RULES) {
+      expect(rule.scope).toBe('project')
+    }
+  })
+
+  it('覆盖 .agents/skills/ .agents/agents/ .agent/skills/ .agent/agents/ 四条路径', () => {
+    const targets = UNIVERSAL_RULES.map((r) => r.targetDir)
+    expect(targets).toContain('.agents/skills/')
+    expect(targets).toContain('.agents/agents/')
+    expect(targets).toContain('.agent/skills/')
+    expect(targets).toContain('.agent/agents/')
+  })
+
+  it('UNIVERSAL_RULES 不存在于 RULE_INDEX', () => {
+    const allIndexed = Array.from(RULE_INDEX.values()).flat()
+    for (const rule of UNIVERSAL_RULES) {
+      expect(allIndexed).not.toContainEqual(rule)
     }
   })
 })

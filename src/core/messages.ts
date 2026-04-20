@@ -92,6 +92,7 @@ interface MessageSet {
     planStats: string
     resultStats: string
     itemCount: string
+    universalDirsLabel: string
   }
   config: {
     notFound: string
@@ -348,6 +349,7 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       planStats: '计划安装: {total} 项 ({tools} 个工具)',
       resultStats: '安装: {installed} 项  更新: {updated} 项  跳过: {skipped} 项',
       itemCount: '{count} 项',
+      universalDirsLabel: '通用目录',
     },
     config: {
       notFound: '未找到配置文件',
@@ -601,6 +603,7 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       planStats: 'Plan: {total} items ({tools} tools)',
       resultStats: 'Installed: {installed}  Updated: {updated}  Skipped: {skipped}',
       itemCount: '{count} items',
+      universalDirsLabel: 'Universal Dirs',
     },
     config: {
       notFound: 'Config file not found',
