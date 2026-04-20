@@ -78,6 +78,10 @@ interface MessageSet {
     fixSshTest: string
     fixTokenGenerate: string
     fixTokenPermission: string
+    universalDirsPrompt: string
+    universalLabel: string
+    enabled: string
+    disabled: string
   }
   reporter: {
     planTitle: string
@@ -335,6 +339,10 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       fixSshTest: '  ssh -T git@<hostname>  # test connection',
       fixTokenGenerate: '  Visit GitLab Settings > Access Tokens to generate a new token',
       fixTokenPermission: '  Ensure the token has read_repository permission',
+      universalDirsPrompt: '是否默认安装通用目标目录（.agents/、.agent/）？',
+      universalLabel: '  通用目录: ',
+      enabled: '启用',
+      disabled: '禁用',
     },
     reporter: {
       planTitle: '📋 安装计划预览 (dry-run)',
@@ -589,6 +597,10 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       fixSshTest: '  ssh -T git@<hostname>  # test connection',
       fixTokenGenerate: '  Visit GitLab Settings > Access Tokens to generate a new token',
       fixTokenPermission: '  Ensure the token has read_repository permission',
+      universalDirsPrompt: 'Install to universal directories (.agents/, .agent/) by default?',
+      universalLabel: '  Universal dirs: ',
+      enabled: 'enabled',
+      disabled: 'disabled',
     },
     reporter: {
       planTitle: '📋 Install plan preview (dry-run)',

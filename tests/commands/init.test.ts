@@ -715,4 +715,198 @@ describe('commands/init — 交互式配置', () => {
       expect(setLanguageSpy).toHaveBeenCalledWith('zh-CN')
     })
   })
+
+  // ── Story 6-4: 通用目录偏好 ──────────────────────────────────
+
+  describe('通用目录偏好 (AC Story 6-4)', () => {
+    beforeEach(() => {
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: true,
+        writable: true,
+        configurable: true,
+      })
+    })
+
+    // Helper: 设置首次 init（无已有配置）的完整 mock
+    function setupFirstTimeInit(universalDirsAnswer: boolean) {
+      mocks.loadConfig.mockRejectedValue(
+        new AiforgeError('未找到配置文件', 'CONFIG_NOT_FOUND', 3, 'fatal', '尚未初始化', []),
+      )
+      mocks.input.mockResolvedValue('git@gitlab.example.com:org/repo.git')
+      mocks.select
+        .mockResolvedValueOnce('zh-CN') // 语言选择
+        .mockResolvedValueOnce('ssh') // 认证方式
+      mocks.confirm.mockResolvedValueOnce(universalDirsAnswer) // universalDirs
+      mocks.saveConfig.mockResolvedValue(undefined)
+      mocks.gitResolve.mockResolvedValue({
+        hostname: 'gitlab.example.com',
+        repoPath: 'org/repo',
+        protocol: 'ssh',
+      })
+      const rawMock = makeGitRaw(false)
+      mocks.createGit.mockReturnValue({ raw: rawMock })
+    }
+
+    it('首次 init 中 confirm() 被调用，message 包含 .agents/ 和 .agent/，default 为 true (AC #1)', async () => {
+      setupFirstTimeInit(true)
+
+      const program = new Command()
+      program.exitOverride()
+      registerInitCommand(program)
+
+      await program.parseAsync(['node', 'aiforge', 'init'])
+
+      // 首次 init 只有 1 次 confirm 调用：universalDirs
+      expect(mocks.confirm).toHaveBeenCalledTimes(1)
+      const confirmCall = mocks.confirm.mock.calls[0]?.[0]
+      expect(confirmCall.message).toContain('.agents/')
+      expect(confirmCall.message).toContain('.agent/')
+      expect(confirmCall.default).toBe(true)
+    })
+
+    it('用户选择 true（默认）→ 保存的 config 中 universalDirs: true (AC #1)', async () => {
+      setupFirstTimeInit(true)
+
+      const program = new Command()
+      program.exitOverride()
+      registerInitCommand(program)
+
+      await program.parseAsync(['node', 'aiforge', 'init'])
+
+      const savedConfig = mocks.saveConfig.mock.calls[0]?.[0]
+      expect(savedConfig).toMatchObject({ universalDirs: true })
+    })
+
+    it('用户选择 false → 保存的 config 中 universalDirs: false (AC #2)', async () => {
+      setupFirstTimeInit(false)
+
+      const program = new Command()
+      program.exitOverride()
+      registerInitCommand(program)
+
+      await program.parseAsync(['node', 'aiforge', 'init'])
+
+      const savedConfig = mocks.saveConfig.mock.calls[0]?.[0]
+      expect(savedConfig).toMatchObject({ universalDirs: false })
+    })
+
+    it('已有配置含 universalDirs: false 且用户选择修改 → confirm default 为 false (AC #1)', async () => {
+      const configWithFalse = {
+        ...EXISTING_CONFIG,
+        universalDirs: false,
+      }
+      mocks.loadConfig.mockResolvedValue(configWithFalse)
+      // confirm 调用顺序：1. 是否修改 → true，2. universalDirs → true
+      mocks.confirm
+        .mockResolvedValueOnce(true) // 是否修改配置
+        .mockResolvedValueOnce(true) // universalDirs
+      mocks.input.mockResolvedValue('git@gitlab.example.com:org/repo.git')
+      mocks.select.mockResolvedValueOnce('zh-CN').mockResolvedValueOnce('ssh')
+      mocks.saveConfig.mockResolvedValue(undefined)
+      mocks.gitResolve.mockResolvedValue({
+        hostname: 'gitlab.example.com',
+        repoPath: 'org/repo',
+        protocol: 'ssh',
+      })
+      const rawMock = makeGitRaw(false)
+      mocks.createGit.mockReturnValue({ raw: rawMock })
+
+      const program = new Command()
+      program.exitOverride()
+      registerInitCommand(program)
+
+      await program.parseAsync(['node', 'aiforge', 'init'])
+
+      // 第 2 次 confirm 调用是 universalDirs，default 应继承已有偏好 false
+      expect(mocks.confirm).toHaveBeenCalledTimes(2)
+      const universalDirsCall = mocks.confirm.mock.calls[1]?.[0]
+      expect(universalDirsCall.default).toBe(false)
+    })
+
+    it('已有配置不含 universalDirs 字段 → confirm default 为 true（缺省值）(AC #5)', async () => {
+      // EXISTING_CONFIG 没有 universalDirs 字段
+      mocks.loadConfig.mockResolvedValue(EXISTING_CONFIG)
+      mocks.confirm
+        .mockResolvedValueOnce(true) // 是否修改配置
+        .mockResolvedValueOnce(true) // universalDirs
+      mocks.input.mockResolvedValue('git@gitlab.example.com:org/repo.git')
+      mocks.select.mockResolvedValueOnce('zh-CN').mockResolvedValueOnce('ssh')
+      mocks.saveConfig.mockResolvedValue(undefined)
+      mocks.gitResolve.mockResolvedValue({
+        hostname: 'gitlab.example.com',
+        repoPath: 'org/repo',
+        protocol: 'ssh',
+      })
+      const rawMock = makeGitRaw(false)
+      mocks.createGit.mockReturnValue({ raw: rawMock })
+
+      const program = new Command()
+      program.exitOverride()
+      registerInitCommand(program)
+
+      await program.parseAsync(['node', 'aiforge', 'init'])
+
+      // 第 2 次 confirm call: universalDirs，default 应为 true（缺省）
+      const universalDirsCall = mocks.confirm.mock.calls[1]?.[0]
+      expect(universalDirsCall.default).toBe(true)
+    })
+
+    it('已有配置摘要中展示通用目录状态 — 启用 (AC #1)', async () => {
+      const configEnabled = { ...EXISTING_CONFIG, universalDirs: true }
+      mocks.loadConfig.mockResolvedValue(configEnabled)
+      mocks.confirm.mockResolvedValue(false) // 不修改
+
+      const program = new Command()
+      program.exitOverride()
+      registerInitCommand(program)
+
+      await program.parseAsync(['node', 'aiforge', 'init'])
+
+      const allLogs = logSpy.mock.calls.map((c) => c[0]).join('\n')
+      // 摘要中应包含 universalLabel 和 enabled
+      expect(allLogs).toMatch(/通用目录.*启用|Universal dirs.*enabled/)
+    })
+
+    it('已有配置摘要中展示通用目录状态 — 禁用 (AC #1)', async () => {
+      const configDisabled = { ...EXISTING_CONFIG, universalDirs: false }
+      mocks.loadConfig.mockResolvedValue(configDisabled)
+      mocks.confirm.mockResolvedValue(false) // 不修改
+
+      const program = new Command()
+      program.exitOverride()
+      registerInitCommand(program)
+
+      await program.parseAsync(['node', 'aiforge', 'init'])
+
+      const allLogs = logSpy.mock.calls.map((c) => c[0]).join('\n')
+      // 摘要中应包含 universalLabel 和 disabled
+      expect(allLogs).toMatch(/通用目录.*禁用|Universal dirs.*disabled/)
+    })
+
+    it('连接验证失败时不询问 universalDirs（不调用对应的 confirm）(AC #1)', async () => {
+      mocks.loadConfig.mockRejectedValue(
+        new AiforgeError('未找到配置文件', 'CONFIG_NOT_FOUND', 3, 'fatal', '尚未初始化', []),
+      )
+      mocks.input.mockResolvedValue('git@gitlab.example.com:org/repo.git')
+      mocks.select.mockResolvedValueOnce('zh-CN').mockResolvedValueOnce('ssh')
+      mocks.gitResolve.mockResolvedValue({
+        hostname: 'gitlab.example.com',
+        repoPath: 'org/repo',
+        protocol: 'ssh',
+      })
+      // SSH 连接失败
+      const rawMock = makeGitRaw(true)
+      mocks.createGit.mockReturnValue({ raw: rawMock })
+
+      const program = new Command()
+      program.exitOverride()
+      registerInitCommand(program)
+
+      await program.parseAsync(['node', 'aiforge', 'init'])
+
+      // 连接失败 → return，不调用 universalDirs confirm
+      expect(mocks.confirm).not.toHaveBeenCalled()
+      expect(mocks.saveConfig).not.toHaveBeenCalled()
+    })
+  })
 })

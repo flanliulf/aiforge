@@ -65,6 +65,9 @@ async function runInit(): Promise<void> {
     console.log(msg('init.currentConfig'))
     console.log(`${msg('init.repoLabel')}${existingConfig.defaultRepo ?? msg('init.notSet')}`)
     console.log(`${msg('init.authLabel')}${authSummary || msg('init.notSet')}`)
+    console.log(
+      `${msg('init.universalLabel')}${existingConfig.universalDirs !== false ? msg('init.enabled') : msg('init.disabled')}`,
+    )
 
     const modify = await confirm({ message: msg('init.modifyPrompt'), default: false })
     if (!modify) return
@@ -147,12 +150,19 @@ async function runInit(): Promise<void> {
     return
   }
 
+  // Story 6-4: 通用目录偏好询问
+  const universalDirs = await confirm({
+    message: msg('init.universalDirsPrompt'),
+    default: existingConfig?.universalDirs !== false,
+  })
+
   // CR Fix #3: 以 existingConfig 为基础 merge，保留已有字段
-  // 只更新本次涉及的字段（defaultRepo、language、auth[hostname]、preferSSH），其余字段保留
+  // 只更新本次涉及的字段（defaultRepo、language、auth[hostname]、preferSSH、universalDirs），其余字段保留
   const config: AiforgeConfig = {
     ...existingConfig,
     defaultRepo: repoUrl,
     language,
+    universalDirs,
     auth: {
       ...existingConfig?.auth,
       [hostname]: {
