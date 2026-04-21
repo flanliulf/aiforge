@@ -339,14 +339,15 @@ After running `npx aiforge init`, settings are saved to `~/.aiforge/config.json`
 
 ## Versioning
 
-aiforge follows [Semantic Versioning](https://semver.org/) during the `0.x` pre-release phase:
+aiforge follows [Semantic Versioning](https://semver.org/) and is now in the stable `1.x` line:
 
 | Version | Trigger | Example |
 |---------|---------|---------|
-| `v0.x.0` | New milestone / major feature set | `v0.2.0` — M2 first batch |
-| `v0.x.y` | Hotfix or patch within a milestone | `v0.1.1` — bug fix |
+| `v1.x.y` | Backward-compatible fixes and improvements | `v1.0.1` — bug fix |
+| `v1.y.0` | Backward-compatible feature release | `v1.1.0` — next milestone |
+| `v2.0.0` | Breaking changes | `v2.0.0` — next major line |
 
-Currently in the `0.x` stage: the minor version (`x`) increments with each milestone, and the patch version (`y`) is used for hotfixes.
+Current baseline: `v1.0.0`, which marks the first stable release after completing the core product scope.
 
 ## AI-Assisted Setup
 
