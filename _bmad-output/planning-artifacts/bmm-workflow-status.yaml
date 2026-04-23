@@ -25,7 +25,7 @@ workflow_path: "_bmad/bmm/workflows/workflow-status/paths/method-greenfield.yaml
 workflow_status:
   # Phase 1: Analysis (Optional)
   brainstorm-project: "_bmad-output/analysis/brainstorming-session-2026-03-04.md"  # ✅ 已完成: Five Whys (25个创意) + Chaos Engineering (6个攻击向量, 100+失败场景) + 总结报告
-  research: skipped
+  research: "_bmad-output/planning-artifacts/research/technical-ai-ide-tools-coverage-research-2026-04-20.md"  # ✅ Epic 7 技术调研（2026-04-20）: 11 工具生态映射 + 规则矩阵扩展（+38/-1）+ 10 Story Backlog
   product-brief: "_bmad-output/planning-artifacts/product-brief-ai-forge-2026-03-11.md"  # ✅ 已完成: 愿景+用户画像+成功指标+MVP范围
 
   # Phase 2: Planning

@@ -11,6 +11,7 @@ shards:
   - epic-4.md
   - epic-5.md
   - epic-6.md
+  - epic-7.md
 ---
 
 # ai-forge - Epic Breakdown
@@ -227,6 +228,16 @@ This document provides the complete epic and story breakdown for ai-forge, decom
 | FR-051 | Epic 6 | `--no-universal` opt-out 参数 |
 | FR-052 | Epic 6 | 增量同步检查通用目录 |
 | FR-053 | Epic 6 | `init` 交互新增通用目录偏好，持久化到 config.json |
+
+> ⚠️ **FR 编号冲突说明**：Epic 6 使用了 FR-047~053（精细化安装控制 + 通用目录），PRD Epic 7 章节也从 FR-047 起编号（含义不同）。Epic 7 实际新增 FR 应从 **FR-054** 开始续编，待 PRD 修订确认后补全此处映射。详见 [epic-7.md](epic-7.md) 需求部分。
+
+**Epic 7 新增 NFR（待 FR 编号确认后对齐）：**
+
+| 需求 | Epic | 简述 |
+|------|------|------|
+| NFR-P6（Epic 7） | Epic 7 | 11 工具检测总耗时 < 1000ms |
+| NFR-I5 | Epic 7 | 新增工具零引擎代码改动 |
+| NFR-C7（Epic 7） | Epic 7 | v1.x→v2.0 平滑迁移，不破坏性覆盖已安装配置 |
 
 ## Epic List
 
