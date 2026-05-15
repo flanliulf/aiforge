@@ -1,6 +1,6 @@
 import ora, { type Ora } from 'ora'
 import chalk from 'chalk'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import type { InstallResult, MatchedPlan } from './types.js'
 import { InstallType } from './types.js'
 import type { AiforgeError } from './errors.js'
@@ -9,7 +9,7 @@ import { msg } from './messages.js'
 export interface Reporter {
   startPhase(name: string): void
   updatePhase(message: string): void
-  completePhase(): void
+  completePhase(message?: string): void
   reportResult(results: InstallResult): void
   reportPlan(plan: MatchedPlan): void
   reportList(dirName: string, entries: string[]): void
@@ -73,34 +73,208 @@ function resultStatsLine(installed: number, updated: number, skipped: number): s
     .replace('{skipped}', String(skipped))
 }
 
+function countResultStatuses(items: InstallResult['items']): {
+  installed: number
+  updated: number
+  skipped: number
+} {
+  return {
+    installed: items.filter((item) => item.status === 'new').length,
+    updated: items.filter((item) => item.status === 'updated').length,
+    skipped: items.filter((item) => item.status === 'skipped').length,
+  }
+}
+
+function compactResultSummary(items: InstallResult['items']): string {
+  const { installed, updated, skipped } = countResultStatuses(items)
+  const installedStr = msg('reporter.statsInstalled').replace('{n}', String(installed))
+  const updatedStr = msg('reporter.statsUpdated').replace('{n}', String(updated))
+  const skippedStr = msg('reporter.statsSkipped').replace('{n}', String(skipped))
+
+  return `${chalk.gray(msg('reporter.collapsedItems').replace('{count}', String(items.length)))}${chalk.gray(' (')}${chalk.green(installedStr)}${chalk.gray(' / ')}${chalk.blue(updatedStr)}${chalk.gray(' / ')}${chalk.yellow(skippedStr)}${chalk.gray(')')}`
+}
+
+function formatTtyWarnMessage(message: string): string {
+  if (message.trim() === '') {
+    return '\n'
+  }
+
+  const line = `${message.trimStart().startsWith('⚠') ? message : `⚠ ${message}`}\n`
+
+  if (/^\s+\d+\./.test(message)) {
+    return chalk.cyan(line)
+  }
+
+  if (!/^\s/.test(message) && /[：:]$/.test(message)) {
+    return chalk.bold.cyan(line)
+  }
+
+  if (/^\s+/.test(message)) {
+    return chalk.gray(line)
+  }
+
+  return chalk.yellow(line)
+}
+
 /** 安装结果状态图标映射（内联常量，与 core/messages.ts icons 保持一致） */
 const STATUS_ICONS: Record<string, string> = {
   new: '✅',
   updated: '🔄',
   skipped: '⏭️',
 }
+const MAX_TTY_RESULT_DETAILS_PER_TOOL = 5
+
+function withTrailingSlash(path: string): string {
+  return path.endsWith('/') ? path : `${path}/`
+}
+
+type ResultItem = InstallResult['items'][number]
+type PlanItem = MatchedPlan['items'][number]
+
+function resolveResultGroupLabel(item: ResultItem): string {
+  if (item.targetGroupLabel) {
+    return withTrailingSlash(item.targetGroupLabel)
+  }
+
+  if (item.targetGroupPath) {
+    return withTrailingSlash(item.targetGroupPath)
+  }
+
+  return withTrailingSlash(dirname(item.targetPath))
+}
+
+function resolveResultGroupKey(item: ResultItem): string {
+  return item.targetGroupPath
+    ? withTrailingSlash(item.targetGroupPath)
+    : resolveResultGroupLabel(item)
+}
+
+function resolvePlanGroupLabel(item: PlanItem): string {
+  return withTrailingSlash(item.rule.targetDir)
+}
+
+function resolvePlanGroupKey(item: PlanItem): string {
+  return withTrailingSlash(item.targetPath)
+}
+
+function groupResultItemsByToolAndTarget(items: InstallResult['items']): Array<{
+  tool: string
+  displayName: string
+  items: InstallResult['items']
+  targets: Array<{ label: string; items: InstallResult['items'] }>
+}> {
+  const byTool = new Map<
+    string,
+    {
+      displayName: string
+      items: InstallResult['items']
+      targets: Map<string, { label: string; items: InstallResult['items'] }>
+    }
+  >()
+
+  for (const item of items) {
+    const toolEntry = byTool.get(item.tool)
+    const displayName = item.toolDisplayName ?? item.tool
+    const targetKey = resolveResultGroupKey(item)
+    const targetLabel = resolveResultGroupLabel(item)
+
+    if (toolEntry) {
+      toolEntry.items.push(item)
+      const targetEntry = toolEntry.targets.get(targetKey)
+      if (targetEntry) {
+        targetEntry.items.push(item)
+      } else {
+        toolEntry.targets.set(targetKey, { label: targetLabel, items: [item] })
+      }
+    } else {
+      byTool.set(item.tool, {
+        displayName,
+        items: [item],
+        targets: new Map([[targetKey, { label: targetLabel, items: [item] }]]),
+      })
+    }
+  }
+
+  return [...byTool.entries()].map(([tool, entry]) => ({
+    tool,
+    displayName: entry.displayName,
+    items: entry.items,
+    targets: [...entry.targets.values()],
+  }))
+}
+
+function groupPlanItemsByToolAndTarget(items: MatchedPlan['items']): Array<{
+  tool: string
+  scope: 'global' | 'project'
+  items: MatchedPlan['items']
+  targets: Array<{ label: string; items: MatchedPlan['items'] }>
+}> {
+  const byTool = new Map<
+    string,
+    {
+      items: MatchedPlan['items']
+      targets: Map<string, { label: string; items: MatchedPlan['items'] }>
+    }
+  >()
+
+  for (const item of items) {
+    const toolEntry = byTool.get(item.rule.tool)
+    const targetKey = resolvePlanGroupKey(item)
+    const targetLabel = resolvePlanGroupLabel(item)
+
+    if (toolEntry) {
+      toolEntry.items.push(item)
+      const targetEntry = toolEntry.targets.get(targetKey)
+      if (targetEntry) {
+        targetEntry.items.push(item)
+      } else {
+        toolEntry.targets.set(targetKey, { label: targetLabel, items: [item] })
+      }
+    } else {
+      byTool.set(item.rule.tool, {
+        scope: item.rule.scope,
+        items: [item],
+        targets: new Map([[targetKey, { label: targetLabel, items: [item] }]]),
+      })
+    }
+  }
+
+  return [...byTool.entries()].map(([tool, entry]) => ({
+    tool,
+    scope: entry.scope,
+    items: entry.items,
+    targets: [...entry.targets.values()],
+  }))
+}
 
 // ── TtyReporter ───────────────────────────────────────────────────────────────
 
 class TtyReporter implements Reporter {
   private spinner: Ora | null = null
+  private spinnerWarnSeparated = false
 
   startPhase(name: string): void {
+    this.spinnerWarnSeparated = false
     this.spinner = ora({ text: name, stream: process.stderr }).start()
   }
 
   updatePhase(message: string): void {
     if (this.spinner) {
+      this.spinnerWarnSeparated = false
       this.spinner.text = message
     } else {
       process.stderr.write(message + '\n')
     }
   }
 
-  completePhase(): void {
+  completePhase(message?: string): void {
     if (this.spinner) {
+      if (message) {
+        this.spinner.text = message
+      }
       this.spinner.succeed()
       this.spinner = null
+      this.spinnerWarnSeparated = false
     }
   }
 
@@ -122,54 +296,55 @@ class TtyReporter implements Reporter {
    * 来源: architecture/03-core-decisions.md#D4 — stdout/stderr 分工
    */
   reportResult(results: InstallResult): void {
-    // 按工具分组
-    const byTool = new Map<string, typeof results.items>()
-    for (const item of results.items) {
-      const list = byTool.get(item.tool)
-      if (list) {
-        list.push(item)
-      } else {
-        byTool.set(item.tool, [item])
-      }
-    }
-
-    for (const [tool, items] of byTool) {
-      // 优先使用 toolDisplayName（如 'GitHub Copilot'），fallback 到内部 id
-      const displayName = items[0]?.toolDisplayName ?? tool
+    for (const group of groupResultItemsByToolAndTarget(results.items)) {
       // 工具标题：bold 显示名 + 项数（FR-036，Story 5-2 Dev Notes chalk 示例）
       process.stdout.write(
         chalk.bold(
-          `\n🔧 ${displayName} (${msg('reporter.itemCount').replace('{count}', String(items.length))})\n`,
+          `\n🔧 ${group.displayName} (${msg('reporter.itemCount').replace('{count}', String(group.items.length))})\n`,
         ),
       )
 
-      const lastIdx = items.length - 1
-      items.forEach((item, idx) => {
-        const icon = STATUS_ICONS[item.status] ?? '❓'
-        // 树形连接符：最后一项用 └──，其他用 ├──
-        const connector = idx === lastIdx ? '  └──' : '  ├──'
-        // 按状态着色：new=green, updated=blue, skipped=gray（Story 5-2 Dev Notes chalk 示例）
-        const line = `${connector} ${icon} ${item.sourcePath}     → ${item.targetPath}`
-        let coloredLine: string
-        if (item.status === 'new') {
-          coloredLine = chalk.green(line)
-        } else if (item.status === 'updated') {
-          coloredLine = chalk.blue(line)
-        } else {
-          coloredLine = chalk.gray(line)
+      for (const targetGroup of group.targets) {
+        process.stdout.write(
+          chalk.bold(
+            `  📁 ${targetGroup.label} (${msg('reporter.itemCount').replace('{count}', String(targetGroup.items.length))})\n`,
+          ),
+        )
+
+        const visibleItems = targetGroup.items.slice(0, MAX_TTY_RESULT_DETAILS_PER_TOOL)
+        const hiddenItems = targetGroup.items.slice(visibleItems.length)
+        const lastVisibleIdx = visibleItems.length - 1
+
+        visibleItems.forEach((item, idx) => {
+          const icon = STATUS_ICONS[item.status] ?? '❓'
+          // 树形连接符：若存在折叠摘要，则最后一条明细也保留 ├──，由摘要占用最终 └──
+          const connector =
+            idx === lastVisibleIdx && hiddenItems.length === 0 ? '    └──' : '    ├──'
+          // 按状态着色：new=green, updated=blue, skipped=green（跳过也属成功，保持一致的绿色）
+          const line = `${connector} ${icon} ${item.sourcePath}     → ${item.targetPath}`
+          let coloredLine: string
+          if (item.status === 'new') {
+            coloredLine = chalk.green(line)
+          } else if (item.status === 'updated') {
+            coloredLine = chalk.blue(line)
+          } else {
+            coloredLine = chalk.green(line)
+          }
+          process.stdout.write(`${coloredLine}\n`)
+        })
+
+        if (hiddenItems.length > 0) {
+          process.stdout.write(`${chalk.gray('    └── … ')}${compactResultSummary(hiddenItems)}\n`)
         }
-        process.stdout.write(`${coloredLine}\n`)
-      })
+      }
     }
 
     // 统计行（国际化）
-    const installed = results.items.filter((i) => i.status === 'new').length
-    const updated = results.items.filter((i) => i.status === 'updated').length
-    const skipped = results.items.filter((i) => i.status === 'skipped').length
+    const { installed, updated, skipped } = countResultStatuses(results.items)
     const installedStr = msg('reporter.statsInstalled').replace('{n}', String(installed))
     const updatedStr = msg('reporter.statsUpdated').replace('{n}', String(updated))
     const skippedStr = msg('reporter.statsSkipped').replace('{n}', String(skipped))
-    const statsLine = `${chalk.green(installedStr)}  ${chalk.blue(updatedStr)}  ${chalk.gray(skippedStr)}`
+    const statsLine = `${chalk.green(installedStr)}  ${chalk.blue(updatedStr)}  ${chalk.yellow(skippedStr)}`
     process.stdout.write(`\n${statsLine}\n`)
   }
 
@@ -193,42 +368,40 @@ class TtyReporter implements Reporter {
     // 标题行（国际化）
     process.stdout.write(chalk.bold(`\n${msg('reporter.planTitle')}\n`))
 
-    // 按工具分组
-    const byTool = new Map<string, typeof plan.items>()
-    for (const item of plan.items) {
-      const key = item.rule.tool
-      const list = byTool.get(key)
-      if (list) {
-        list.push(item)
-      } else {
-        byTool.set(key, [item])
-      }
-    }
-
-    for (const [tool, items] of byTool) {
+    for (const group of groupPlanItemsByToolAndTarget(plan.items)) {
       const scopeLabel =
-        items[0]!.rule.scope === 'global'
-          ? msg('reporter.scopeGlobal')
-          : msg('reporter.scopeProject')
-      process.stdout.write(chalk.yellow(`\n🔧 ${tool} (${scopeLabel})\n`))
+        group.scope === 'global' ? msg('reporter.scopeGlobal') : msg('reporter.scopeProject')
+      process.stdout.write(
+        chalk.yellow(
+          `\n🔧 ${group.tool} (${scopeLabel}, ${msg('reporter.itemCount').replace('{count}', String(group.items.length))})\n`,
+        ),
+      )
 
-      for (const item of items) {
-        const label = `[${typeLabel(item.rule.type)}/${item.mode}]`
-        process.stdout.write(chalk.dim(`  ${item.rule.sourceDir}/\n`))
+      for (const targetGroup of group.targets) {
+        process.stdout.write(
+          chalk.bold(
+            `  📁 ${targetGroup.label} (${msg('reporter.itemCount').replace('{count}', String(targetGroup.items.length))})\n`,
+          ),
+        )
 
-        const lastIdx = item.sourceFiles.length - 1
-        item.sourceFiles.forEach((srcFile, idx) => {
-          const name = basename(srcFile)
-          const prefix = idx === lastIdx ? '    └── ' : '    ├── '
-          const annotation = chalk.gray(label)
-          const fileTarget = resolveFileTarget(item.targetPath, srcFile)
-          process.stdout.write(`${prefix}${name}  → ${fileTarget}  ${annotation}\n`)
-        })
+        for (const item of targetGroup.items) {
+          const label = `[${typeLabel(item.rule.type)}/${item.mode}]`
+          process.stdout.write(chalk.dim(`    ${item.rule.sourceDir}/\n`))
 
-        // 空 sourceFiles 时仍输出规则行（说明源目录为空，国际化）
-        if (item.sourceFiles.length === 0) {
-          const emptyMsg = msg('reporter.emptySourceDir').replace('{dir}', item.rule.sourceDir)
-          process.stdout.write(chalk.dim(`    ${emptyMsg}\n`))
+          const lastIdx = item.sourceFiles.length - 1
+          item.sourceFiles.forEach((srcFile, idx) => {
+            const name = basename(srcFile)
+            const prefix = idx === lastIdx ? '      └── ' : '      ├── '
+            const annotation = chalk.gray(label)
+            const fileTarget = resolveFileTarget(item.targetPath, srcFile)
+            process.stdout.write(`${prefix}${name}  → ${fileTarget}  ${annotation}\n`)
+          })
+
+          // 空 sourceFiles 时仍输出规则行（说明源目录为空，国际化）
+          if (item.sourceFiles.length === 0) {
+            const emptyMsg = msg('reporter.emptySourceDir').replace('{dir}', item.rule.sourceDir)
+            process.stdout.write(chalk.dim(`      ${emptyMsg}\n`))
+          }
         }
       }
     }
@@ -242,6 +415,7 @@ class TtyReporter implements Reporter {
     if (this.spinner) {
       this.spinner.fail()
       this.spinner = null
+      this.spinnerWarnSeparated = false
     }
     // Story 5-4 AC #2: 三段式彩色格式（国际化 fixMethod 标签）
     // ❌ ${message} → chalk.gray(${why}) → chalk.yellow(fixMethod) → chalk.cyan(   ${cmd})
@@ -266,7 +440,11 @@ class TtyReporter implements Reporter {
   }
 
   warn(message: string): void {
-    process.stderr.write(chalk.yellow(`⚠ ${message}\n`))
+    if (this.spinner && !this.spinnerWarnSeparated) {
+      process.stderr.write('\n')
+      this.spinnerWarnSeparated = true
+    }
+    process.stderr.write(formatTtyWarnMessage(message))
   }
 }
 
@@ -297,8 +475,8 @@ class PlainReporter implements Reporter {
    * completePhase — 输出 [DONE] 阶段名 到 stderr（Story 5-3 Task 2.3, AC #1）
    * 格式: [DONE] 解析仓库地址...
    */
-  completePhase(): void {
-    process.stderr.write(`[DONE] ${this.currentPhase}\n`)
+  completePhase(message?: string): void {
+    process.stderr.write(`[DONE] ${message ?? this.currentPhase}\n`)
     this.currentPhase = ''
   }
 

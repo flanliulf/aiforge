@@ -3,17 +3,17 @@ import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { TOOL_DEFINITIONS } from '../../src/data/tool-registry.js'
 
-describe('data/tool-registry — TOOL_DEFINITIONS (AC: #2)', () => {
-  it('contains exactly 4 tool definitions', () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(4)
+describe('data/tool-registry — TOOL_DEFINITIONS (AC: #2, v2.0)', () => {
+  it('v2.0: contains exactly 3 tool definitions (vscode removed)', () => {
+    expect(TOOL_DEFINITIONS).toHaveLength(3)
   })
 
-  it('covers copilot, claude, cursor, vscode', () => {
+  it('v2.0: covers copilot, claude, cursor (no vscode)', () => {
     const ids = TOOL_DEFINITIONS.map((t) => t.id)
     expect(ids).toContain('copilot')
     expect(ids).toContain('claude')
     expect(ids).toContain('cursor')
-    expect(ids).toContain('vscode')
+    expect(ids).not.toContain('vscode')
   })
 
   it('each tool has id, name, detect.global, detect.project', () => {
@@ -55,12 +55,6 @@ describe('data/tool-registry — TOOL_DEFINITIONS (AC: #2)', () => {
     const cursor = TOOL_DEFINITIONS.find((t) => t.id === 'cursor')!
     expect(cursor.detect.global.some((p) => p.includes('.cursor'))).toBe(true)
     expect(cursor.detect.project.some((p) => p.includes('.cursor'))).toBe(true)
-  })
-
-  it('vscode detects via .vscode (global and project)', () => {
-    const vscode = TOOL_DEFINITIONS.find((t) => t.id === 'vscode')!
-    expect(vscode.detect.global.some((p) => p.includes('.vscode'))).toBe(true)
-    expect(vscode.detect.project.some((p) => p.includes('.vscode'))).toBe(true)
   })
 
   it('all tool ids are unique', () => {

@@ -514,6 +514,74 @@ CR 修复中如果修改了类型定义（interface/type/enum 的字段增删改
 安装: 7 项  更新: 1 项  跳过: 1 项
 ```
 
+**TTY 结果着色双重语义（Updated 2026-04-24）：**
+
+明细行按状态着色，汇总数字另用差异化色彩：
+
+| 元素 | 颜色 | 说明 |
+|------|------|------|
+| 明细行 `new` | `chalk.green` | 新建成功 |
+| 明细行 `updated` | `chalk.blue` | 更新成功 |
+| 明细行 `skipped` | `chalk.green` | **跳过视为成功结果，与 new 同色** |
+| 折叠摘要 / 底部统计 `安装: N 项` | `chalk.green` | |
+| 折叠摘要 / 底部统计 `更新: N 项` | `chalk.blue` | |
+| 折叠摘要 / 底部统计 `跳过: N 项` | `chalk.yellow` | **数字层面差异化，提示「需要关注的非新增量」** |
+
+禁止将明细行 skipped 着为 `chalk.gray` 或 `chalk.yellow`——会被误读为告警/被忽略状态。
+
+> 来源：Story 5-2 + Install UX 收敛（2026-04-24）。原 Story 5-2 规则为「明细行 skipped = chalk.gray」，UX 收敛中先改为 yellow（与 warn 同色，造成混淆）后定为 green（与 new 同色，体现成功语义）。
+
+**TTY 结果折叠阈值（Updated 2026-04-24）：**
+
+常量：`MAX_TTY_RESULT_DETAILS_PER_TOOL = 5`（位于 `src/core/reporter.ts`）
+
+分组规则：按「工具 → 本地安装根目录」二级分组（`targetGroupLabel` / `targetGroupPath`），每组超 5 条明细折叠：
+
+```
+🔧 Claude Code (273 项)
+  📁 .claude/skills/ (273 项)
+    ├── ⏭️ skills/tapd/.DS_Store → ...
+    ├── ⏭️ skills/tapd/SKILL.md → ...
+    ├── ⏭️ skills/tapd/...
+    ├── ⏭️ skills/tapd/...
+    └── ⏭️ skills/tapd/...
+    └── … 其余 268 项已折叠 (安装: 0 项 / 更新: 0 项 / 跳过: 268 项)
+```
+
+> 来源：Install UX 收敛（2026-04-24）。原阈值经历 12→10→5 三次调整，最终 5 项可见 + 折叠摘要被验证为单屏可读最优值。
+
+**零结果诊断双分支（Updated 2026-04-24）：**
+
+`executeInstall()` 完成后必须判定两类零结果场景，选择不同的输出通道：
+
+```typescript
+const hasActualInstall = resultItems.some(
+  (item) => item.status === 'new' || item.status === 'updated',
+)
+
+if (!hasActualInstall && resultItems.length > 0) {
+  // 分支 1：全部跳过 → 成功路径
+  reporter.completePhase(chalk.gray(msg('executeInstall.skippedOnlySummary')))
+  return { items: resultItems }
+}
+
+// 分支 2：真·零结果（resultItems.length === 0）→ 诊断警告
+diagnoseZeroResults(plan, resultItems, reporter)
+reporter.completePhase()
+```
+
+| 分支 | 触发条件 | 输出通道 | 输出文案 |
+|------|---------|---------|---------|
+| **全部跳过** | `resultItems.length > 0` 且无 `new`/`updated` | `reporter.completePhase()` 成功摘要（灰色） | `没有新增/更新文件，全部已是最新或被跳过` |
+| **真·零结果** | `resultItems.length === 0` | `reporter.warn()` 诊断（4 级颜色层级：warning/header/detail/suggestion） | 扫描目录 + 匹配规则（超 5 条折叠为「… 其余 N 项已折叠」）+ 分类建议（`noInstallSources` / `emptyDirectories`） |
+
+**关键约束：**
+- 真·零结果的修复建议**禁止包含 `--force`**——`--force` 解决冲突而非「找不到源」
+- `ZERO_RESULT_DIAG_DETAIL_THRESHOLD = 5`（位于 `src/stages/execute-install.ts`），扫描目录与匹配规则列表超 5 条均折叠
+- TTY warn 输出使用 4 级颜色层级（`formatTtyWarnMessage`）：主警告=yellow、章节头=bold.cyan、明细=gray、修复建议=cyan
+
+> 来源：Install UX 收敛（2026-04-24）。原 Story 4.5 设计为「全部 skipped 也触发零结果诊断」，UX 实测时该分支误导用户（用户已主动选 skip，再触发 warn 显得系统不理解用户意图）；改为「全部 skipped 走成功路径，仅真·零结果触发 warn」后语义自洽。
+
 **输出字符串集中管理：** 所有用户可见字符串统一通过 `src/core/messages.ts` 的 `msg()` 函数获取（Story 5-5a 将 `data/messages.ts` 迁移至 `core/messages.ts`，`data/messages.ts` 现为向后兼容 re-export 垫片）。
 
 **CLI help 文案不做国际化：** Commander `.description()` / `.option()` 描述统一使用英文硬编码，不通过 `msg()` 动态获取——Commander 在模块加载时求值 description，此时 `currentLanguage` 始终为默认值，动态获取无效。
@@ -635,6 +703,92 @@ CR 修复中如果修改了类型定义（interface/type/enum 的字段增删改
 ```
 
 > 来源：Story 5-3 CR R1 — `reportPlan()` 主数据行用双空格而非 `\t`；CR R2 — `reportResult()` 明细行已用 `\t` 但统计行仍用双空格，同一方法内两套分隔规则，两轮 CR 才全部收口。
+
+**v2.0 工具注册表变更（Story 7-1）：**
+
+- `TOOL_DEFINITIONS`：4 工具 → 3 工具（移除 `vscode`，保留 `copilot | claude | cursor`）
+- `BUILTIN_RULES`：16 条 → 19 条（+4 新规则，-1 vscode 规则）
+  - 新增：claude 全局 instructions（`~/.claude/`）
+  - 新增：claude 项目 instructions（`.claude/`）
+  - 新增：cursor 全局 agents（`~/.cursor/rules/`）
+  - 新增：copilot 项目 mcp-tools → `.vscode/`（承接原 vscode 项目级 MCP 语义）
+  - 删除：vscode 全局 mcp（`~/.vscode/`）
+- 新增/删除工具只修改 `src/data/tool-registry.ts` + `src/data/install-rules.ts`，引擎层（`src/stages/`）零改动（NFR-I5）
+
+**删除工具时必须提供一次性 migration 提示（vscodeMergedNote 模式）：**
+
+当工具从注册表删除时，若用户环境仍存在该工具的历史标志路径（如 `~/.vscode/`），必须在 `detect-tools.ts` 中通过 `reporter.warn()` 输出迁移提示。
+
+```typescript
+// detect-tools.ts：legacy 检测辅助函数 + warn 注入
+async function detectLegacyVscodeOnly(pathResolver: PathResolver): Promise<boolean> {
+  return (await pathExists(join(pathResolver.home(), '.vscode'))) &&
+    !(await pathExists(join(pathResolver.home(), '.copilot')))
+}
+
+// 在自动检测分支：新工具未检测到时输出 warn（非阻断，绝不修改 detectedTools）
+if (!detectedTools.includes('copilot') && await detectLegacyVscodeOnly(pathResolver)) {
+  reporter.warn(msg('detectTools.vscodeMergedNote'))
+}
+```
+
+约束：
+- 提示**不阻断**安装流程（不 throw，不修改 `detectedTools` 数组）
+- 绝不对历史工具目录执行任何读写操作（NFR-C7）
+- 提示内容须包含：① 新工具承接路径说明；② 明确的用户操作步骤（如 `mkdir ~/.copilot/`）
+
+**reserved-name 强制保护（claude:\*:instructions 专用）：**
+
+`claude:*:instructions` 规则的安装路径对 7 个 Claude Code 保留文件执行硬拦截，`--force` 无效：
+
+```typescript
+// src/stages/execute-install.ts — 保留文件名集合（大小写不敏感比较）
+const CLAUDE_RESERVED_NAMES = new Set([
+  'claude.md', 'claude.local.md',
+  'agents.md', 'agents.local.md',
+  'settings.json', 'settings.local.json',
+  '.claudeignore',
+])
+
+// 守卫应用于三种 InstallType（Files / Directories / Flatten）
+const destName = basename(srcPath).toLocaleLowerCase('en-US')  // locale-locked
+if (
+  item.rule.tool === 'claude' &&
+  item.rule.sourceDir === 'instructions' &&
+  CLAUDE_RESERVED_NAMES.has(destName)
+) {
+  reporter.warn(msg('executeInstall.reservedSkipWarn', { targetDir: item.targetPath }))
+  reservedSkipCount++
+  continue  // 不执行任何文件 I/O
+}
+```
+
+三种 `InstallType` **必须全部包含此守卫**，且执行顺序必须是：`validateDestPathSecurity` → **reserved-name 守卫** → `stat` / `copyFile`（安全校验先于守卫，防止路径穿越绕过）。
+
+**全 reserved-skip 时 completePhase 语义必须区分：**
+
+当本次安装的全部文件都被 reserved-name 拦截时，`completePhase` 使用黄色专属告警，而非灰色"已是最新"：
+
+```typescript
+if (!hasActualInstall && resultItems.length > 0) {
+  if (reservedSkipCount > 0 && reservedSkipCount === processedCount) {
+    // 全部被 Claude Code reserved-name 保护拦截 → 黄色告警
+    reporter.completePhase(chalk.yellow(msg('executeInstall.reservedSkippedOnlySummary')))
+  } else {
+    // 正常 skip（内容相同 / 链接已存在）→ 灰色中性
+    reporter.completePhase(chalk.gray(msg('executeInstall.skippedOnlySummary')))
+  }
+  return { items: resultItems }
+}
+```
+
+| 场景 | `completePhase` 颜色 | 语义 |
+|------|---------------------|------|
+| 全部被 reserved 拦截 | `chalk.yellow` | 告警：未执行任何写入，需用户知晓 |
+| 混合（reserved + 其他 skip） | `chalk.gray` | 中性：整体成功路径 |
+| 全部已是最新 | `chalk.gray` | 中性：无新内容 |
+
+> 来源：Story 7-1 CR R4 ID-3 — R3 修复采用方案 B（仅加聚合 warn），导致"全部被保护拦截"时仍输出灰色成功摘要，语义误导用户；R4 修复替换为方案 A（黄色专属 completePhase）。
 
 <!-- PATTERNS_APPEND_2 -->
 
@@ -1245,6 +1399,100 @@ Story 开发及 CR 修复的质量门禁验证必须使用 `npm run lint:src`（
 
 > 来源：Story 5-5c CR TODO-016 — `npm run lint` 全仓作用域包含 339 个非发布文件，导致退出码非零；Story 5-6 落地 `lint:src` 脚本后正式区分两种 lint 目标。
 
+**[CR-001] 多触点字面量修复必须全局扫描，一次性闭合所有触点：**
+
+修复包含字面量（路径名、关键词、特定字符串）的不一致问题时，禁止只修审查指出的单一位置。修复前先全局扫描，修复后再次确认无残留：
+
+```bash
+✅ # 修复前：找出所有触点
+   grep -rn "\.vscode/mcp\.json" src/ docs/ tests/ _bmad-output/
+   # 对每个命中位置评估：是历史注解（保留）还是语义不一致（需修复）
+   # 一次性提交所有需修复的触点
+
+❌ # 只修 CR 指出的具体文件
+   # → 其他触点残留，下轮 CR 继续发现，循环不止
+```
+
+> 来源：Story 7-1 CR R7→R8 — `.vscode/mcp.json` 字面量散布 4 个触点（docs/migration-v2、install-rules-matrix、Story AC、messages.ts）；R7 Fixer 只闭合前两个，R8 再次发现后两个；识别此模式为"8 轮循环的根因"。
+
+**[CR-002] 修复完成后立即 `git add`，禁止跨轮留存 unstaged 修复：**
+
+每轮修复完成后必须立即 stage，并验证无分裂：
+
+```bash
+✅ # 修复完成后立即 stage + 验证
+   git add <all-modified-files>
+   git status --short | grep -E "MM|AM"   # 期望：无输出
+   git diff --cached -- src/core/messages.ts docs/migration-v2.md  # 期望：显示本轮修复
+
+❌ # 修复完但没有 git add，等"全部确认后"再 stage
+   # git status: MM src/core/messages.ts
+   # → 复审看到最新内容，commit 却只包含旧 staged 版本，本轮全部修复丢失
+```
+
+> 来源：Story 7-1 CR R5/R6/R8 — 连续 3 轮出现 unstaged 修复；R8 的 staged/unstaged 分裂被评为 P1 交付阻塞项。
+
+**[CR-003] 每次修复后必须检查 AC 满足度不回退：**
+
+修复文案或行为时，修改完成后必须逐条对照 Story AC 确认关键文本/行为仍然存在：
+
+```bash
+✅ # 修复文案后，逐条检查 AC
+   # AC #3: 提示必须包含"如何安装 GitHub Copilot 扩展"
+   grep -n "GitHub Copilot 扩展\|GitHub Copilot extension" src/core/messages.ts
+   # → 期望：命中，否则此轮修复意外破坏了 AC #3
+
+❌ # 修复 vscodeMergedNote 文案对齐时，删除了 ② 项"安装扩展"
+   # → AC #3 被意外破坏，下轮 CR 升级为 P1 阻塞项
+```
+
+> 来源：Story 7-1 CR R4→R5 — R4 修复文档对齐时意外删除 vscodeMergedNote ② 项"安装 GitHub Copilot 扩展"，直接导致 AC #3 回归，R5 必须再修一轮。
+
+**[CR-004] 回归保护测试断言必须精确到关键词，禁止使用宽泛正则：**
+
+注释为"防止文案回归"或"AC #X 保护"的测试断言，必须精确到 AC 要求的关键短语：
+
+```typescript
+✅ // AC #3: 提示内容必须包含"如何安装 GitHub Copilot 扩展"（防止文案回归）
+   expect(String(vscodeMergedCall![0])).toContain('GitHub Copilot 扩展')
+   // 心算验证：如果把 ② 项"安装扩展"删掉，这条断言会失败 ✅
+
+❌ // 太宽泛——删除"安装扩展"后文案仍含"Copilot 项目级规则"，断言仍通过
+   expect(String(vscodeMergedCall![0])).toMatch(/Copilot/i)
+```
+
+自查方法：心算"如果把 AC 要求的文案删掉，断言还会通过吗？"若答案是"会"，断言不够强。
+
+> 来源：Story 7-1 CR R5→R6 — vscodeMergedNote 回归保护用 `.toMatch(/Copilot/i)`，AC #3 再次被删时断言仍通过；R6 升级为 `.toContain('GitHub Copilot 扩展')` 才真正形成门禁。
+
+**[CR-005] CR 超过 4 轮未通过时，Evaluator 必须主动诊断根因并给出突围路径：**
+
+当 CR 达到第 5 轮仍未通过，Evaluator 必须完成三件事：
+
+1. **根因分析**：指出"为何同类问题反复出现"（根因，不是症状）
+2. **突围路径**：给出 Fixer 的具体行动指引（如"执行全局 grep + 一次性闭合所有触点"）
+3. **严重性重评**：对本轮发现重新评级，避免非阻塞项被审查疲劳放大
+
+禁止：轮数 ≥5 时仍只做"本轮发现有效/无效"的逐条确认而不给突围路径。
+
+> 来源：Story 7-1 CR R8 评估 — 第 8 轮主动诊断"多触点字面量未全局扫描"为根因，给出全局 grep + 一次性闭合的突围路径，R9 完整执行后一轮通过。此前 7 轮均为逐条确认，循环不止。
+
+**[CR-006] 每轮修复执行记录必须包含质量门禁三件套的执行结果（补充：必须记录完整运行结果）：**
+
+本条是已有「CR 修复后必须执行完整质量门禁三件套」规则的补充约束：缺少完整运行结果会导致 Auditor 将"缺质量门禁记录"列为阻塞项，制造额外 CR 轮次。记录格式：
+
+```
+| 检查项 | 结果 |
+|--------|------|
+| npm run lint:src | ✅ All matched files use Prettier code style! |
+| npm run build    | ✅ ESM 136.26 KB |
+| npm test         | ✅ 853/853 passed (33 test files) |
+```
+
+即使修改内容看似与测试无关也必须重新执行（文档类修改不能"借用"上轮结果）。
+
+> 来源：Story 7-1 CR R8 Finding #4 — R7 修复记录只记录局部测试（24 tests），未记录全量 npm test/lint/build，被 Auditor 列为 P3 阻塞项需另轮修复。
+
 ### Enforcement Guidelines
 
 **所有 AI Agent 必须遵守：**
@@ -1256,4 +1504,17 @@ Story 开发及 CR 修复的质量门禁验证必须使用 `npm run lint:src`（
 5. ESM 导入路径必须带 `.js` 扩展名
 6. 命名导出，不用默认导出（工具配置文件如 `tsup.config.ts`、`vitest.config.ts` 豁免）
 7. **当 story Dev Notes 中的代码片段与架构文档（`architecture/*.md`）存在差异时，以架构文档为准。** Story 代码片段仅为示意，不保证字段的 optional/required 标记完整
+
+---
+
+## 后续修订（2026-04-24 UX 收敛）
+
+> 本次修订源于安装阶段 UX 收敛（spinner 修复、明细折叠阈值、零结果诊断分支拆分、TTY 颜色层级）。
+> 已原地更新上文 CLI Output Patterns 区域，本块保留变更对照供审计追溯。
+
+| 章节 / 项 | 变更前 | 变更后 | 依据 |
+|----------|--------|--------|------|
+| CLI Output Patterns — 结果状态图标 | 仅列出图标类型，未明确颜色语义 | 新增「TTY 结果着色双重语义」表：明细行 new/updated/skipped = green/blue/green；汇总数字 安装/更新/跳过 = green/blue/yellow | 代码 `src/core/reporter.ts` |
+| CLI Output Patterns — 折叠阈值 | 未设定 | 新增「TTY 结果折叠阈值」区域：`MAX_TTY_RESULT_DETAILS_PER_TOOL = 5`，工具+本地根二级分组 | 代码 `src/core/reporter.ts` |
+| CLI Output Patterns — 零结果诊断 | 未拆分零结果与全部跳过两种场景 | 新增「零结果诊断双分支」区域：拆为真·零结果（warn）与全部跳过（completePhase 成功路径）；修复建议禁含 `--force`；diag 明细超 5 条折叠 | 代码 `src/stages/execute-install.ts`、`src/core/messages.ts` |
 

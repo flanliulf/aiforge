@@ -1,10 +1,12 @@
 # Install Rules Matrix | 安装规则矩阵
 
-Complete reference of all built-in install rules in aiforge: 16 tool-specific rules + 4 universal directory rules.
+Complete reference of all built-in install rules in aiforge v2.0: 19 tool-specific rules + 4 universal directory rules.
+
+> **v2.0 Breaking Change**: The `vscode` tool has been removed. VS Code MCP configuration is now managed via the `copilot` project-level rule. See [migration-v2.md](migration-v2.md) for upgrade instructions.
 
 ## Overview | 概览
 
-aiforge maps **4 resource types** from the knowledge repository to **4 AI tools** across **2 scopes** (global/project), using **3 install modes** (Files/Directories/Flatten). Additionally, **4 universal directory rules** provide tool-agnostic access via `.agents/` and `.agent/`.
+aiforge maps **4 resource types** from the knowledge repository to **3 AI tools** across **2 scopes** (global/project), using **3 install modes** (Files/Directories/Flatten). Additionally, **4 universal directory rules** provide tool-agnostic access via `.agents/` and `.agent/`.
 
 ## Full Matrix | 完整矩阵
 
@@ -20,6 +22,7 @@ aiforge maps **4 resource types** from the knowledge repository to **4 AI tools*
 | project | `skills/` | Directories | `.github/skills/` | Project-level skill packages |
 | project | `instructions/` | Files | `.github/` | Project-level instructions |
 | project | `mcp-tools/` | Files | `.github/` | Project-level MCP configurations |
+| project | `mcp-tools/` | Files | `.vscode/` | VS Code project MCP config (filename follows source in `mcp-tools/`) — v2.0 |
 
 ### Claude Code
 
@@ -27,22 +30,19 @@ aiforge maps **4 resource types** from the knowledge repository to **4 AI tools*
 |-------|-----------|:------------:|------------|-------------|
 | global | `agents/` | Files | `~/.claude/agents/` | Sub-agent definitions |
 | global | `skills/` | Directories | `~/.claude/skills/` | Skill packages |
+| global | `instructions/` | Files | `~/.claude/` | Global instruction files — v2.0 |
 | project | `agents/` | Files | `.claude/agents/` | Project-level sub-agents |
 | project | `skills/` | Directories | `.claude/skills/` | Project-level skills |
+| project | `instructions/` | Files | `.claude/` | Project-level instruction files — v2.0 |
 
 ### Cursor
 
 | Scope | Source Dir | Install Type | Target Dir | Description |
 |-------|-----------|:------------:|------------|-------------|
+| global | `agents/` | Files | `~/.cursor/rules/` | Global agent files as rules — v2.0 |
 | global | `skills/` | Flatten | `~/.cursor/rules/` | Skills flattened to rule files |
 | project | `skills/` | Flatten | `.cursor/rules/` | Project skills flattened to rules |
 | project | `agents/` | Files | `.cursor/rules/` | Agent files as rules |
-
-### VS Code
-
-| Scope | Source Dir | Install Type | Target Dir | Description |
-|-------|-----------|:------------:|------------|-------------|
-| global | `mcp-tools/` | Files | `~/.vscode/` | MCP server configurations |
 
 ### Universal Directories
 
@@ -100,21 +100,22 @@ skills/                          ~/.cursor/rules/
 
 | Tool | Global Rules | Project Rules | Total |
 |------|:-----------:|:------------:|:-----:|
-| GitHub Copilot | 4 | 4 | **8** |
-| Claude Code | 2 | 2 | **4** |
-| Cursor | 1 | 2 | **3** |
-| VS Code | 1 | 0 | **1** |
+| GitHub Copilot | 4 | 5 | **9** |
+| Claude Code | 3 | 3 | **6** |
+| Cursor | 2 | 2 | **4** |
 | Universal | 0 | 4 | **4** |
-| **Total** | **8** | **12** | **20** |
+| **Total** | **9** | **14** | **23** |
+
+> Note: `vscode` tool removed in v2.0. Universal rules (4) are separate from the 19 tool-specific rules.
 
 ## Resource Type Coverage | 资源类型覆盖
 
-| Resource | Copilot | Claude | Cursor | VS Code |
-|----------|:-------:|:------:|:------:|:-------:|
-| Agents | ✅ G+P | ✅ G+P | ✅ P | — |
-| Skills | ✅ G+P | ✅ G+P | ✅ G+P | — |
-| Instructions | ✅ G+P | — | — | — |
-| MCP Tools | ✅ G+P | — | — | ✅ G |
+| Resource | Copilot | Claude | Cursor |
+|----------|:-------:|:------:|:------:|
+| Agents | ✅ G+P | ✅ G+P | ✅ G+P |
+| Skills | ✅ G+P | ✅ G+P | ✅ G+P |
+| Instructions | ✅ G+P | ✅ G+P | — |
+| MCP Tools | ✅ G+P | — | — |
 
 G = Global, P = Project
 

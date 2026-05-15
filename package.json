@@ -1,6 +1,6 @@
 {
   "name": "aiforge",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "AI rules installer - sync AI tool configurations from a knowledge repository",
   "type": "module",
   "engines": {

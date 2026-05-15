@@ -249,6 +249,14 @@ describe('TtyReporter.reportPlan', () => {
     expect(allOutput).toContain('cursor')
   })
 
+  it('AC #2: 工具下按本地安装主目录分组显示', () => {
+    reporter.reportPlan(createTestPlan())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('📁 ~/.copilot/agents/')
+    expect(allOutput).toContain('📁 ~/.copilot/skills/')
+    expect(allOutput).toContain('📁 ~/.claude/agents/')
+  })
+
   it('AC #2: 每行包含源文件名和目标路径', () => {
     reporter.reportPlan(createSingleToolPlan())
     const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')

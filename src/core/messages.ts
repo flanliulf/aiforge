@@ -88,6 +88,7 @@ interface MessageSet {
     scopeGlobal: string
     scopeProject: string
     emptySourceDir: string
+    collapsedItems: string
     fixMethod: string
     statsInstalled: string
     statsUpdated: string
@@ -203,16 +204,26 @@ interface MessageSet {
     linkProjectRejectedWhy: string
   }
   executeInstall: {
+    skippedOnlySummary: string
     zeroResultsWarning: string
     diagHeader: string
     diagScannedDirs: string
     diagMatchedRules: string
+    diagNoInstallSources: string
+    diagEmptyDirectories: string
     diagAllSkipped: string
     suggestHeader: string
+    suggestCheckSelection: string
+    suggestCheckRepoContent: string
+    suggestCheckEmptyDirectories: string
+    suggestCheckDirectoryContents: string
     suggestForce: string
     suggestCheckRepo: string
     brokenLink: string
     flattenMissingMainFile: string
+    claudeInstructionsReservedSkip: string
+    reservedSkippedSummary: string
+    reservedSkippedOnlySummary: string
   }
   conflictResolver: {
     conflictMessage: string
@@ -247,6 +258,7 @@ interface MessageSet {
     noToolsErrorWhy: string
     fixInstallTools: string
     fixSupportedTools: string
+    vscodeMergedNote: string
   }
   authenticate: {
     argConflict: string
@@ -349,6 +361,7 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       scopeGlobal: '全局',
       scopeProject: '项目',
       emptySourceDir: '(源目录为空: {dir})',
+      collapsedItems: '其余 {count} 项已折叠',
       fixMethod: '修复方法：',
       statsInstalled: '安装: {n} 项',
       statsUpdated: '更新: {n} 项',
@@ -465,16 +478,29 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       linkProjectRejectedWhy: '-l/--link 仅支持全局安装模式（-g）',
     },
     executeInstall: {
+      skippedOnlySummary: '执行安装... 没有新增/更新文件，全部已是最新或被跳过',
       zeroResultsWarning: '⚠️ 未安装任何文件',
       diagHeader: '诊断信息：',
       diagScannedDirs: '  扫描目录: {dirs}',
       diagMatchedRules: '  匹配规则: {rules} ({count} 条)',
+      diagNoInstallSources: '  未发现匹配当前条件的可安装文件',
+      diagEmptyDirectories: '  匹配到的目录中未发现实际文件',
       diagAllSkipped: '  所有文件已是最新或被跳过',
-      suggestHeader: '建议：',
+      suggestHeader: '如果你预期本次应有更新，可尝试：',
+      suggestCheckSelection: '  1. 检查 --dirs / --filter / --tools 条件是否过窄',
+      suggestCheckRepoContent: '  2. 检查知识仓库中所选目录是否包含可安装文件',
+      suggestCheckEmptyDirectories: '  1. 检查知识仓库中的目标目录是否为空',
+      suggestCheckDirectoryContents: '  2. 确认目录内包含实际文件，而不是空目录',
       suggestForce: '  1. 使用 --force 强制重新安装',
       suggestCheckRepo: '  2. 检查知识仓库是否有新内容',
       brokenLink: '⚠️ 断链: {targetPath} → 目标文件不存在',
       flattenMissingMainFile: '⚠️ flatten: {srcDir}/ 中未找到 {mainFile}，跳过',
+      claudeInstructionsReservedSkip:
+        '⚠️ 跳过保留文件 {name}（目标目录: {targetDir}）— Claude Code 保留文件不允许被 aiforge 覆盖（即便 --force 也跳过）',
+      reservedSkippedSummary:
+        '⚠️ {count} 个 Claude Code 保留文件被拦截，未写入目标目录（--force 对此无效）',
+      reservedSkippedOnlySummary:
+        '⚠️ 全部源文件均被 Claude Code reserved-name 保护拦截，未执行任何写入（--force 对此无效）',
     },
     conflictResolver: {
       conflictMessage: '⚠️ 文件冲突: {target} 已存在（用户手写文件）',
@@ -501,14 +527,20 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       globalFlag: '  全局: {path} (不存在)',
       projectFlag: '  项目: {path} (不存在)',
       suggestionsHeader: '建议：',
-      suggestion1: '  1. 安装 GitHub Copilot、Claude Code、Cursor 或 VS Code',
+      suggestion1: '  1. 安装 GitHub Copilot、Claude Code 或 Cursor',
       suggestion2: '  2. 使用 --tools {tools} 手动指定工具',
       unknownTool: '未知的工具 ID: {id}',
       unknownToolWhy: '工具 ID "{id}" 在注册表中不存在',
       noToolsError: '未检测到任何 AI 编码工具',
       noToolsErrorWhy: '在全局目录和项目目录中均未找到支持工具的标志文件',
-      fixInstallTools: '安装 GitHub Copilot、Claude Code、Cursor 或 VS Code',
+      fixInstallTools: '安装 GitHub Copilot、Claude Code 或 Cursor',
       fixSupportedTools: '支持的工具: {tools}',
+      vscodeMergedNote:
+        '⚠️ 检测到 ~/.vscode/ 但未检测到 ~/.copilot/。从 v2.0 起 VS Code 已归并到 GitHub Copilot 语境。\n' +
+        '  ① VS Code MCP 现由 Copilot 项目级规则承接（目标路径 .vscode/，常见文件名 mcp.json；具体文件名沿用 mcp-tools/ 源目录）\n' +
+        '  ② 安装 GitHub Copilot 扩展\n' +
+        '  ③ 创建 ~/.copilot/ 作为 aiforge 标识目录后重新执行 aiforge install\n' +
+        '  ④ 现有 ~/.vscode/ 文件不会被覆盖或删除',
     },
     authenticate: {
       argConflict: '--ssh 和 --token 不能同时使用',
@@ -607,6 +639,7 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       scopeGlobal: 'global',
       scopeProject: 'project',
       emptySourceDir: '(source directory is empty: {dir})',
+      collapsedItems: '{count} more items collapsed',
       fixMethod: 'Fix:',
       statsInstalled: 'Installed: {n}',
       statsUpdated: 'Updated: {n}',
@@ -728,16 +761,33 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       linkProjectRejectedWhy: '-l/--link only supports global installation mode (-g)',
     },
     executeInstall: {
+      skippedOnlySummary:
+        'Executing install... No new or updated files; all items are already up-to-date or skipped',
       zeroResultsWarning: '⚠️ No files were installed',
       diagHeader: 'Diagnostics:',
       diagScannedDirs: '  Scanned directories: {dirs}',
       diagMatchedRules: '  Matched rules: {rules} ({count} rules)',
+      diagNoInstallSources: '  No installable files matched the current selection',
+      diagEmptyDirectories: '  Matched directories did not contain any actual files',
       diagAllSkipped: '  All files are up-to-date or skipped',
-      suggestHeader: 'Suggestions:',
+      suggestHeader: 'If you expected updates in this run, you can try:',
+      suggestCheckSelection: '  1. Check whether --dirs / --filter / --tools is too restrictive',
+      suggestCheckRepoContent:
+        '  2. Check whether the selected directories in the knowledge repository contain installable files',
+      suggestCheckEmptyDirectories:
+        '  1. Check whether the matched directories in the knowledge repository are empty',
+      suggestCheckDirectoryContents:
+        '  2. Confirm the directories contain actual files instead of only empty folders',
       suggestForce: '  1. Use --force to force reinstall',
       suggestCheckRepo: '  2. Check if the knowledge repository has new content',
       brokenLink: '⚠️ Broken link: {targetPath} → target file does not exist',
       flattenMissingMainFile: '⚠️ flatten: {mainFile} not found in {srcDir}/, skipping',
+      claudeInstructionsReservedSkip:
+        '⚠️ Skipping reserved file {name} (target directory: {targetDir}) — Claude Code reserved files cannot be overwritten by aiforge (even with --force)',
+      reservedSkippedSummary:
+        '⚠️ {count} Claude Code reserved file(s) blocked and not written (--force has no effect on these)',
+      reservedSkippedOnlySummary:
+        '⚠️ All source files were blocked by Claude Code reserved-name protection; no writes performed (--force has no effect)',
     },
     conflictResolver: {
       conflictMessage: '⚠️ File conflict: {target} already exists (user-written file)',
@@ -765,14 +815,20 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       globalFlag: '  global: {path} (not found)',
       projectFlag: '  project: {path} (not found)',
       suggestionsHeader: 'Suggestions:',
-      suggestion1: '  1. Install GitHub Copilot, Claude Code, Cursor, or VS Code',
+      suggestion1: '  1. Install GitHub Copilot, Claude Code, or Cursor',
       suggestion2: '  2. Use --tools {tools} to specify tools manually',
       unknownTool: 'Unknown tool ID: {id}',
       unknownToolWhy: 'Tool ID "{id}" does not exist in the registry',
       noToolsError: 'No AI coding tools detected',
       noToolsErrorWhy: 'No tool marker files found in global or project directories',
-      fixInstallTools: 'Install GitHub Copilot, Claude Code, Cursor, or VS Code',
+      fixInstallTools: 'Install GitHub Copilot, Claude Code, or Cursor',
       fixSupportedTools: 'Supported tools: {tools}',
+      vscodeMergedNote:
+        '⚠️ Detected ~/.vscode/ without ~/.copilot/. Since v2.0, VS Code has been merged into the GitHub Copilot context.\n' +
+        '  ① VS Code MCP is now handled by the Copilot project-level rule (target: .vscode/, typically mcp.json; filename follows mcp-tools/ source)\n' +
+        '  ② Install the GitHub Copilot extension\n' +
+        '  ③ Create ~/.copilot/ as an aiforge marker, then re-run aiforge install\n' +
+        '  ④ Existing ~/.vscode/ files will not be overwritten or deleted',
     },
     authenticate: {
       argConflict: '--ssh and --token cannot be used together',

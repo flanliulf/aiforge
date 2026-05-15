@@ -167,6 +167,9 @@ index.ts → pipeline.ts → stages/* → services/*
 - Progress phase names: verb + object in Chinese (`"解析仓库地址..."`, `"克隆仓库..."`)
 - Result icons: `✅` new, `🔄` updated, `⏭️` skipped
 - Stats line: `安装: N 项  更新: N 项  跳过: N 项`
+- **TTY 结果着色双重语义（Updated 2026-04-24）：** 明细行按状态着色 — `new=chalk.green` / `updated=chalk.blue` / `skipped=chalk.green`（明细行 skipped 视为成功结果，与 new 同色）；汇总数字着色 — 折叠摘要与底部统计行的 `跳过: N 项` 数字使用 `chalk.yellow`（提供视觉差异化）。**禁止**将明细行 skipped 着为 gray 或 yellow——会被误读为告警/被忽略状态。
+- **TTY 结果折叠阈值（Updated 2026-04-24）：** `MAX_TTY_RESULT_DETAILS_PER_TOOL = 5`，按「工具 → 本地安装根目录」二级分组，每组超过 5 条明细折叠为 `… 其余 N 项已折叠 (安装: X / 更新: Y / 跳过: Z)`。
+- **零结果诊断双分支（Updated 2026-04-24）：** `executeInstall()` 完成后判定结果：(1) **真·零结果**（`resultItems.length === 0`）→ 调用 `reporter.warn()` 输出诊断（扫描目录 / 匹配规则 / 修复建议，超 5 条折叠），分 `noInstallSources` / `emptyDirectories` 两个子类，**修复建议禁止包含 `--force`**；(2) **全部跳过**（无 new/updated 但 `resultItems.length > 0`）→ 视为成功路径，调用 `reporter.completePhase(chalk.gray(skippedOnlySummary))`，**不**触发 warn 诊断。
 - Output strings centralized in `core/messages.ts` (moved from `data/messages.ts` in Story 5-5a — `data/messages.ts` now re-exports for backward compatibility)
 - **i18n 字符串覆盖完整性：** 实现多语言输出时，`AiforgeError.fix[]`、`reporter.warn()` 文案、Reporter 量词/标签（如 `(N 项)`）、诊断输出（如 `emitDiagnostics`）与 `message`/`why` 字段具有**同等用户可见性**，必须全部接入 `msg()`。禁止只国际化主展示字段而遗漏 `fix[]` 或量词。实现完成后，按以下清单逐项自查：(1) `AiforgeError.fix[]` 数组 → 全接入 `msg()`？(2) `reporter.warn()` 所有调用点 → 全接入 `msg()`？(3) Reporter 量词/标签（如 `(${n} 项)`）→ 使用模板键？(4) 诊断输出 → 接入 `msg()`？(5) CLI help 文案 → 英文硬编码（不做国际化）？（来源：Story 5-5a CR R1~R5 — 每轮修复后仍被发现新的中文残留，原因均是分层遗漏 fix[]/warn/量词）
 - **子命令独立语言初始化：** 具有独立 `action()` handler 的子命令（如 `aiforge init`）不走主管道的语言预加载路径（`index.ts` 的 `setLanguage(config.language)` 仅覆盖主命令路径）。子命令 handler 必须在自己内部完成 `setLanguage()` 初始化，时机为 `loadConfig()` 成功后、首次用户可见输出之前。（来源：Story 5-5a CR R2 — `init` 子命令有独立 `action()`，`config.language = 'en'` 时运行 `aiforge init` 仍先输出中文配置摘要）
@@ -228,6 +231,12 @@ index.ts → pipeline.ts → stages/* → services/*
 - **CR 修复验证结论必须可独立复现：** CR 修复记录中的"验证通过"结论必须附带可独立复现的验证命令和输出摘要（如测试通过数、lint 状态）。禁止只写"✅ npm run lint 通过"而不附带任何证据。后续审查轮次必须能通过重新执行相同命令来验证结论的真实性。修复记录中如果声称验证通过，但下一轮审查独立执行后发现未通过，视为修复记录不合规。（来源：Story 4-6b CR R1→R2 — R1 修复记录声称"npm run lint ✅ 通过"，但 R2 审查独立执行后发现 lint 实际未通过，说明 R1 验证结论不可靠）
 - **Rule Document Registry 同步时必须扫描示例代码块和格式示例，不限于文字规则段落：** 执行 Rule Document Registry 三文档同步时，除更新文字规则段落外，还必须检查：(1) **示例代码块**（`` ``` `` 块内的接口签名、类型定义、枚举值）；(2) **格式示例/图标枚举**（如 Result icons 枚举列表、统计行格式示例）。搜索关键词：同步目标的字段名、枚举值、状态词（如 `failed`、`InstallResult`）。遗漏"非文字规则"内容是多轮 CR 中持续出现的同步缺口。（来源：Story 5-2 CR R1 — `failed` 图标/统计行示例未同步；R2 — `InstallResult[]` 接口示例未同步，均属文字规则已同步但示例内容遗漏的模式）
 - **lint 门禁作用域必须使用 `npm run lint:src`：** Story 开发及 CR 修复的质量门禁验证必须使用 `npm run lint:src`（作用域：`src/` + `tests/`），而非 `npm run lint`（全仓，包含外部 AI 工具目录等非发布产物）。Dev Agent Record 中声称 "lint 通过" 时，必须注明执行的是 `npm run lint:src`。`npm run lint` 用于确认全仓无 Prettier 污染，在发布前和 `.prettierignore` 修改后执行。（来源：Story 5-5c CR TODO-016，Story 5-6 落地 `lint:src` 脚本）
+- **[CR-001] 多触点字面量修复必须全局扫描，一次性闭合所有触点：** 修复包含字面量（路径名、关键词、特定字符串）的不一致问题时，禁止只修审查指出的单一位置。修复前必须执行 `grep -rn "<字面量>" src/ docs/ tests/ _bmad-output/` 找出所有触点，在一次修复中一并闭合；修复后再次执行相同 grep 确认无残留。**这是 CR 多轮循环的第一根因**：同一字面量分散于代码/文档/Story AC/测试等多处，每轮只修部分触点，下轮继续被发现。（来源：Story 7-1 CR R7→R8 — `.vscode/mcp.json` 字面量散布 4 个触点：docs/migration-v2、docs/install-rules-matrix、Story AC、messages.ts；R7 Fixer 只闭合前两个，R8 再次发现后三个，导致 8 轮循环）
+- **[CR-002] 修复完成后立即 `git add`，禁止跨轮留存 unstaged 修复：** 每轮修复完成后必须立即执行 `git add`，并通过 `git status --short | grep -E "MM|AM"` 确认无 staged/unstaged 分裂；用 `git diff --cached` 验证 staged 内容包含本轮全部修复。禁止等到"最终确认"才 stage，一旦有 `MM`/`AM` 标记即为交付阻塞项——复审看到最新工作区内容，但 commit 只会包含旧的 staged 内容，导致所有修复丢失。（来源：Story 7-1 CR R5/R6/R8 — R5 新增文档未 stage；R6 R5 全部代码修复未 stage；R8 R7 全部修复均为 unstaged，连续 3 次发生相同问题）
+- **[CR-003] 每次修复后必须检查 AC 满足度不回退：** 修复某项问题时，必须同步检查所有 Story AC 的满足状态，确保没有意外破坏其他 AC 的关键文本或行为。文案类修复（messages.ts、migration 文档）和删减类修复尤其高危——修改时极易将满足某条 AC 的文本连带删除。自查方式：对照 Story AC 逐条确认关键词/行为仍然存在于实现代码中。（来源：Story 7-1 CR R4→R5 — R4 修复 vscodeMergedNote 文案对齐时，意外删除了 ② 项「安装 GitHub Copilot 扩展」指引，直接导致 AC #3 明文契约被破坏，R5 升级为 P1 阻塞项）
+- **[CR-004] 回归保护测试断言必须精确到关键词，禁止使用宽泛正则：** 注释为"防止文案回归"或"AC #X 保护"的测试断言，必须精确到 AC 要求的关键短语（如 `toContain('GitHub Copilot 扩展')`），而非宽泛正则（`/Copilot/i`）。自查方法：心算"如果把 AC 要求的文案删掉，断言还会通过吗？"若答案是"会"，则断言不够强，必须加精确关键词。（来源：Story 7-1 CR R5→R6 — vscodeMergedNote 回归保护用 `.toMatch(/Copilot/i)`，删除 ② 项"安装扩展"后文案仍含 "Copilot 项目级规则"，断言仍通过，R6 才将断言改为 `.toContain('GitHub Copilot 扩展')`）
+- **[CR-005] CR 超过 4 轮未通过时，Evaluator 必须主动诊断根因并给出突围路径：** 当 CR 达到第 5 轮仍未通过，Evaluator 不得仅逐条确认"本轮发现有效/无效"，必须：① 分析"为何同类问题反复出现"（根因，而非症状）；② 给出 Fixer 的具体行动指引（如"执行全局 grep + 一次性闭合所有触点"）；③ 对本轮发现进行严重性重新评估（避免审查疲劳导致非阻塞项被过度放大）。**沉默型确认只会延长循环**；根因诊断 + 突围路径是破局的关键。（来源：Story 7-1 CR R8 评估 — 第 8 轮明确诊断"多触点字面量未全局扫描"为根因，给出全局 grep + 一次性闭合的突围路径，R9 完整执行后一轮通过）
+- **[CR-006] 每轮修复执行记录必须包含质量门禁三件套的执行结果：** 每轮修复完成后必须运行 `npm run lint:src && npm run build && npm test`，并将结果写入该轮评估文件的「修复执行记录」章节，格式：lint ✅/❌、build ✅ XX KB / ❌、test ✅ NNN/NNN passed / ❌。禁止省略或复用上轮结果——即使修改内容看似与测试无关也必须重新执行。缺少记录会导致下轮 Auditor 将"缺质量门禁记录"列为阻塞项，制造额外 CR 轮次。（来源：Story 7-1 CR R8 Finding #4 — R7 修复记录只记载局部测试（24 测试），未记录全量 npm test/lint/build，被 Auditor 列为阻塞项；Story 7-1 CR R8→R9 修复后补录 853/853 全量通过才闭合）
 
 ### Install Rules Data Architecture
 
@@ -236,6 +245,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - Tool detection: data-driven `TOOL_DEFINITIONS` registry (not hardcoded functions)
 - Path resolution: `PathResolver` interface centralizes all platform-specific paths
 - **Adding a new AI tool = add data to registry + add rules to BUILTIN_RULES, no engine changes**
+- **v2.0 (Story 7-1)**: `vscode` tool removed from `TOOL_DEFINITIONS`; supported tools = `copilot | claude | cursor` (3 tools). `BUILTIN_RULES` count: 16 → 19 (+4 new rules, -1 vscode rule). New rules: claude global/project instructions, cursor global agents, copilot project mcp-tools → `.vscode/`. Reserved name protection added to `execute-install.ts` for `claude:*:instructions` chain. Full reserved-name set (case-insensitive, 7 items): `claude.md`, `claude.local.md`, `agents.md`, `agents.local.md`, `settings.json`, `settings.local.json`, `.claudeignore`. Protection applies to all three InstallType (Files / Directories / Flatten) for `claude:*:instructions`; `--force` has no effect on reserved-name skips. When all source files are blocked by reserved-name protection, `completePhase` outputs the dedicated yellow `reservedSkippedOnlySummary` instead of the generic gray skipped summary.
 
 ### Critical Don't-Miss Rules
 
@@ -265,4 +275,19 @@ index.ts → pipeline.ts → stages/* → services/*
 - Update when technology stack or patterns change
 - Remove rules that become obvious over time
 
-Last Updated: 2026-04-01
+Last Updated: 2026-04-24
+
+---
+
+## 后续修订（2026-04-24 UX 收敛）
+
+> 本次修订源于安装阶段 UX 收敛（spinner 修复、明细折叠阈值、零结果诊断分支拆分、TTY 颜色层级）。
+> 已原地更新上文 Output Rules 区域，本块保留变更对照供审计追溯。
+
+| 章节 / 项 | 变更前 | 变更后 | 依据 |
+|----------|--------|--------|------|
+| Output Rules — Result icons 后续颜色规则 | 未明确明细行 skipped 颜色，Story 5-2 隐式约定 `chalk.gray` | 明细行 skipped = `chalk.green`（与 new 同色）；折叠摘要 + 底部统计行 `跳过: N 项` 数字 = `chalk.yellow`（双重语义） | 代码 `src/core/reporter.ts` L94/L323-333/L347；测试 `tests/core/reporter.test.ts` |
+| Output Rules — TTY 折叠阈值 | 未设定全局阈值 | `MAX_TTY_RESULT_DETAILS_PER_TOOL = 5`，工具+本地根二级分组 | 代码 `src/core/reporter.ts` |
+| Output Rules — 零结果诊断 | 「安装结果为 0 项」一带「全部跳过」混合触发 | 双分支：真·零结果（`resultItems.length===0`）→ `reporter.warn()` 诊断；全部跳过（>0 但无 new/updated）→ `completePhase(chalk.gray(skippedOnlySummary))` 成功路径 | 代码 `src/stages/execute-install.ts` L685-695；测试 `tests/stages/execute-install.test.ts`、`tests/integration/edge-cases.test.ts` |
+| Output Rules — 修复建议 | 例示含「使用 --force 强制重新安装」 | 真·零结果建议禁含 `--force`（该选项解决冲突、不解决「找不到源」） | 代码 `src/core/messages.ts` `executeInstall.suggest*` |
+| Reporter Lifecycle | authenticate / clone 阶段 spinner 可能不闭合 | 两阶段补齐 `completePhase()`；新增 `spinnerWarnSeparated` 避免同一 spinner 下连续 warn 双换行 | 代码 `src/core/reporter.ts`、`src/stages/authenticate.ts`、`src/stages/clone.ts` |

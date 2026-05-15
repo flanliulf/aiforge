@@ -4,6 +4,7 @@ import type { ToolDefinition } from '../core/types.js'
  * AI 工具检测注册表 — 基于标志性文件/目录存在性检测，不依赖工具进程（NFR-I3）
  *
  * 来源: architecture/03-core-decisions.md#D5
+ * v2.0 变更: VS Code 归并到 GitHub Copilot 语境（Breaking Change）
  */
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
@@ -28,14 +29,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     detect: {
       global: ['~/.cursor'],
       project: ['.cursor'],
-    },
-  },
-  {
-    id: 'vscode',
-    name: 'VS Code',
-    detect: {
-      global: ['~/.vscode'],
-      project: ['.vscode'],
     },
   },
 ]

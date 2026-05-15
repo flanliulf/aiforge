@@ -565,7 +565,7 @@ describe('Story 5.5b AC #3: dry-run 一致性测试（真实安装流程）', ()
   it('Task 4.3: dry-run 计划的 flatten 完整目标路径与实际安装结果一致（含重命名规则）', async () => {
     const { basename: pathBasename, join: nodeJoin } = await import('node:path')
 
-    // Step 1: dry-run（cursor Flatten）
+    // Step 1: dry-run（cursor:global — Flatten skills + Files agents）
     const stagesDry = createProductionStages(dryRunPathResolver)
     const argsDry = createDryRunE2EArgs({ tools: ['cursor'], global: true, dryRun: true })
 
@@ -575,14 +575,29 @@ describe('Story 5.5b AC #3: dry-run 一致性测试（真实安装流程）', ()
     const env1 = await stagesDry.detect(repo1, argsDry, dryRunReporter)
     const plan = await stagesDry.match(env1, argsDry, dryRunReporter)
 
-    // 提取 Flatten 类型预期目标（重命名规则：basename(srcDir) + '.md'）
-    const flattenItems = plan.items.filter((i) => i.rule.type === InstallType.Flatten)
-    const plannedFlattenTargets = flattenItems.flatMap((item) =>
-      item.sourceFiles.map((srcDir) => ({
-        targetPath: nodeJoin(item.targetPath, pathBasename(srcDir) + '.md'),
-        mode: item.mode,
-      })),
-    )
+    // v2.0: cursor:global 包含 Flatten(skills) + Files(agents)，需计入两种类型的预期目标路径
+    const flattenTargets = plan.items
+      .filter((i) => i.rule.type === InstallType.Flatten)
+      .flatMap((item) =>
+        item.sourceFiles.map((srcDir) => ({
+          targetPath: nodeJoin(item.targetPath, pathBasename(srcDir) + '.md'),
+          mode: item.mode,
+        })),
+      )
+    const filesTargets = plan.items
+      .filter(
+        (i) =>
+          i.rule.type === InstallType.Files &&
+          i.rule.tool === 'cursor' &&
+          i.rule.scope === 'global',
+      )
+      .flatMap((item) =>
+        item.sourceFiles.map((srcFile) => ({
+          targetPath: nodeJoin(item.targetPath, pathBasename(srcFile)),
+          mode: item.mode,
+        })),
+      )
+    const plannedCursorGlobalTargets = [...flattenTargets, ...filesTargets]
 
     // Step 2: 实际安装
     const stagesInstall = createProductionStages(dryRunPathResolver)
@@ -595,17 +610,17 @@ describe('Story 5.5b AC #3: dry-run 一致性测试（真实安装流程）', ()
     const plan2 = await stagesInstall.match(env2, argsInstall, dryRunReporter)
     const result = await stagesInstall.install(plan2, argsInstall, dryRunReporter)
 
-    const installedFlattenTargets = result.items
+    const installedCursorGlobalTargets = result.items
       .filter((i) => i.status !== 'skipped')
-      .filter((i) => i.targetPath.endsWith('.md') && i.targetPath.includes('.cursor'))
+      .filter((i) => i.targetPath.includes('.cursor'))
       .map((i) => ({ targetPath: i.targetPath, mode: 'copy' as const }))
 
     const sortFn = (a: { targetPath: string }, b: { targetPath: string }) =>
       a.targetPath.localeCompare(b.targetPath)
 
     // 对比完整路径（含 flatten 重命名规则）
-    expect(plannedFlattenTargets.sort(sortFn).map((p) => p.targetPath)).toEqual(
-      installedFlattenTargets.sort(sortFn).map((p) => p.targetPath),
+    expect(plannedCursorGlobalTargets.sort(sortFn).map((p) => p.targetPath)).toEqual(
+      installedCursorGlobalTargets.sort(sortFn).map((p) => p.targetPath),
     )
   })
 

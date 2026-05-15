@@ -9,9 +9,9 @@ import {
   loadRules,
 } from '../../src/data/install-rules.js'
 
-describe('data/install-rules — BUILTIN_RULES (AC: #1)', () => {
-  it('contains exactly 16 MVP rules', () => {
-    expect(BUILTIN_RULES).toHaveLength(16)
+describe('data/install-rules — BUILTIN_RULES (AC: #1, v2.0)', () => {
+  it('contains exactly 19 rules (v2.0: +4 new rules -1 vscode = 16+3)', () => {
+    expect(BUILTIN_RULES).toHaveLength(19)
   })
 
   it('every rule has required fields: tool, scope, sourceDir, type, targetDir', () => {
@@ -24,9 +24,14 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1)', () => {
     }
   })
 
-  it('covers all 4 tools: copilot, claude, cursor, vscode', () => {
+  it('v2.0: covers 3 tools (vscode removed): copilot, claude, cursor', () => {
     const tools = new Set(BUILTIN_RULES.map((r) => r.tool))
-    expect(tools).toEqual(new Set(['copilot', 'claude', 'cursor', 'vscode']))
+    expect(tools).toEqual(new Set(['copilot', 'claude', 'cursor']))
+  })
+
+  it('v2.0: no vscode rules exist in BUILTIN_RULES', () => {
+    const vscodeRules = BUILTIN_RULES.filter((r) => r.tool === 'vscode')
+    expect(vscodeRules).toHaveLength(0)
   })
 
   it('covers both global and project scopes', () => {
@@ -34,29 +39,61 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1)', () => {
     expect(scopes).toEqual(new Set(['global', 'project']))
   })
 
-  it('copilot has 8 rules (4 global + 4 project)', () => {
+  it('v2.0: copilot has 9 rules (4 global + 5 project, including new .vscode/ mcp rule)', () => {
     const copilotRules = BUILTIN_RULES.filter((r) => r.tool === 'copilot')
-    expect(copilotRules).toHaveLength(8)
+    expect(copilotRules).toHaveLength(9)
     expect(copilotRules.filter((r) => r.scope === 'global')).toHaveLength(4)
-    expect(copilotRules.filter((r) => r.scope === 'project')).toHaveLength(4)
+    expect(copilotRules.filter((r) => r.scope === 'project')).toHaveLength(5)
   })
 
-  it('claude has 4 rules (2 global + 2 project)', () => {
+  it('v2.0: copilot project has mcp-tools rule targeting .vscode/', () => {
+    const rule = BUILTIN_RULES.find(
+      (r) => r.tool === 'copilot' && r.scope === 'project' && r.targetDir === '.vscode/',
+    )
+    expect(rule).toBeDefined()
+    expect(rule!.sourceDir).toBe('mcp-tools')
+    expect(rule!.type).toBe(InstallType.Files)
+  })
+
+  it('v2.0: claude has 6 rules (3 global + 3 project, including new instructions rules)', () => {
     const claudeRules = BUILTIN_RULES.filter((r) => r.tool === 'claude')
-    expect(claudeRules).toHaveLength(4)
-    expect(claudeRules.filter((r) => r.scope === 'global')).toHaveLength(2)
-    expect(claudeRules.filter((r) => r.scope === 'project')).toHaveLength(2)
+    expect(claudeRules).toHaveLength(6)
+    expect(claudeRules.filter((r) => r.scope === 'global')).toHaveLength(3)
+    expect(claudeRules.filter((r) => r.scope === 'project')).toHaveLength(3)
   })
 
-  it('cursor has 3 rules', () => {
+  it('v2.0: claude has global instructions rule targeting ~/.claude/', () => {
+    const rule = BUILTIN_RULES.find(
+      (r) => r.tool === 'claude' && r.scope === 'global' && r.sourceDir === 'instructions',
+    )
+    expect(rule).toBeDefined()
+    expect(rule!.targetDir).toBe('~/.claude/')
+    expect(rule!.type).toBe(InstallType.Files)
+  })
+
+  it('v2.0: claude has project instructions rule targeting .claude/', () => {
+    const rule = BUILTIN_RULES.find(
+      (r) => r.tool === 'claude' && r.scope === 'project' && r.sourceDir === 'instructions',
+    )
+    expect(rule).toBeDefined()
+    expect(rule!.targetDir).toBe('.claude/')
+    expect(rule!.type).toBe(InstallType.Files)
+  })
+
+  it('v2.0: cursor has 4 rules (2 global + 2 project, including new global agents rule)', () => {
     const cursorRules = BUILTIN_RULES.filter((r) => r.tool === 'cursor')
-    expect(cursorRules).toHaveLength(3)
+    expect(cursorRules).toHaveLength(4)
+    expect(cursorRules.filter((r) => r.scope === 'global')).toHaveLength(2)
+    expect(cursorRules.filter((r) => r.scope === 'project')).toHaveLength(2)
   })
 
-  it('vscode has 1 rule (global mcp-tools)', () => {
-    const vscodeRules = BUILTIN_RULES.filter((r) => r.tool === 'vscode')
-    expect(vscodeRules).toHaveLength(1)
-    expect(vscodeRules[0].scope).toBe('global')
+  it('v2.0: cursor has global agents rule targeting ~/.cursor/rules/', () => {
+    const rule = BUILTIN_RULES.find(
+      (r) => r.tool === 'cursor' && r.scope === 'global' && r.sourceDir === 'agents',
+    )
+    expect(rule).toBeDefined()
+    expect(rule!.targetDir).toBe('~/.cursor/rules/')
+    expect(rule!.type).toBe(InstallType.Files)
   })
 
   it('uses valid InstallType values only', () => {
@@ -95,16 +132,16 @@ describe('data/install-rules — RULE_INDEX (AC: #1)', () => {
     expect(rules).toHaveLength(4)
   })
 
-  it('lookup copilot:project returns 4 rules', () => {
+  it('v2.0: lookup copilot:project returns 5 rules (including new .vscode/ mcp rule)', () => {
     const rules = RULE_INDEX.get('copilot:project')
     expect(rules).toBeDefined()
-    expect(rules).toHaveLength(4)
+    expect(rules).toHaveLength(5)
   })
 
-  it('lookup claude:global returns 2 rules', () => {
+  it('v2.0: lookup claude:global returns 3 rules (agents + skills + instructions)', () => {
     const rules = RULE_INDEX.get('claude:global')
     expect(rules).toBeDefined()
-    expect(rules).toHaveLength(2)
+    expect(rules).toHaveLength(3)
   })
 
   it('lookup for non-existent key returns undefined', () => {

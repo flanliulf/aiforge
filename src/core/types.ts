@@ -77,6 +77,10 @@ export interface InstallResult {
     tool: string
     /** 工具显示名称（如 'GitHub Copilot'），由上游从 tool-registry 查找填充；TTY 输出标题使用 */
     toolDisplayName?: string
+    /** 安装主目录的用户可读简写（如 '~/.claude/skills/'、'.agents/skills/'），供 TTY 分组显示 */
+    targetGroupLabel?: string
+    /** 安装主目录的本地解析路径，用于在缺少 label 时兜底分组 */
+    targetGroupPath?: string
     sourcePath: string
     targetPath: string
   }>

@@ -7,7 +7,7 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 11 |
+| 🔴 open | 32 |
 | 🟡 in-progress | 0 |
 | ✅ resolved | 12 |
 
@@ -125,6 +125,237 @@
 - **描述**: `src/stages/match-rules.ts` 的零匹配恢复路径候选收集逻辑对 `entry.name.startsWith('.')` 直接跳过，而主匹配路径 `scanSourceFiles()` 在 Files/Directories/Flatten 分支下仅排除 `DEFAULT_EXCLUDES`（含 `.gitkeep`、`.DS_Store` 等 6 项），不额外排除所有 `.` 开头条目。导致恢复路径候选空间比主匹配空间更窄。触发条件极端：需同时满足 dot-prefixed 可安装项 + 零匹配 + 该项恰好是用户想要的候选，实际风险极低。修复方向：将候选枚举的过滤条件收敛到与 `scanSourceFiles()` 一致，或统一决策对 dot items 的处理策略后两处同步调整。
 - **涉及文件**: `src/stages/match-rules.ts`
 - **建议时机**: 后续统一 dot-item 处理策略时一并修复
+- **状态**: open
+- **解决记录**:
+
+### TODO-019: copilot:project mcp-tools 同源双规则 totalFiles 计数与 manifest 去重
+
+- **来源**: 7-1 CR round 1 ID #3 (2026-05-11)
+- **优先级**: P2
+- **类别**: design-debt
+- **描述**: `src/data/install-rules.ts:74,76` 中 copilot:project 同时存在 `mcp-tools → .github/` 与 `mcp-tools → .vscode/` 两条规则，同一源文件被安装两次（双倍 totalFiles 计数、可能出现 manifest 重复条目）。属于显式设计决策（承接 v1.x vscode MCP 路径语义），但引发的计数与 manifest 行为需补文档和测试说明。建议：(1) install-rules-matrix.md 显式说明双写语义；(2) 单元测试断言 totalFiles 计数预期行为；(3) 长期评估 plan 层 (sourceDir, sourceFile) 跨规则去重或显式 multi-target 标注。
+- **涉及文件**: `src/data/install-rules.ts`, `docs/install-rules-matrix.md`
+- **建议时机**: Story 7-10 E2E 收尾时统一处理
+- **状态**: open
+- **解决记录**:
+
+### TODO-020: cursor:global agents/skills 共用 ~/.cursor/rules/ basename 冲突静默覆盖
+
+- **来源**: 7-1 CR round 1 ID #4 (2026-05-11)
+- **优先级**: P2
+- **类别**: design-debt
+- **描述**: `src/data/install-rules.ts` cursor:global 的 `agents(Files)` 与 `skills(Flatten)` 均写入 `~/.cursor/rules/`，若源仓库存在 `agents/foo.md` 与 `skills/foo/index.md`（Flatten 产物 `foo.md`），basename 一致时后写者静默覆盖先写者。`--force` 模式或 aiforge-current/outdated 状态下缓解失效。cursor:project 同样存在此模式（既有，非本次引入）。建议在 plan 阶段对 (targetPath basename) 跨规则去重检测，命中时 reporter.warn；或采用 sub-folder 隔离。
+- **涉及文件**: `src/data/install-rules.ts`, `src/stages/match-rules.ts`（或 plan 层）
+- **建议时机**: Story 7-3/7-9 或专项 backlog 治理
+- **状态**: open
+- **解决记录**:
+
+### TODO-021: Story 7-10 补齐 copilot:project:mcp-tools → .vscode/ E2E 测试
+
+- **来源**: 7-1 CR round 1 ID #8 (2026-05-11)
+- **优先级**: P2
+- **类别**: test-gap
+- **描述**: `tests/integration/pipeline.test.ts` 原 `vscode:global mcp-tools` E2E 已在 v2.0 移除，对应的 `copilot:project:mcp-tools → .vscode/` 新 E2E 尚未补齐。Story 7-1 单元测试已覆盖规则存在性，但端到端集成验证后置到 Story 7-10。
+- **涉及文件**: `tests/integration/pipeline.test.ts`
+- **建议时机**: Story 7-10（Epic 7 收尾）必须交付
+- **状态**: open
+- **解决记录**:
+
+### TODO-022: vscodeMergedNote 文案保护范围歧义与排版风格不一致
+
+- **来源**: 7-1 CR round 1 ID #11 (2026-05-11)
+- **优先级**: P3
+- **类别**: ux
+- **描述**: `src/core/messages.ts` vscodeMergedNote (zh-CN: ~530, en: ~810) 使用 ①②③ 圆圈数字，与同文件其他列表（1./2.）风格不一致。"现有 ~/.vscode/ 文件不会被覆盖或删除"未区分 home 级与项目级 .vscode/，存在歧义。
+- **涉及文件**: `src/core/messages.ts`
+- **建议时机**: 文案专项优化时
+- **状态**: open
+- **解决记录**:
+
+### TODO-023: --tools vscode 手动模式未输出 vscodeMergedNote 迁移提示
+
+- **来源**: 7-1 CR round 1 ID #12 (2026-05-11)
+- **优先级**: P3
+- **类别**: ux
+- **描述**: `src/stages/detect-tools.ts` 手动 `--tools` 校验分支命中 `vscode` 时直接 throw UNKNOWN_TOOL，未先输出 vscodeMergedNote 提示。AC #3 字面未限定"自动检测 vs 手动模式"，技术上应同样覆盖手动模式。修复：手动分支命中 vscode 时先 `reporter.warn(msg('detectTools.vscodeMergedNote'))` 再 throw。
+- **涉及文件**: `src/stages/detect-tools.ts`
+- **建议时机**: 下次触及 detect-tools.ts 手动模式分支时
+- **状态**: open
+- **解决记录**:
+
+### TODO-024: detectLegacyVscodeOnly 非目录辨别（~/.vscode 为普通文件时误判）
+
+- **来源**: 7-1 CR round 1 ID #13（非目录辨别部分）(2026-05-11)
+- **优先级**: P3
+- **类别**: edge-case
+- **描述**: `src/stages/detect-tools.ts` 的 `detectLegacyVscodeOnly` 使用 `pathExists`（access），若 `~/.vscode` 为普通文件（非目录）时仍返回 true，可能误判为 vscode-only 场景。修复：改用 `stat() + isDirectory()` 替代 `pathExists`。（注：异常透传部分为预期架构行为，不修复）
+- **涉及文件**: `src/stages/detect-tools.ts`
+- **建议时机**: 下次触及 detectLegacyVscodeOnly 时
+- **状态**: open
+- **解决记录**:
+
+### TODO-025: detect-tools 测试硬编码绝对路径 '/home/user/.vscode'
+
+- **来源**: 7-1 CR round 1 ID #14 (2026-05-11)
+- **优先级**: P3
+- **类别**: test-quality
+- **描述**: `tests/stages/detect-tools.test.ts:414, 446` 字面比对 `/home/user/.vscode`，跨平台风险存在（mock home 依赖 `/home/user` 硬编码）。建议改用 `path.join(pathResolver.home(), '.vscode')` 动态拼接；断言改为检查语义关键词组合（如 VS Code / v2.0 / Copilot）。
+- **涉及文件**: `tests/stages/detect-tools.test.ts`
+- **建议时机**: 下次重构 detect-tools 测试时
+- **状态**: open
+- **解决记录**:
+
+### TODO-026: dry-run 测试 filter 缺 rule 维度过滤
+
+- **来源**: 7-1 CR round 1 ID #18 (2026-05-11)
+- **优先级**: P3
+- **类别**: test-quality
+- **描述**: `tests/integration/dry-run.test.ts:613-616` 仅按 `targetPath.includes('.cursor')` 字符串过滤计划目标，缺乏 rule 维度验证。建议改为 `i.rule?.tool === 'cursor' && i.rule?.scope === 'global'` 精确匹配。
+- **涉及文件**: `tests/integration/dry-run.test.ts`
+- **建议时机**: 下次触及 dry-run 测试时
+- **状态**: open
+- **解决记录**:
+
+### TODO-027: migration-v2.md 缺少 v1.x vscode 规则数量说明表头
+
+- **来源**: 7-1 CR round 1 ID #19 (2026-05-11)
+- **优先级**: P3
+- **类别**: docs
+- **描述**: `docs/migration-v2.md` 和 `docs/migration-v2.zh.md` 中旧规则映射表直接列出单条规则但缺少表头说明（"v1.x 中 vscode 共有 1 条规则，迁移映射如下："）。中英双语需同步补充。
+- **涉及文件**: `docs/migration-v2.md`, `docs/migration-v2.zh.md`
+- **建议时机**: 文档优化时
+- **状态**: open
+- **解决记录**:
+
+### TODO-028: detectLegacyVscodeOnly 外层守卫与函数内 copilotExists 不等价（单一职责）
+
+- **来源**: 7-1 CR round 2 ID #2 (2026-05-11)
+- **优先级**: P3
+- **类别**: tech-debt
+- **描述**: `src/stages/detect-tools.ts:198` 外层守卫 `!detectedTools.includes('copilot')` 与函数内 `!copilotExists`（`~/.copilot/` 检测）存在不等价：copilot 可通过项目级 `.github/` 检测到，此时 detectedTools 含 'copilot' 但 `~/.copilot/` 可能不存在。两者逻辑不完全对应。建议单一职责改进：函数仅返回「vscode 路径是否存在」，copilot 检测完全由外层 `!detectedTools.includes('copilot')` 负责；移除函数内 copilotExists 冗余判断。
+- **涉及文件**: `src/stages/detect-tools.ts`
+- **建议时机**: 下次重构 detect-tools 检测逻辑时
+- **状态**: open
+- **解决记录**:
+
+### TODO-029: detectLegacyVscodeOnly 直接调用 process.cwd()，需专项治理
+
+- **来源**: 7-1 CR round 2 ID #3 (2026-05-11)
+- **优先级**: P3
+- **类别**: tech-debt
+- **描述**: `src/stages/detect-tools.ts:98` 直接调用 `process.cwd()` 获取项目根，与 `detectSingleTool`/`emitDiagnostics` 中的既有模式一致。但这使测试需 patch `process.cwd` 而非通过 pathResolver 注入。建议在 PathResolver 接口添加 `projectRoot()` 方法，批量替换 detect-tools.ts 内所有直接 process.cwd() 调用。
+- **涉及文件**: `src/stages/detect-tools.ts`, `src/core/types.ts`（PathResolver 接口）
+- **建议时机**: PathResolver 专项扩展 Story 中批量处理
+- **状态**: open
+- **解决记录**:
+
+### TODO-030: detectLegacyVscodeOnly Promise.all 单点失败阻塞整体检测
+
+- **来源**: 7-1 CR round 2 ID #4 (2026-05-11)
+- **优先级**: P3
+- **类别**: tech-debt
+- **描述**: `src/stages/detect-tools.ts:96-100` 的 `Promise.all([pathExists(~/.vscode), pathExists(.vscode), pathExists(~/.copilot)])` 在任一 pathExists 抛出非 ENOENT/ENOTDIR 错误（如 EACCES、ELOOP）时整体 reject，阻塞 detect 流程。与 detectSingleTool 同病相怜。建议改为 `Promise.allSettled` + rejected 视为 false；或整体 try/catch 降级。需与 detectSingleTool 一同治理保持一致。
+- **涉及文件**: `src/stages/detect-tools.ts`
+- **建议时机**: detect-tools 专项加固时
+- **状态**: open
+- **解决记录**:
+
+### TODO-031: reserved-name skip 分支不清理旧 manifest stale 条目
+
+- **来源**: 7-1 CR round 2 ID #5 (2026-05-11)
+- **优先级**: P3
+- **类别**: tech-debt
+- **描述**: `src/stages/execute-install.ts` reserved-name 命中时写 `status:'skipped'` + continue，但不调用 manifest API。若 v1.x 已写入该 reserved-name 到 manifest（升级前旧版本），升级到 v2.0 后保护跳过，旧 manifest 条目残留为 stale。触发链路：v1.x install → v2.0 upgrade + reserved 保护 → manifest 残留。建议 skip 分支前查询 manifest，若有同 target 条目则 `manifest.remove`；或标记 `status:'reserved-skipped'`。
+- **涉及文件**: `src/stages/execute-install.ts`
+- **建议时机**: manifest 生命周期治理专项时
+- **状态**: open
+- **解决记录**:
+
+### TODO-032: migration-v2.md FAQ 未说明 vscodeMergedNote 在 claude/cursor 已检测时仍触发
+
+- **来源**: 7-1 CR round 2 ID #6 (2026-05-11)
+- **优先级**: P3
+- **类别**: docs
+- **描述**: `docs/migration-v2.md:77` / `docs/migration-v2.zh.md:76` FAQ 仅说明「NO_TOOLS 是否触发」，未明确 vscodeMergedNote 触发条件：即便 claude/cursor 已被检测到，只要 copilot 未检测且存在 `~/.vscode/` 或项目 `.vscode/`，migration note 仍会输出。建议在 FAQ 增加说明：「migration note 在 detect 阶段当 copilot 未被识别且检测到 `.vscode/` 时输出（与是否同时检测到 claude/cursor 无关）；不阻塞安装；但若同时未检测到任何受支持工具，仍因 NO_TOOLS 退出」。中英双语同步。
+- **涉及文件**: `docs/migration-v2.md`, `docs/migration-v2.zh.md`
+- **建议时机**: 文档完善时
+- **状态**: open
+- **解决记录**:
+
+### TODO-033: mcp-tools 双写文档说明缺失（合并 R1-TODO-019）
+
+- **来源**: 7-1 CR round 2 ID #7 / round 1 ID #3 (2026-05-11)
+- **优先级**: P3
+- **类别**: docs
+- **描述**: `docs/install-rules-matrix.md:24-25` 列出 `mcp-tools → .github/` 与 `mcp-tools → .vscode/` 两行，但无双写语义注释；`docs/migration-v2.md` 未明示双写行为。建议在 migration-v2.md 增加 FAQ「为什么 mcp-tools 文件同时出现在 .github/ 和 .vscode/？」；install-rules-matrix.md 表格上方加注「※ mcp-tools 为双写规则，文件同时安装到 .github/ 和 .vscode/ 两处」。与 TODO-019 合并跟踪。
+- **涉及文件**: `docs/install-rules-matrix.md`, `docs/migration-v2.md`, `docs/install-rules-matrix.zh.md`, `docs/migration-v2.zh.md`
+- **建议时机**: 文档完善时
+- **状态**: open
+- **解决记录**:
+
+### TODO-034: AC #5 package.json version 字段无测试断言
+
+- **来源**: 7-1 CR round 2 ID #8 (2026-05-11)
+- **优先级**: P3
+- **类别**: test-quality
+- **描述**: AC #5 要求 package.json version = '2.0.0'，但无测试覆盖此断言，未来误改 version 不会被测试捕获。建议新增 `tests/version.test.ts` 或在 `tests/data/install-rules.test.ts` 末尾加 `expect(pkg.version).toBe('2.0.0')`（通过 ESM JSON import）。
+- **涉及文件**: `tests/`（新增）
+- **建议时机**: 下次补充 release 回归测试时
+- **状态**: open
+- **解决记录**:
+
+### TODO-035: install-rules.test.ts it title 与 AC #2 文本未同步
+
+- **来源**: 7-1 CR round 2 ID #9 (2026-05-11)
+- **优先级**: P3
+- **类别**: test-quality
+- **描述**: `tests/data/install-rules.test.ts:13` it title 为 `'+4 new rules -1 vscode = 16+3'`，Round 1 已将 AC #2 修订为「16 → 19（+4/-1）」但 it title 未同步。建议改为 `contains exactly 19 rules (v2.0: 16 - 1 + 4 = 19)` 与 AC 文本一致。
+- **涉及文件**: `tests/data/install-rules.test.ts`
+- **建议时机**: 下次触及 install-rules 测试时
+- **状态**: open
+- **解决记录**:
+
+### TODO-036: CHANGELOG v2.0.0 Migration 行缺少步骤摘要
+
+- **来源**: 7-1 CR round 2 ID #10 (2026-05-11)
+- **优先级**: P3
+- **类别**: docs
+- **描述**: `CHANGELOG.md:10` Migration 行仅写链接索引，未提供步骤摘要。按 Keep a Changelog 最佳实践，建议在 Migration 行尾追加摘要：`(steps: 1. upgrade aiforge → 2. install Copilot extension → 3. re-run aiforge install)`。
+- **涉及文件**: `CHANGELOG.md`
+- **建议时机**: 文档完善时
+- **状态**: open
+- **解决记录**:
+
+### TODO-037: Story 7-10 补全多工具矩阵端到端集成测试（AC #2 .vscode/ 延伸覆盖）
+
+- **来源**: 7-1 CR round 5 ID #4 (2026-05-12)
+- **优先级**: P2
+- **类别**: test-gap
+- **描述**: AC #2 要求 `copilot:project mcp-tools → .vscode/` 生效；本 Story 7-1 已在 `pipeline.test.ts:928` 的 `copilot:project` it block 中追加 `.vscode/server.json` 存在性断言（最小集成验证，AC #2 已基本闭合）。Story 7-10 计划补充更完整的多工具矩阵 E2E 测试，包括：多 mcp-tools 文件、全局+项目级组合、symlink 模式下的 `.vscode/` 写入验证。本条目确保该计划在 Story 7-10 中可追溯执行，不被遗忘。
+- **涉及文件**: `tests/integration/pipeline.test.ts`
+- **建议时机**: Story 7-10 执行时（计划内延伸覆盖）
+- **状态**: open
+- **解决记录**:
+
+### TODO-038: 项目 `.github/` 命中时抑制 legacy VS Code 迁移提示（语义待明确）
+
+- **来源**: 7-1 CR round 9 发现 #1 (2026-05-12)
+- **优先级**: P3
+- **类别**: tech-debt
+- **描述**: `src/stages/detect-tools.ts:196-199` 的 vscodeMergedNote warning 触发条件为 `!detectedTools.includes('copilot') && detectLegacyVscodeOnly()`。当项目存在 `.github/` 时，copilot 通过项目级检测路径被识别（`detectedTools.includes('copilot') = true`），warning 被抑制——即使 `~/.copilot/` 不存在。此场景下不触发 warning 实际上更智能（Copilot 已通过 `.github/` 识别，无需再提示安装），但与 AC #3 字面表述（"无 `~/.copilot/` 则显示警告"）存在间隙。建议：路径 A（推荐）在后续 Story Dev Notes 或 AC 修订中明确"`.github/` 存在视为 Copilot context，因此不输出 legacy warning"；路径 B 补充测试覆盖 `~/.vscode/ + 无 ~/.copilot/ + 项目 .github/` 边界场景。
+- **涉及文件**: `src/stages/detect-tools.ts`
+- **建议时机**: 后续轻量化优化 Story 或 Story 7-2/7-10 中一并处理；如选路径 A 可在 Story 7-1 finalize 时顺手更新 AC 描述
+- **状态**: open
+- **解决记录**:
+
+### TODO-039: `install-rules.ts` 注释残留 `.vscode/mcp.json` 历史示例（可能引发固定文件名误解）
+
+- **来源**: 7-1 CR round 9 发现 #2 (2026-05-12)
+- **优先级**: P3
+- **类别**: tech-debt
+- **描述**: `src/data/install-rules.ts:75` 注释 `// v2.0: 承接原 vscode 项目级 MCP 配置语义（.vscode/mcp.json）` 字面使用 `.vscode/mcp.json` 描述历史路径语义，与实际规则 `type: Files, targetDir: '.vscode/'`（文件名沿用 `mcp-tools/` 源目录）存在字面差异。该注释是开发者内部历史溯源说明，不影响运行时行为，但可能在后续维护中引发"目标固定为 mcp.json"的误解。建议改为：`// v2.0: 承接原 vscode 项目级 MCP 配置语义（目标目录 .vscode/，文件名沿用 mcp-tools/ 源目录）`。
+- **涉及文件**: `src/data/install-rules.ts`
+- **建议时机**: 下次触及 `install-rules.ts` 时或常规代码清理
 - **状态**: open
 - **解决记录**:
 

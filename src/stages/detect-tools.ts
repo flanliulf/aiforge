@@ -82,6 +82,25 @@ async function detectSingleTool(
   return false
 }
 
+// ── vscode-only migration 检测 ──────────────────────────────────
+
+/**
+ * 检测是否为 vscode-only 用户（v1.x → v2.0 迁移场景）
+ *
+ * 条件：~/.vscode/（home 级）存在且 ~/.copilot/ 不存在
+ * 目的：无论是否检测到其他工具，只要满足条件即输出 vscodeMergedNote 提示（AC #3），
+ *       让用户知道为什么 vscode 不再被检测（NFR-C7：不读写 ~/.vscode/ 任何文件）
+ * 注意：仅检测 home 级 ~/.vscode/，项目级 .vscode/ 不触发（AC #3 明文限定 home 路径）
+ */
+async function detectLegacyVscodeOnly(pathResolver: PathResolver): Promise<boolean> {
+  const home = pathResolver.home()
+  const [vscodeHomeExists, copilotExists] = await Promise.all([
+    pathExists(join(home, '.vscode')),
+    pathExists(join(home, '.copilot')),
+  ])
+  return vscodeHomeExists && !copilotExists
+}
+
 // ── 诊断输出 ────────────────────────────────────────────────────
 
 /**
@@ -172,6 +191,12 @@ export async function detectTools(
     if (await detectSingleTool(toolDef, pathResolver)) {
       detectedTools.push(toolDef.id)
     }
+  }
+
+  // vscode-only 用户迁移提示（AC #3）：无论是否检测到其他工具，
+  // 只要 ~/.vscode/（home 级）存在且 ~/.copilot/ 不存在则输出提示
+  if (!detectedTools.includes('copilot') && (await detectLegacyVscodeOnly(pathResolver))) {
+    reporter.warn(msg('detectTools.vscodeMergedNote'))
   }
 
   // ── 无工具处理 ──────────────────────────────────────────────

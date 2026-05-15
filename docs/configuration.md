@@ -75,7 +75,7 @@ npx aiforge [repo-url] [options]
 | `repo-url` | `string` | `config.defaultRepo` | Git repository URL or GitHub shorthand |
 | `-g, --global` | `boolean` | `false` | Install to user-level global directories |
 | `-l, --link` | `boolean` | `false` | Use symlink mode (global only) |
-| `-t, --tools <tools...>` | `string[]` | auto-detect | Target tools: `copilot`, `claude`, `cursor`, `vscode` |
+| `-t, --tools <tools...>` | `string[]` | auto-detect | Target tools: `copilot`, `claude`, `cursor` (v2.0: `vscode` removed — use `copilot` instead; see [migration guide](migration-v2.md)) |
 | `-d, --dirs <dirs...>` | `string[]` | all | Resource types: `agents`, `skills`, `instructions`, `mcp-tools` |
 | `--dry-run` | `boolean` | `false` | Preview only, write nothing |
 | `--quiet` | `boolean` | `false` | Minimal output |

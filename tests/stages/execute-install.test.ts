@@ -36,9 +36,11 @@ import type { ManifestContext } from '../../src/stages/execute-install.js'
 import { AiforgeError } from '../../src/core/errors.js'
 import { InstallType } from '../../src/core/types.js'
 import type { MatchedPlan, ParsedArgs } from '../../src/core/types.js'
+import { createReporter } from '../../src/core/reporter.js'
 import type { Reporter } from '../../src/core/reporter.js'
 import { setLanguage } from '../../src/core/messages.js'
 import type { PathResolver } from '../../src/core/path-resolver.js'
+import chalk from 'chalk'
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -505,6 +507,53 @@ describe('stages/execute-install', () => {
 
       // updatePhase 被调用了 2 次（每个非 skipped 文件一次）
       expect(reporter.updatePhase).toHaveBeenCalledTimes(2)
+    })
+
+    it('大批量安装时压缩 reporter.updatePhase 调用频率', async () => {
+      const sourceFiles = await Promise.all(
+        Array.from({ length: 25 }, async (_, idx) => {
+          const srcFile = join(tmpDir, `bulk-${idx + 1}.md`)
+          await writeFile(srcFile, `content-${idx + 1}`)
+          return srcFile
+        }),
+      )
+      const targetDir = join(tmpDir, 'reporter-bulk-target')
+
+      const plan = makeFilePlan(sourceFiles, targetDir)
+      await executeInstall(plan, makeArgs(), reporter, pathResolver)
+
+      const calls = (reporter.updatePhase as ReturnType<typeof vi.fn>).mock.calls
+      expect(calls.length).toBeLessThan(sourceFiles.length)
+      expect(calls.length).toBeLessThanOrEqual(10)
+      expect(calls[0]?.[0]).toBe('执行安装... (1/25)')
+      expect(calls.at(-1)?.[0]).toBe('执行安装... (25/25)')
+    })
+
+    it('结果项携带本地安装主目录分组信息', async () => {
+      const srcFile = join(tmpDir, 'grouped.md')
+      const targetDir = join(tmpDir, 'grouped-target')
+      await writeFile(srcFile, 'grouped')
+
+      const plan: MatchedPlan = {
+        items: [
+          {
+            rule: {
+              tool: 'claude',
+              scope: 'global',
+              sourceDir: 'agents',
+              type: InstallType.Files,
+              targetDir: '~/.claude/agents/',
+            },
+            sourceFiles: [srcFile],
+            targetPath: targetDir,
+            mode: 'copy',
+          },
+        ],
+      }
+      const result = await executeInstall(plan, makeArgs(), reporter, pathResolver)
+
+      expect(result.items[0]?.targetGroupPath).toBe(targetDir)
+      expect(result.items[0]?.targetGroupLabel).toBe('~/.claude/agents/')
     })
 
     it('skipped 文件仍调用 reporter.updatePhase 推进进度计数', async () => {
@@ -1285,7 +1334,7 @@ describe('stages/execute-install', () => {
   // ══════════════════════════════════════════════════════════════════════════════
 
   describe('零结果诊断 (AC: #5 / FR-032)', () => {
-    it('全部文件 skipped → 触发零结果诊断 warn', async () => {
+    it('全部文件 skipped → 输出成功态摘要，不触发零结果诊断 warn', async () => {
       const srcFile = join(tmpDir, 'zero-diag-src.md')
       const targetDir = join(tmpDir, 'zero-diag-target')
       await mkdir(targetDir)
@@ -1296,9 +1345,11 @@ describe('stages/execute-install', () => {
       const plan = makeFilePlan([srcFile], targetDir)
       await executeInstall(plan, makeArgs(), reporter, pathResolver)
 
-      // reporter.warn 应包含零结果诊断信息
-      expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('未安装任何文件'))
-      expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('--force'))
+      expect(reporter.completePhase).toHaveBeenCalledWith(
+        '执行安装... 没有新增/更新文件，全部已是最新或被跳过',
+      )
+      expect(reporter.warn).not.toHaveBeenCalledWith(expect.stringContaining('未安装任何文件'))
+      expect(reporter.warn).not.toHaveBeenCalledWith(expect.stringContaining('--force'))
     })
 
     it('有文件被安装（new/updated）→ 不触发零结果诊断', async () => {
@@ -1341,6 +1392,131 @@ describe('stages/execute-install', () => {
 
       // 零结果诊断应触发（空 sourceFiles 静默跳过 → 无任何结果）
       expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('未安装任何文件'))
+      expect(reporter.warn).toHaveBeenCalledWith(
+        expect.stringContaining('未发现匹配当前条件的可安装文件'),
+      )
+      expect(reporter.warn).toHaveBeenCalledWith(
+        expect.stringContaining('如果你预期本次应有更新，可尝试：'),
+      )
+      expect(reporter.warn).toHaveBeenCalledWith(
+        expect.stringContaining('--dirs / --filter / --tools 条件是否过窄'),
+      )
+      expect(reporter.warn).not.toHaveBeenCalledWith(expect.stringContaining('--force'))
+    })
+
+    it('长列表 true-zero 诊断会摘要化扫描目录和匹配规则，避免刷屏', async () => {
+      const longPlan: MatchedPlan = {
+        items: Array.from({ length: 7 }, (_, index) => ({
+          rule: {
+            tool: `tool-${index + 1}`,
+            scope: 'global' as const,
+            sourceDir: `dir-${index + 1}`,
+            type: InstallType.Files,
+            targetDir: join(tmpDir, `long-zero-target-${index + 1}`),
+          },
+          sourceFiles: [],
+          targetPath: join(tmpDir, `long-zero-target-${index + 1}`),
+          mode: 'copy' as const,
+        })),
+      }
+
+      await executeInstall(longPlan, makeArgs(), reporter, pathResolver)
+
+      const warnCalls = (reporter.warn as ReturnType<typeof vi.fn>).mock.calls.map(
+        (c: unknown[]) => c[0] as string,
+      )
+      const scannedDirsLine = warnCalls.find((line) => line.includes('扫描目录:')) ?? ''
+      const matchedRulesLine = warnCalls.find((line) => line.includes('匹配规则:')) ?? ''
+
+      expect(scannedDirsLine).toContain('dir-1, dir-2, dir-3, dir-4, dir-5')
+      expect(scannedDirsLine).toContain('其余 2 项已折叠')
+      expect(scannedDirsLine).not.toContain('dir-6')
+
+      expect(matchedRulesLine).toContain('tool-1:global, tool-2:global, tool-3:global')
+      expect(matchedRulesLine).toContain('其余 2 项已折叠')
+      expect(matchedRulesLine).not.toContain('tool-6:global')
+    })
+
+    it('true-zero TTY 输出快照保持长列表摘要和 warning 间距', async () => {
+      const ttyReporter = createReporter({ quiet: false, isTty: true })
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+      const origLevel = chalk.level
+      const longPlan: MatchedPlan = {
+        items: Array.from({ length: 7 }, (_, index) => ({
+          rule: {
+            tool: `tool-${index + 1}`,
+            scope: 'global' as const,
+            sourceDir: `dir-${index + 1}`,
+            type: InstallType.Files,
+            targetDir: join(tmpDir, `tty-zero-target-${index + 1}`),
+          },
+          sourceFiles: [],
+          targetPath: join(tmpDir, `tty-zero-target-${index + 1}`),
+          mode: 'copy' as const,
+        })),
+      }
+
+      chalk.level = 0
+      try {
+        await executeInstall(longPlan, makeArgs(), ttyReporter, pathResolver)
+        const fullOutput = stderrSpy.mock.calls
+          .map((c) => c[0] as string)
+          .join('')
+          .replace(/\r/g, '')
+        const diagnosticOutput = fullOutput.slice(fullOutput.indexOf('⚠️ 未安装任何文件'))
+
+        expect(diagnosticOutput).toMatchInlineSnapshot(`
+"⚠️ 未安装任何文件
+
+⚠ 诊断信息：
+⚠   扫描目录: dir-1, dir-2, dir-3, dir-4, dir-5, ... 其余 2 项已折叠
+⚠   匹配规则: tool-1:global, tool-2:global, tool-3:global, tool-4:global, tool-5:global, ... 其余 2 项已折叠 (7 条)
+⚠   未发现匹配当前条件的可安装文件
+
+⚠ 如果你预期本次应有更新，可尝试：
+⚠   1. 检查 --dirs / --filter / --tools 条件是否过窄
+⚠   2. 检查知识仓库中所选目录是否包含可安装文件
+✔ 执行安装...
+"
+`)
+      } finally {
+        chalk.level = origLevel
+        stderrSpy.mockRestore()
+      }
+    })
+
+    it('匹配到空目录 → 输出空目录诊断，不建议使用 --force', async () => {
+      const sourceDir = join(tmpDir, 'zero-diag-empty-dir')
+      const targetDir = join(tmpDir, 'zero-diag-empty-dir-target')
+      await mkdir(sourceDir)
+
+      const plan: MatchedPlan = {
+        items: [
+          {
+            rule: {
+              tool: 'claude',
+              scope: 'global',
+              sourceDir: 'skills',
+              type: InstallType.Directories,
+              targetDir: targetDir,
+            },
+            sourceFiles: [sourceDir],
+            targetPath: targetDir,
+            mode: 'copy',
+          },
+        ],
+      }
+
+      await executeInstall(plan, makeArgs(), reporter, pathResolver)
+
+      expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('未安装任何文件'))
+      expect(reporter.warn).toHaveBeenCalledWith(
+        expect.stringContaining('匹配到的目录中未发现实际文件'),
+      )
+      expect(reporter.warn).toHaveBeenCalledWith(
+        expect.stringContaining('检查知识仓库中的目标目录是否为空'),
+      )
+      expect(reporter.warn).not.toHaveBeenCalledWith(expect.stringContaining('--force'))
     })
   })
 
@@ -1693,7 +1869,7 @@ describe('executeInstall — English language mode (zero results diagnostics)', 
     await rm(tmpDir, { recursive: true, force: true })
   })
 
-  it('zero results diagnostics are in English when language=en', async () => {
+  it('skipped-only summary is in English when language=en', async () => {
     const srcFile = join(tmpDir, 'en-zero-src.md')
     const targetDir = join(tmpDir, 'en-zero-target')
     await mkdir(targetDir)
@@ -1721,9 +1897,48 @@ describe('executeInstall — English language mode (zero results diagnostics)', 
     const pathResolver = { home: () => tmpDir, reposDir: () => join(tmpDir, 'repos') }
     await executeInstall(plan, { force: false } as ParsedArgs, reporter, pathResolver as never)
 
-    // English mode: zero results warning should be in English
+    expect(reporter.completePhase).toHaveBeenCalledWith(
+      'Executing install... No new or updated files; all items are already up-to-date or skipped',
+    )
+    expect(reporter.warn).not.toHaveBeenCalledWith(
+      expect.stringContaining('No files were installed'),
+    )
+  })
+
+  it('true zero-result diagnostics are in English when language=en', async () => {
+    const targetDir = join(tmpDir, 'en-zero-empty-target')
+
+    const plan: MatchedPlan = {
+      items: [
+        {
+          rule: {
+            tool: 'claude',
+            scope: 'global',
+            sourceDir: 'agents',
+            type: InstallType.Files,
+            targetDir: targetDir,
+          },
+          mode: 'copy',
+          sourceFiles: [],
+          targetPath: targetDir,
+        },
+      ],
+    }
+
+    const pathResolver = { home: () => tmpDir, reposDir: () => join(tmpDir, 'repos') }
+    await executeInstall(plan, { force: false } as ParsedArgs, reporter, pathResolver as never)
+
     expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('No files were installed'))
-    expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('--force'))
+    expect(reporter.warn).toHaveBeenCalledWith(
+      expect.stringContaining('No installable files matched the current selection'),
+    )
+    expect(reporter.warn).toHaveBeenCalledWith(
+      expect.stringContaining('If you expected updates in this run, you can try:'),
+    )
+    expect(reporter.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Check whether --dirs / --filter / --tools is too restrictive'),
+    )
+    expect(reporter.warn).not.toHaveBeenCalledWith(expect.stringContaining('--force'))
   })
 
   it('broken link warn is in English when language=en', async () => {
@@ -1813,5 +2028,352 @@ describe('executeInstall — English language mode (zero results diagnostics)', 
     // English mode: flatten missing warn should be in English
     expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('not found'))
     expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('index.md'))
+  })
+})
+
+// ── Story 7-1 CR Fix #5: claude:*:instructions reserved name 保护 ─────────────
+
+describe('claude:*:instructions reserved name 保护（Story 7-1 CR Fix #5）', () => {
+  let tmpDir: string
+  let reporter: Reporter
+
+  beforeEach(async () => {
+    tmpDir = await makeTmpDir()
+    reporter = makeReporter()
+  })
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true })
+  })
+
+  const RESERVED_NAMES = [
+    'CLAUDE.md',
+    'CLAUDE.local.md',
+    'AGENTS.md',
+    'AGENTS.local.md',
+    'settings.json',
+    'settings.local.json',
+    '.claudeignore',
+  ]
+
+  it.each(RESERVED_NAMES)(
+    'claude:global:instructions 安装 %s 时跳过并输出 warn（即便 --force）',
+    async (reservedName) => {
+      const srcFile = join(tmpDir, 'src', reservedName)
+      const targetDir = join(tmpDir, 'target')
+      await mkdir(join(tmpDir, 'src'), { recursive: true })
+      await mkdir(targetDir, { recursive: true })
+      await writeFile(srcFile, 'should not be written')
+
+      const plan: MatchedPlan = {
+        items: [
+          {
+            rule: {
+              tool: 'claude',
+              scope: 'global',
+              sourceDir: 'instructions',
+              type: InstallType.Files,
+              targetDir: '.claude/',
+            },
+            sourceFiles: [srcFile],
+            targetPath: targetDir,
+            mode: 'copy',
+          },
+        ],
+      }
+
+      const pathResolver = makePathResolver(tmpDir)
+      await executeInstall(plan, makeArgs({ force: true }), reporter, pathResolver as never)
+
+      // 目标文件不应被创建
+      const destPath = join(targetDir, reservedName)
+      await expect(access(destPath)).rejects.toThrow()
+      // reporter.warn 应被调用且包含保留文件名
+      expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining(reservedName))
+    },
+  )
+
+  it('claude:global:instructions 非保留文件名正常安装', async () => {
+    const srcFile = join(tmpDir, 'src', 'custom-instruction.md')
+    const targetDir = join(tmpDir, 'target')
+    await mkdir(join(tmpDir, 'src'), { recursive: true })
+    await mkdir(targetDir, { recursive: true })
+    await writeFile(srcFile, 'custom content')
+
+    const plan: MatchedPlan = {
+      items: [
+        {
+          rule: {
+            tool: 'claude',
+            scope: 'global',
+            sourceDir: 'instructions',
+            type: InstallType.Files,
+            targetDir: '.claude/',
+          },
+          sourceFiles: [srcFile],
+          targetPath: targetDir,
+          mode: 'copy',
+        },
+      ],
+    }
+
+    const pathResolver = makePathResolver(tmpDir)
+    await executeInstall(plan, makeArgs(), reporter, pathResolver as never)
+
+    // 非保留文件应被正常安装
+    const destPath = join(targetDir, 'custom-instruction.md')
+    const content = await readFile(destPath, 'utf-8')
+    expect(content).toBe('custom content')
+  })
+
+  it('非 claude instructions 规则不触发保护（claude:global:agents 中的 CLAUDE.md 可正常安装）', async () => {
+    const srcFile = join(tmpDir, 'src', 'CLAUDE.md')
+    const targetDir = join(tmpDir, 'target')
+    await mkdir(join(tmpDir, 'src'), { recursive: true })
+    await mkdir(targetDir, { recursive: true })
+    await writeFile(srcFile, 'agent content')
+
+    const plan: MatchedPlan = {
+      items: [
+        {
+          rule: {
+            tool: 'claude',
+            scope: 'global',
+            sourceDir: 'agents',
+            type: InstallType.Files,
+            targetDir: '.claude/agents/',
+          },
+          sourceFiles: [srcFile],
+          targetPath: targetDir,
+          mode: 'copy',
+        },
+      ],
+    }
+
+    const pathResolver = makePathResolver(tmpDir)
+    await executeInstall(plan, makeArgs(), reporter, pathResolver as never)
+
+    // agents 规则下的 CLAUDE.md 不受保护限制
+    const destPath = join(targetDir, 'CLAUDE.md')
+    const content = await readFile(destPath, 'utf-8')
+    expect(content).toBe('agent content')
+  })
+
+  // ── R2 #1(b): 大小写不敏感 ─────────────────────────────────────────────────
+
+  it.each(['claude.md', 'Claude.MD', 'CLAUDE.MD', 'Settings.JSON', '.ClaudeIgnore'])(
+    'R2 #1(b): 大小写变体 %s 也被拦截（大小写不敏感比较）',
+    async (mixedCaseName) => {
+      const srcFile = join(tmpDir, 'src', mixedCaseName)
+      const targetDir = join(tmpDir, 'target')
+      await mkdir(join(tmpDir, 'src'), { recursive: true })
+      await mkdir(targetDir, { recursive: true })
+      await writeFile(srcFile, 'should not be written')
+
+      const plan: MatchedPlan = {
+        items: [
+          {
+            rule: {
+              tool: 'claude',
+              scope: 'global',
+              sourceDir: 'instructions',
+              type: InstallType.Files,
+              targetDir: '.claude/',
+            },
+            sourceFiles: [srcFile],
+            targetPath: targetDir,
+            mode: 'copy',
+          },
+        ],
+      }
+
+      const pathResolver = makePathResolver(tmpDir)
+      await executeInstall(plan, makeArgs({ force: true }), reporter, pathResolver as never)
+
+      const destPath = join(targetDir, mixedCaseName)
+      await expect(access(destPath)).rejects.toThrow()
+      expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining(mixedCaseName))
+    },
+  )
+
+  // ── R2 #1(a): Directories 类型也受保护 ─────────────────────────────────────
+
+  it('R2 #1(a): claude:global:instructions Directories 类型下 CLAUDE.md 也被拦截', async () => {
+    const srcFile = join(tmpDir, 'src', 'CLAUDE.md')
+    const targetDir = join(tmpDir, 'target')
+    await mkdir(join(tmpDir, 'src'), { recursive: true })
+    await mkdir(targetDir, { recursive: true })
+    await writeFile(srcFile, 'should not be written')
+
+    const plan: MatchedPlan = {
+      items: [
+        {
+          rule: {
+            tool: 'claude',
+            scope: 'global',
+            sourceDir: 'instructions',
+            type: InstallType.Directories,
+            targetDir: '.claude/',
+          },
+          sourceFiles: [srcFile],
+          targetPath: targetDir,
+          mode: 'copy',
+        },
+      ],
+    }
+
+    const pathResolver = makePathResolver(tmpDir)
+    await executeInstall(plan, makeArgs({ force: true }), reporter, pathResolver as never)
+
+    const destPath = join(targetDir, 'CLAUDE.md')
+    await expect(access(destPath)).rejects.toThrow()
+    expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('CLAUDE.md'))
+  })
+
+  // ── R3 #1: Flatten 分支守卫 ────────────────────────────────────────────────
+
+  it('R3 #1: claude:global:instructions Flatten 类型下目录名为 CLAUDE 时（destName=CLAUDE.md）被拦截', async () => {
+    // Flatten 类型：sourceFiles 为子目录列表，destName = basename(srcDir) + '.md'
+    const srcDir = join(tmpDir, 'src', 'CLAUDE')
+    const mainFile = join(srcDir, 'index.md')
+    const targetDir = join(tmpDir, 'target')
+    await mkdir(srcDir, { recursive: true })
+    await mkdir(targetDir, { recursive: true })
+    await writeFile(mainFile, 'should not be written')
+
+    const plan: MatchedPlan = {
+      items: [
+        {
+          rule: {
+            tool: 'claude',
+            scope: 'global',
+            sourceDir: 'instructions',
+            type: InstallType.Flatten,
+            targetDir: '.claude/',
+          },
+          sourceFiles: [srcDir],
+          targetPath: targetDir,
+          mode: 'copy',
+        },
+      ],
+    }
+
+    const pathResolver = makePathResolver(tmpDir)
+    await executeInstall(plan, makeArgs({ force: true }), reporter, pathResolver as never)
+
+    const destPath = join(targetDir, 'CLAUDE.md')
+    await expect(access(destPath)).rejects.toThrow()
+    expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('CLAUDE.md'))
+  })
+
+  // ── R3 #3: 聚合 warn ─────────────────────────────────────────────────────────
+
+  it('R3 #3: 多个 reserved-name 文件被拦截后输出包含拦截数量的聚合 warn', async () => {
+    const srcDir = join(tmpDir, 'src')
+    const targetDir = join(tmpDir, 'target')
+    await mkdir(srcDir, { recursive: true })
+    await mkdir(targetDir, { recursive: true })
+    for (const name of ['CLAUDE.md', 'AGENTS.md']) {
+      await writeFile(join(srcDir, name), 'should not be written')
+    }
+
+    const plan: MatchedPlan = {
+      items: [
+        {
+          rule: {
+            tool: 'claude',
+            scope: 'global',
+            sourceDir: 'instructions',
+            type: InstallType.Files,
+            targetDir: '.claude/',
+          },
+          sourceFiles: [join(srcDir, 'CLAUDE.md'), join(srcDir, 'AGENTS.md')],
+          targetPath: targetDir,
+          mode: 'copy',
+        },
+      ],
+    }
+
+    const pathResolver = makePathResolver(tmpDir)
+    await executeInstall(plan, makeArgs({ force: true }), reporter, pathResolver as never)
+
+    // 聚合 warn 应包含拦截数量和 "Claude Code 保留文件" 字样
+    const warnCalls = vi.mocked(reporter.warn).mock.calls.map((c) => String(c[0]))
+    const summaryCall = warnCalls.find((w) => w.includes('2') && w.includes('Claude Code'))
+    expect(summaryCall).toBeDefined()
+  })
+
+  // ── R4 #3: completePhase 语义修复 ─────────────────────────────────────────
+
+  it('R4 #3a: 全部文件均为 reserved-skip 时 completePhase 输出专属黄色摘要', async () => {
+    const srcDir = join(tmpDir, 'src-reserved-only')
+    const targetDir = join(tmpDir, 'target-reserved-only')
+    await mkdir(srcDir, { recursive: true })
+    await mkdir(targetDir, { recursive: true })
+    for (const name of ['CLAUDE.md', 'AGENTS.md']) {
+      await writeFile(join(srcDir, name), 'reserved content')
+    }
+
+    const plan: MatchedPlan = {
+      items: [
+        {
+          rule: {
+            tool: 'claude',
+            scope: 'global',
+            sourceDir: 'instructions',
+            type: InstallType.Files,
+            targetDir: '.claude/',
+          },
+          sourceFiles: [join(srcDir, 'CLAUDE.md'), join(srcDir, 'AGENTS.md')],
+          targetPath: targetDir,
+          mode: 'copy',
+        },
+      ],
+    }
+
+    const pathResolver = makePathResolver(tmpDir)
+    await executeInstall(plan, makeArgs({ force: true }), reporter, pathResolver as never)
+
+    expect(reporter.completePhase).toHaveBeenCalledWith(
+      '⚠️ 全部源文件均被 Claude Code reserved-name 保护拦截，未执行任何写入（--force 对此无效）',
+    )
+  })
+
+  it('R4 #3b: 混合 reserved-skip + 其他 skip 时 completePhase 输出通用摘要', async () => {
+    const srcDir = join(tmpDir, 'src-mixed-skip')
+    const targetDir = join(tmpDir, 'target-mixed-skip')
+    await mkdir(srcDir, { recursive: true })
+    await mkdir(targetDir, { recursive: true })
+
+    // CLAUDE.md 会被 reserved-name 保护拦截
+    await writeFile(join(srcDir, 'CLAUDE.md'), 'reserved content')
+    // normal.md 已存在于目标目录且内容相同 → up-to-date skip
+    await writeFile(join(srcDir, 'normal.md'), 'same content')
+    await writeFile(join(targetDir, 'normal.md'), 'same content')
+
+    const plan: MatchedPlan = {
+      items: [
+        {
+          rule: {
+            tool: 'claude',
+            scope: 'global',
+            sourceDir: 'instructions',
+            type: InstallType.Files,
+            targetDir: '.claude/',
+          },
+          sourceFiles: [join(srcDir, 'CLAUDE.md'), join(srcDir, 'normal.md')],
+          targetPath: targetDir,
+          mode: 'copy',
+        },
+      ],
+    }
+
+    const pathResolver = makePathResolver(tmpDir)
+    await executeInstall(plan, makeArgs({ force: false }), reporter, pathResolver as never)
+
+    // reservedSkipCount(1) < processedCount(2) → 通用灰色摘要
+    expect(reporter.completePhase).toHaveBeenCalledWith(
+      '执行安装... 没有新增/更新文件，全部已是最新或被跳过',
+    )
   })
 })

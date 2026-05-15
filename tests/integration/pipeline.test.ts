@@ -955,41 +955,17 @@ describe('Story 5.7 Task 4: BUILTIN_RULES E2E 覆盖扩展 (CR TODO-013)', () =>
     const mcpTarget = pathJoin(tmpDir, '.github', 'server.json')
     await expect(fsAccess(mcpTarget)).resolves.toBeUndefined()
 
+    // v2.0 AC #2: mcp-tools 同时写入 .vscode/（copilot project 规则双目标路径）
+    const vscodeMcpTarget = pathJoin(tmpDir, '.vscode', 'server.json')
+    await expect(fsAccess(vscodeMcpTarget)).resolves.toBeUndefined()
+
     expect(result.items.filter((i) => i.status === 'new').length).toBeGreaterThan(0)
   })
 
-  // ── vscode:global ──────────────────────────────────────────────────────────
-
-  it('vscode:global — mcp-tools(Files) 安装到 ~/.vscode/', async () => {
-    const stages = createProductionStages(mockPathResolver)
-    const args = createE2ETestArgs({ tools: ['vscode'], global: true })
-
-    const source = await stages.resolve(args, mockReporter)
-    const authed = await stages.authenticate(source, args, mockReporter)
-    const repo = await stages.clone(authed, args, mockReporter)
-    const env = await stages.detect(repo, args, mockReporter)
-    const plan = await stages.match(env, args, mockReporter)
-
-    // vscode:global 只有 1 条规则: mcp-tools(Files)
-    const vscodeGlobalRules = BUILTIN_RULES.filter(
-      (r) => r.tool === 'vscode' && r.scope === 'global',
-    )
-    expect(plan.items.length).toBe(vscodeGlobalRules.length)
-
-    const mcpItem = plan.items[0]
-    expect(mcpItem!.rule.tool).toBe('vscode')
-    expect(mcpItem!.rule.scope).toBe('global')
-    expect(mcpItem!.rule.type).toBe('Files')
-    expect(mcpItem!.rule.sourceDir).toBe('mcp-tools')
-
-    const result = await stages.install(plan, args, mockReporter)
-
-    // server.json 应安装到 ~/.vscode/
-    const mcpTarget = pathJoin(homeDir, '.vscode', 'server.json')
-    await expect(fsAccess(mcpTarget)).resolves.toBeUndefined()
-
-    expect(result.items[0]?.status).toBe('new')
-  })
+  // ── vscode:global (v2.0: removed, VS Code merged into Copilot context) ───────
+  // 原 vscode:global mcp-tools 测试已在 v2.0 移除；
+  // copilot:project mcp-tools → .vscode/ 端到端集成测试已在本 it block 上方验证（AC #2 闭合）
+  // Story 7-10 将补充更完整的多工具矩阵集成测试（cr-todo-backlog: AC#2-.vscode/-e2e-story-7-10）
 
   // ── cursor:project ─────────────────────────────────────────────────────────
 

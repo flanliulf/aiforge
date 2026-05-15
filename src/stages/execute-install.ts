@@ -54,6 +54,7 @@ import { checkConflict, checkDirConflict } from '../services/manifest.js'
 import type { ConflictType } from '../services/manifest.js'
 import { handleConflict } from './conflict-resolver.js'
 import { msg } from '../core/messages.js'
+import chalk from 'chalk'
 
 // ── 状态判定 ──────────────────────────────────────────────────────────────────
 
@@ -155,10 +156,66 @@ async function checkBrokenLinks(
   }
 }
 
+// ── claude:*:instructions reserved name 保护 ─────────────────────────────────
+
+/**
+ * Claude Code 在 ~/.claude/ 和 .claude/ 根目录维护的保留文件（全小写，比较时 .toLowerCase()）。
+ * 即便 --force 也跳过，防止覆盖用户最高优先级配置（NFR-C7 + Story 7-1 CR Fix #5 / R2 #1）
+ */
+const CLAUDE_INSTRUCTIONS_RESERVED_NAMES = new Set([
+  'claude.md',
+  'claude.local.md',
+  'agents.md',
+  'agents.local.md',
+  'settings.json',
+  'settings.local.json',
+  '.claudeignore',
+])
+
 // ── flatten 主文件查找 ────────────────────────────────────────────────────────
 
 /** flatten 模式默认主文件名 */
 const DEFAULT_MAIN_FILE = 'index.md'
+const INSTALL_PROGRESS_DETAIL_THRESHOLD = 10
+const INSTALL_PROGRESS_MILESTONES = 10
+const ZERO_RESULT_DIAG_DETAIL_THRESHOLD = 5
+
+function summarizeDiagnosticValues(values: string[]): string {
+  if (values.length === 0) return '-'
+
+  const visibleValues = values.slice(0, ZERO_RESULT_DIAG_DETAIL_THRESHOLD)
+  if (values.length <= ZERO_RESULT_DIAG_DETAIL_THRESHOLD) {
+    return visibleValues.join(', ')
+  }
+
+  const hiddenCount = values.length - ZERO_RESULT_DIAG_DETAIL_THRESHOLD
+  return `${visibleValues.join(', ')}, ... ${msg('reporter.collapsedItems').replace('{count}', String(hiddenCount))}`
+}
+
+function formatInstallProgress(processedCount: number, totalFiles: number): string {
+  return `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`
+}
+
+function shouldReportInstallProgress(
+  processedCount: number,
+  totalFiles: number,
+  lastReportedCount: number,
+): boolean {
+  if (totalFiles === 0 || processedCount === 0 || processedCount === lastReportedCount) {
+    return false
+  }
+
+  if (processedCount === totalFiles || totalFiles <= INSTALL_PROGRESS_DETAIL_THRESHOLD) {
+    return true
+  }
+
+  if (processedCount === 1) {
+    return true
+  }
+
+  const milestoneSize = Math.max(1, Math.ceil(totalFiles / INSTALL_PROGRESS_MILESTONES))
+  return processedCount - lastReportedCount >= milestoneSize
+}
 
 // ── 冲突检测辅助 ────────────────────────────────────────────────────────────
 
@@ -254,35 +311,46 @@ async function processConflict(
 
 /**
  * 零结果诊断（FR-032）。
- * 当安装结果为空或全部为 skipped 时，输出诊断信息。
+ * 当安装结果为空时，输出诊断信息。
  */
 function diagnoseZeroResults(
   plan: MatchedPlan,
   resultItems: InstallResult['items'],
   reporter: Reporter,
 ): void {
-  const hasActualInstall = resultItems.some(
-    (item) => item.status === 'new' || item.status === 'updated',
-  )
-  if (hasActualInstall) return
+  if (resultItems.length > 0) return
 
   const scannedDirs = [...new Set(plan.items.map((item) => item.rule.sourceDir))]
   const matchedRules = plan.items.map((item) => `${item.rule.tool}:${item.rule.scope}`)
+  const totalSourceEntries = plan.items.reduce((sum, item) => sum + item.sourceFiles.length, 0)
+  const noInstallSources = totalSourceEntries === 0
 
   reporter.warn(msg('executeInstall.zeroResultsWarning'))
   reporter.warn('')
   reporter.warn(msg('executeInstall.diagHeader'))
-  reporter.warn(msg('executeInstall.diagScannedDirs').replace('{dirs}', scannedDirs.join(', ')))
+  reporter.warn(
+    msg('executeInstall.diagScannedDirs').replace('{dirs}', summarizeDiagnosticValues(scannedDirs)),
+  )
   reporter.warn(
     msg('executeInstall.diagMatchedRules')
-      .replace('{rules}', matchedRules.join(', '))
+      .replace('{rules}', summarizeDiagnosticValues(matchedRules))
       .replace('{count}', String(matchedRules.length)),
   )
-  reporter.warn(msg('executeInstall.diagAllSkipped'))
+  reporter.warn(
+    noInstallSources
+      ? msg('executeInstall.diagNoInstallSources')
+      : msg('executeInstall.diagEmptyDirectories'),
+  )
   reporter.warn('')
   reporter.warn(msg('executeInstall.suggestHeader'))
-  reporter.warn(msg('executeInstall.suggestForce'))
-  reporter.warn(msg('executeInstall.suggestCheckRepo'))
+  if (noInstallSources) {
+    reporter.warn(msg('executeInstall.suggestCheckSelection'))
+    reporter.warn(msg('executeInstall.suggestCheckRepoContent'))
+    return
+  }
+
+  reporter.warn(msg('executeInstall.suggestCheckEmptyDirectories'))
+  reporter.warn(msg('executeInstall.suggestCheckDirectoryContents'))
 }
 
 // ── manifest 冲突上下文 ─────────────────────────────────────────────────────
@@ -345,6 +413,17 @@ export async function executeInstall(
     return sum + item.sourceFiles.length
   }, 0)
   let processedCount = 0
+  let lastReportedCount = 0
+  let reservedSkipCount = 0
+
+  const updateInstallProgress = (): void => {
+    if (!shouldReportInstallProgress(processedCount, totalFiles, lastReportedCount)) {
+      return
+    }
+
+    reporter.updatePhase(formatInstallProgress(processedCount, totalFiles))
+    lastReportedCount = processedCount
+  }
 
   for (const item of plan.items) {
     // 空 sourceFiles 静默跳过：不创建目录、不产生副作用（CR R4-#1）
@@ -367,6 +446,37 @@ export async function executeInstall(
         const targetName = basename(srcDir) + '.md'
         const destPath = join(item.targetPath, targetName)
 
+        // NFR-S5: 安全校验前置，即便后续 early-return 也经过路径穿越检查
+        await validateDestPathSecurity(destPath, allowedRoot)
+
+        // claude:*:instructions reserved name 硬保护（Flatten 分支，CR Fix R3 #1, Story 7-1）
+        // 守卫范围限定 instructions：仅 instructions 直接写入 .claude/ 根目录（顶级配置位置）
+        // agents/ 子目录写入不冲突，不在保护范围内（方向 B，CR R3 ID-7）
+        if (
+          item.rule.tool === 'claude' &&
+          item.rule.sourceDir === 'instructions' &&
+          CLAUDE_INSTRUCTIONS_RESERVED_NAMES.has(targetName.toLocaleLowerCase('en-US'))
+        ) {
+          reporter.warn(
+            msg('executeInstall.claudeInstructionsReservedSkip')
+              .replace('{name}', targetName)
+              .replace('{targetDir}', item.targetPath),
+          )
+          resultItems.push({
+            status: 'skipped',
+            tool: item.rule.tool,
+            toolDisplayName: toolNameMap.get(item.rule.tool),
+            targetGroupLabel: item.rule.targetDir,
+            targetGroupPath: item.targetPath,
+            sourcePath: srcDir,
+            targetPath: destPath,
+          })
+          reservedSkipCount++
+          processedCount++
+          updateInstallProgress()
+          continue
+        }
+
         // 检查主文件是否存在
         try {
           await access(mainPath)
@@ -383,21 +493,18 @@ export async function executeInstall(
               status: 'skipped',
               tool: item.rule.tool,
               toolDisplayName: toolNameMap.get(item.rule.tool),
+              targetGroupLabel: item.rule.targetDir,
+              targetGroupPath: item.targetPath,
               sourcePath: srcDir,
               targetPath: destPath,
             })
             processedCount++
-            reporter.updatePhase(
-              `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
-            )
+            updateInstallProgress()
             continue
           }
           // 其他 I/O 错误向上抛出
           throw error
         }
-
-        // 安全校验
-        await validateDestPathSecurity(destPath, allowedRoot)
 
         // 冲突检测与处理（Story 4.4 + 4.5）
         const conflict = await detectConflict(mainPath, destPath, manifestContext)
@@ -413,13 +520,13 @@ export async function executeInstall(
             status: 'skipped',
             tool: item.rule.tool,
             toolDisplayName: toolNameMap.get(item.rule.tool),
+            targetGroupLabel: item.rule.targetDir,
+            targetGroupPath: item.targetPath,
             sourcePath: mainPath,
             targetPath: destPath,
           })
           processedCount++
-          reporter.updatePhase(
-            `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
-          )
+          updateInstallProgress()
           continue
         }
 
@@ -429,14 +536,14 @@ export async function executeInstall(
             await createSymlink(mainPath, destPath)
           }
           processedCount++
-          reporter.updatePhase(
-            `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
-          )
+          updateInstallProgress()
           itemModes.set(destPath, 'symlink')
           resultItems.push({
             status,
             tool: item.rule.tool,
             toolDisplayName: toolNameMap.get(item.rule.tool),
+            targetGroupLabel: item.rule.targetDir,
+            targetGroupPath: item.targetPath,
             sourcePath: mainPath,
             targetPath: destPath,
           })
@@ -446,13 +553,13 @@ export async function executeInstall(
             await copyFile(mainPath, destPath)
           }
           processedCount++
-          reporter.updatePhase(
-            `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
-          )
+          updateInstallProgress()
           resultItems.push({
             status,
             tool: item.rule.tool,
             toolDisplayName: toolNameMap.get(item.rule.tool),
+            targetGroupLabel: item.rule.targetDir,
+            targetGroupPath: item.targetPath,
             sourcePath: mainPath,
             targetPath: destPath,
           })
@@ -461,11 +568,42 @@ export async function executeInstall(
     } else {
       // ── files / directories 类型 ──────────────────────────────────
       for (const srcPath of item.sourceFiles) {
-        if (item.rule.type === InstallType.Files) {
-          const destPath = join(item.targetPath, basename(srcPath))
+        const destPath = join(item.targetPath, basename(srcPath))
 
-          // 文件级 symlink 逃逸校验（NFR-S5）
-          await validateDestPathSecurity(destPath, allowedRoot)
+        // NFR-S5: 安全校验前置，即便 reserved-skip early-return 也经过路径穿越检查（CR Fix R3 #2）
+        await validateDestPathSecurity(destPath, allowedRoot)
+
+        // claude:*:instructions reserved name 硬保护（CR Fix #5 / R2 #1 / R3 #2, Story 7-1）
+        // Files + Directories 共享前置守卫；toLocaleLowerCase('en-US') 锁定 locale；即便 --force 也跳过（NFR-C7）
+        // 守卫范围限定 instructions：仅 instructions 直接写入 .claude/ 根目录（Claude Code 顶级配置位置）
+        // agents/CLAUDE.md 写入 .claude/agents/ 子目录，不冲突，不在保护范围内（方向 B，CR R3 ID-7）
+        if (
+          item.rule.tool === 'claude' &&
+          item.rule.sourceDir === 'instructions' &&
+          CLAUDE_INSTRUCTIONS_RESERVED_NAMES.has(basename(srcPath).toLocaleLowerCase('en-US'))
+        ) {
+          reporter.warn(
+            msg('executeInstall.claudeInstructionsReservedSkip')
+              .replace('{name}', basename(srcPath))
+              .replace('{targetDir}', item.targetPath),
+          )
+          resultItems.push({
+            status: 'skipped',
+            tool: item.rule.tool,
+            toolDisplayName: toolNameMap.get(item.rule.tool),
+            targetGroupLabel: item.rule.targetDir,
+            targetGroupPath: item.targetPath,
+            sourcePath: srcPath,
+            targetPath: destPath,
+          })
+          reservedSkipCount++
+          processedCount++
+          updateInstallProgress()
+          continue
+        }
+
+        if (item.rule.type === InstallType.Files) {
+          // 冲突检测与处理（Story 4.4 + 4.5）
 
           // 冲突检测与处理（Story 4.4 + 4.5）
           const conflict = await detectConflict(srcPath, destPath, manifestContext)
@@ -481,13 +619,13 @@ export async function executeInstall(
               status: 'skipped',
               tool: item.rule.tool,
               toolDisplayName: toolNameMap.get(item.rule.tool),
+              targetGroupLabel: item.rule.targetDir,
+              targetGroupPath: item.targetPath,
               sourcePath: srcPath,
               targetPath: destPath,
             })
             processedCount++
-            reporter.updatePhase(
-              `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
-            )
+            updateInstallProgress()
             continue
           }
 
@@ -498,14 +636,14 @@ export async function executeInstall(
               await createSymlink(srcPath, destPath)
             }
             processedCount++
-            reporter.updatePhase(
-              `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
-            )
+            updateInstallProgress()
             itemModes.set(destPath, 'symlink')
             resultItems.push({
               status,
               tool: item.rule.tool,
               toolDisplayName: toolNameMap.get(item.rule.tool),
+              targetGroupLabel: item.rule.targetDir,
+              targetGroupPath: item.targetPath,
               sourcePath: srcPath,
               targetPath: destPath,
             })
@@ -516,23 +654,18 @@ export async function executeInstall(
               await copyFile(srcPath, destPath)
             }
             processedCount++
-            reporter.updatePhase(
-              `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
-            )
+            updateInstallProgress()
             resultItems.push({
               status,
               tool: item.rule.tool,
               toolDisplayName: toolNameMap.get(item.rule.tool),
+              targetGroupLabel: item.rule.targetDir,
+              targetGroupPath: item.targetPath,
               sourcePath: srcPath,
               targetPath: destPath,
             })
           }
         } else if (item.rule.type === InstallType.Directories) {
-          const destPath = join(item.targetPath, basename(srcPath))
-
-          // 目录级 symlink 逃逸校验（NFR-S5）
-          await validateDestPathSecurity(destPath, allowedRoot)
-
           if (item.mode === 'symlink') {
             // 冲突检测与处理（CR Round-1 修复）：symlink 模式目录级冲突
             const conflict = await detectDirConflict(destPath, manifestContext)
@@ -548,13 +681,13 @@ export async function executeInstall(
                 status: 'skipped',
                 tool: item.rule.tool,
                 toolDisplayName: toolNameMap.get(item.rule.tool),
+                targetGroupLabel: item.rule.targetDir,
+                targetGroupPath: item.targetPath,
                 sourcePath: srcPath,
                 targetPath: destPath,
               })
               processedCount++
-              reporter.updatePhase(
-                `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
-              )
+              updateInstallProgress()
               continue
             }
 
@@ -564,14 +697,14 @@ export async function executeInstall(
               await createSymlink(srcPath, destPath)
             }
             processedCount++
-            reporter.updatePhase(
-              `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
-            )
+            updateInstallProgress()
             itemModes.set(destPath, 'symlink')
             resultItems.push({
               status,
               tool: item.rule.tool,
               toolDisplayName: toolNameMap.get(item.rule.tool),
+              targetGroupLabel: item.rule.targetDir,
+              targetGroupPath: item.targetPath,
               sourcePath: srcPath,
               targetPath: destPath,
             })
@@ -600,23 +733,43 @@ export async function executeInstall(
                 status: fileStatus,
                 tool: item.rule.tool,
                 toolDisplayName: toolNameMap.get(item.rule.tool),
+                targetGroupLabel: item.rule.targetDir,
+                targetGroupPath: item.targetPath,
                 sourcePath: srcFilePath,
                 targetPath: destFilePath,
               })
             }
             processedCount++
-            reporter.updatePhase(
-              `${msg('phases.install').replace('...', '')}... (${processedCount}/${totalFiles})`,
-            )
+            updateInstallProgress()
           }
         }
       }
     }
   }
 
+  // reserved-name 拦截聚合提示（CR Fix R3 #3）：让用户了解保护拦截事实，避免 completePhase 误导
+  if (reservedSkipCount > 0) {
+    reporter.warn(
+      msg('executeInstall.reservedSkippedSummary').replace('{count}', String(reservedSkipCount)),
+    )
+  }
+
   // 断链检测（Task 1.6 / AC #5 / NFR-R6）
   if (itemModes.size > 0) {
     await checkBrokenLinks(resultItems, itemModes, reporter)
+  }
+
+  const hasActualInstall = resultItems.some(
+    (item) => item.status === 'new' || item.status === 'updated',
+  )
+
+  if (!hasActualInstall && resultItems.length > 0) {
+    if (reservedSkipCount > 0 && reservedSkipCount === processedCount) {
+      reporter.completePhase(chalk.yellow(msg('executeInstall.reservedSkippedOnlySummary')))
+    } else {
+      reporter.completePhase(chalk.gray(msg('executeInstall.skippedOnlySummary')))
+    }
+    return { items: resultItems }
   }
 
   // 零结果诊断（FR-032 / AC #5）

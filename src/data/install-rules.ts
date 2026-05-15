@@ -6,7 +6,13 @@ const Directories: InstallType = 'Directories' as InstallType
 const Flatten: InstallType = 'Flatten' as InstallType
 
 /**
- * MVP 内置安装规则表 — 16 条规则覆盖 4 工具 × 全局/项目
+ * v2.0 内置安装规则表 — 19 条规则覆盖 3 工具 × 全局/项目
+ *
+ * v2.0 变更（Breaking Change）:
+ *   - 删除: vscode:global:mcp-tools（VS Code 归并到 Copilot 语境）
+ *   - 新增: copilot:project:mcp-tools → .vscode/（承接原 vscode 项目级 MCP 语义）
+ *   - 新增: claude:global:instructions + claude:project:instructions（双路径）
+ *   - 新增: cursor:global:agents（补齐全局 agents 规则）
  *
  * 规则来源: PRD 安装规则映射表 + architecture/03-core-decisions.md#D2
  */
@@ -42,7 +48,7 @@ export const BUILTIN_RULES: InstallRule[] = [
     targetDir: '~/.copilot/',
   },
 
-  // ── Copilot: 项目 (4 条) ──
+  // ── Copilot: 项目 (5 条) ──
   {
     tool: 'copilot',
     scope: 'project',
@@ -64,10 +70,12 @@ export const BUILTIN_RULES: InstallRule[] = [
     type: Files,
     targetDir: '.github/',
   },
-  // mcp-tools 同上，目标为工具项目根目录
+  // mcp-tools 同上，目标为工具项目根目录（.github/）
   { tool: 'copilot', scope: 'project', sourceDir: 'mcp-tools', type: Files, targetDir: '.github/' },
+  // v2.0: 承接原 vscode 项目级 MCP 配置语义（.vscode/mcp.json）
+  { tool: 'copilot', scope: 'project', sourceDir: 'mcp-tools', type: Files, targetDir: '.vscode/' },
 
-  // ── Claude: 全局 + 项目 (4 条) ──
+  // ── Claude: 全局 + 项目 (6 条) ──
   // Claude Code 的 sub-agents 概念对应 agents/ 源目录
   {
     tool: 'claude',
@@ -83,6 +91,14 @@ export const BUILTIN_RULES: InstallRule[] = [
     type: Directories,
     targetDir: '~/.claude/skills/',
   },
+  // v2.0: claude 全局 instructions → ~/.claude/（补齐）
+  {
+    tool: 'claude',
+    scope: 'global',
+    sourceDir: 'instructions',
+    type: Files,
+    targetDir: '~/.claude/',
+  },
   {
     tool: 'claude',
     scope: 'project',
@@ -97,8 +113,24 @@ export const BUILTIN_RULES: InstallRule[] = [
     type: Directories,
     targetDir: '.claude/skills/',
   },
+  // v2.0: claude 项目级 instructions → .claude/（补齐）
+  {
+    tool: 'claude',
+    scope: 'project',
+    sourceDir: 'instructions',
+    type: Files,
+    targetDir: '.claude/',
+  },
 
-  // ── Cursor: 全局 + 项目 (3 条) ──
+  // ── Cursor: 全局 + 项目 (4 条) ──
+  // v2.0: 新增全局 agents 规则，与项目级保持对称
+  {
+    tool: 'cursor',
+    scope: 'global',
+    sourceDir: 'agents',
+    type: Files,
+    targetDir: '~/.cursor/rules/',
+  },
   {
     tool: 'cursor',
     scope: 'global',
@@ -120,10 +152,6 @@ export const BUILTIN_RULES: InstallRule[] = [
     type: Files,
     targetDir: '.cursor/rules/',
   },
-
-  // ── VS Code: 全局 (1 条) ──
-  // mcp-tools 目标为工具根目录：VS Code MCP 配置需放在用户配置目录固定位置，不建子目录
-  { tool: 'vscode', scope: 'global', sourceDir: 'mcp-tools', type: Files, targetDir: '~/.vscode/' },
 ]
 
 /**

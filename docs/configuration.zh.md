@@ -75,7 +75,7 @@ npx aiforge [repo-url] [options]
 | `repo-url` | `string` | `config.defaultRepo` | Git 仓库 URL 或 GitHub 简写 |
 | `-g, --global` | `boolean` | `false` | 安装到用户级全局目录 |
 | `-l, --link` | `boolean` | `false` | 使用符号链接模式（仅限全局） |
-| `-t, --tools <tools...>` | `string[]` | 自动检测 | 目标工具：`copilot`、`claude`、`cursor`、`vscode` |
+| `-t, --tools <tools...>` | `string[]` | 自动检测 | 目标工具：`copilot`、`claude`、`cursor`（v2.0 起 `vscode` 已移除，请改用 `copilot`；详见[迁移指南](migration-v2.zh.md)） |
 | `-d, --dirs <dirs...>` | `string[]` | 全部 | 资源类型：`agents`、`skills`、`instructions`、`mcp-tools` |
 | `--dry-run` | `boolean` | `false` | 仅预览，不写入文件 |
 | `--quiet` | `boolean` | `false` | 极简输出 |

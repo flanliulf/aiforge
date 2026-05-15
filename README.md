@@ -17,7 +17,7 @@ Knowledge Repo (Git)            aiforge              Local AI Tools
 │  agents/     │         │              │      │ GitHub Copilot │
 │  skills/     │────────>│  Auto-detect │─────>│ Claude Code    │
 │  instructions│         │  Rule-match  │      │ Cursor         │
-│  mcp-tools/  │         │  Install     │      │ VS Code        │
+│  mcp-tools/  │         │  Install     │      │                │
 └──────────────┘         └──────────────┘      └────────────────┘
 ```
 
@@ -27,7 +27,7 @@ Knowledge Repo (Git)            aiforge              Local AI Tools
 
 ## Features
 
-- **Multi-tool support** — Auto-detects and installs to GitHub Copilot, Claude Code, Cursor, and VS Code
+- **Multi-tool support** — Auto-detects and installs to GitHub Copilot, Claude Code, and Cursor
 - **Global + Project scope** — User-level global install (`-g`) or project-level install (default)
 - **Copy or Symlink** — Copy files by default; use `-l` for symlinks that auto-update with `git pull`
 - **Four resource types** — Agents, Skills, Instructions, and MCP Tools
@@ -187,18 +187,19 @@ npx aiforge update
 
 ## Supported AI Tools
 
+> **v2.0**: The `vscode` tool has been removed. VS Code MCP configuration is now managed via the `copilot` project rule. See [docs/migration-v2.md](docs/migration-v2.md).
+
 | Tool | Global | Project | Resource Types |
 |------|:------:|:-------:|----------------|
 | GitHub Copilot | ✅ | ✅ | Agents, Skills, Instructions, MCP Tools |
-| Claude Code | ✅ | ✅ | Agents, Skills |
-| Cursor | ✅ | ✅ | Skills, Agents |
-| VS Code | ✅ | — | MCP Tools |
+| Claude Code | ✅ | ✅ | Agents, Skills, Instructions |
+| Cursor | ✅ | ✅ | Agents, Skills |
 | Universal (`.agents/`, `.agent/`) | — | ✅ | Agents, Skills |
 
 ### Detailed Install Rules
 
 <details>
-<summary>Click to expand the full 20-rule matrix (16 tool rules + 4 universal rules)</summary>
+<summary>Click to expand the full 23-rule matrix (19 tool rules + 4 universal rules)</summary>
 
 | Tool | Scope | Source Dir | Install Type | Target Dir |
 |------|-------|-----------|:------------:|------------|
@@ -210,14 +211,17 @@ npx aiforge update
 | Copilot | project | `skills/` | Directories | `.github/skills/` |
 | Copilot | project | `instructions/` | Files | `.github/` |
 | Copilot | project | `mcp-tools/` | Files | `.github/` |
+| Copilot | project | `mcp-tools/` | Files | `.vscode/` |
 | Claude | global | `agents/` | Files | `~/.claude/agents/` |
 | Claude | global | `skills/` | Directories | `~/.claude/skills/` |
+| Claude | global | `instructions/` | Files | `~/.claude/` |
 | Claude | project | `agents/` | Files | `.claude/agents/` |
 | Claude | project | `skills/` | Directories | `.claude/skills/` |
+| Claude | project | `instructions/` | Files | `.claude/` |
+| Cursor | global | `agents/` | Files | `~/.cursor/rules/` |
 | Cursor | global | `skills/` | Flatten | `~/.cursor/rules/` |
 | Cursor | project | `skills/` | Flatten | `.cursor/rules/` |
 | Cursor | project | `agents/` | Files | `.cursor/rules/` |
-| VS Code | global | `mcp-tools/` | Files | `~/.vscode/` |
 | Universal | project | `skills/` | Directories | `.agents/skills/` |
 | Universal | project | `agents/` | Files | `.agents/agents/` |
 | Universal | project | `skills/` | Directories | `.agent/skills/` |

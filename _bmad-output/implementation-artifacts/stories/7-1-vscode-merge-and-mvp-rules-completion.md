@@ -1,6 +1,6 @@
 # Story 7.1: VS Code 归并 + MVP 三工具规则补齐（Breaking Change）
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -15,12 +15,12 @@ So that v2.0.0 版本无破坏性地覆盖 MVP 已安装配置，已有用户收
 1. **Given** `src/data/tool-registry.ts` 当前包含 `vscode` ToolDefinition  
    **When** Story 7-1 实施完成  
    **Then** `TOOL_DEFINITIONS` 中不再包含 `id: 'vscode'` 的条目  
-   **And** `BUILTIN_RULES` 中原 vscode 规则（`.vscode/mcp.json` 项目级 MCP）被迁移并绑定到 `copilot` 工具
+   **And** `BUILTIN_RULES` 中原 vscode 规则（`.vscode/` 项目级 MCP，文件名沿用 `mcp-tools/` 源目录）被迁移并绑定到 `copilot` 工具
 
-2. **Given** MVP 阶段 copilot/claude/cursor 的规则存在缺失（claude 缺 instructions 双路径、cursor 缺全局 agents 路径、copilot 缺 `.vscode/mcp.json` 项目级 MCP）  
+2. **Given** MVP 阶段 copilot/claude/cursor 的规则存在缺失（claude 缺 instructions 双路径、cursor 缺全局 agents 路径、copilot 缺 `.vscode/` 项目级 MCP）  
    **When** 用户执行 `aiforge install`  
-   **Then** 新增规则生效：claude instructions 支持全局 `~/.claude/` 和项目根双路径；cursor agents 支持 `~/.cursor/rules/` 全局；copilot 新增 `.vscode/mcp.json` 项目级 MCP 规则  
-   **And** `BUILTIN_RULES` 总量从 16 条变为 20 条（+5/-1）
+   **Then** 新增规则生效：claude instructions 支持全局 `~/.claude/` 和项目根双路径；cursor agents 支持 `~/.cursor/rules/` 全局；copilot 新增 `.vscode/` 项目级 MCP 规则（文件名沿用 `mcp-tools/` 源目录）  
+   **And** `BUILTIN_RULES` 总量从 16 条变为 19 条（+4/-1；规格标注 20 为笔误，见 Dev Notes Debug Log #2）
 
 3. **Given** 已安装 MVP v1.x 的用户，其环境存在 `~/.vscode/` 目录但无 `~/.copilot/` 目录  
    **When** 用户执行 `aiforge install`（工具检测阶段）  
@@ -43,53 +43,53 @@ So that v2.0.0 版本无破坏性地覆盖 MVP 已安装配置，已有用户收
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 删除 vscode 工具定义并补齐 copilot 规则 (AC: #1, #2)
-  - [ ] 1.1 在 `src/data/tool-registry.ts` 中删除 `id: 'vscode'` 的 ToolDefinition 条目
-  - [ ] 1.2 在 `src/data/install-rules.ts` 中删除 `tool: 'vscode'` 的全局 mcp-tools 规则
-  - [ ] 1.3 新增 `copilot` 项目级规则：`{ tool: 'copilot', scope: 'project', sourceDir: 'mcp-tools', type: Files, targetDir: '.vscode/' }` —— 承接原 vscode 项目级 MCP 配置语义
-  - [ ] 1.4 验证 `RULE_INDEX` 自动重建（IIFE 自执行），无需手动改动
-- [ ] Task 2: 补齐 claude instructions 双路径规则 (AC: #2)
-  - [ ] 2.1 新增 claude 全局 instructions 规则：`{ tool: 'claude', scope: 'global', sourceDir: 'instructions', type: Files, targetDir: '~/.claude/' }`
-  - [ ] 2.2 新增 claude 项目级 instructions 规则：`{ tool: 'claude', scope: 'project', sourceDir: 'instructions', type: Files, targetDir: '.claude/' }`
-  - [ ] 2.3 注意 Claude Code 坚持 `CLAUDE.md`（FR-058 规则），instructions 源目录中的 `CLAUDE.md` 与 `AGENTS.md` 共存场景在 Story 7-3/7-9 进一步处理，此处仅按 Files 类型分发即可
-- [ ] Task 3: 补齐 cursor 全局 agents 规则 (AC: #2)
-  - [ ] 3.1 新增 cursor 全局 agents 规则：`{ tool: 'cursor', scope: 'global', sourceDir: 'agents', type: Files, targetDir: '~/.cursor/rules/' }`
-  - [ ] 3.2 与现有 `cursor:project agents → .cursor/rules/` 规则保持对称
-- [ ] Task 4: 实现 vscode-only 用户的 migration 兼容提示 (AC: #3)
-  - [ ] 4.1 在 `src/stages/detect-tools.ts` 中新增辅助函数 `detectLegacyVscodeOnly(pathResolver)`：当 `~/.vscode/` 存在但 `~/.copilot/` 不存在时返回 true
-  - [ ] 4.2 在 `detectTools()` 自动检测分支，若 `detectedTools` 不含 `copilot` 且 `detectLegacyVscodeOnly()` 为 true，调用 `reporter.warn(msg('detectTools.vscodeMergedNote'))` 输出 migration 提示（仅一次）
-  - [ ] 4.3 该提示**不阻断**安装流程；仅做语义化告知。绝不读写 `~/.vscode/` 目录任何文件（NFR-C7）
-  - [ ] 4.4 在 `src/core/messages.ts` 新增 i18n 键：
+- [x] Task 1: 删除 vscode 工具定义并补齐 copilot 规则 (AC: #1, #2)
+  - [x] 1.1 在 `src/data/tool-registry.ts` 中删除 `id: 'vscode'` 的 ToolDefinition 条目
+  - [x] 1.2 在 `src/data/install-rules.ts` 中删除 `tool: 'vscode'` 的全局 mcp-tools 规则
+  - [x] 1.3 新增 `copilot` 项目级规则：`{ tool: 'copilot', scope: 'project', sourceDir: 'mcp-tools', type: Files, targetDir: '.vscode/' }` —— 承接原 vscode 项目级 MCP 配置语义
+  - [x] 1.4 验证 `RULE_INDEX` 自动重建（IIFE 自执行），无需手动改动
+- [x] Task 2: 补齐 claude instructions 双路径规则 (AC: #2)
+  - [x] 2.1 新增 claude 全局 instructions 规则：`{ tool: 'claude', scope: 'global', sourceDir: 'instructions', type: Files, targetDir: '~/.claude/' }`
+  - [x] 2.2 新增 claude 项目级 instructions 规则：`{ tool: 'claude', scope: 'project', sourceDir: 'instructions', type: Files, targetDir: '.claude/' }`
+  - [x] 2.3 注意 Claude Code 坚持 `CLAUDE.md`（FR-058 规则），instructions 源目录中的 `CLAUDE.md` 与 `AGENTS.md` 共存场景在 Story 7-3/7-9 进一步处理，此处仅按 Files 类型分发即可
+- [x] Task 3: 补齐 cursor 全局 agents 规则 (AC: #2)
+  - [x] 3.1 新增 cursor 全局 agents 规则：`{ tool: 'cursor', scope: 'global', sourceDir: 'agents', type: Files, targetDir: '~/.cursor/rules/' }`
+  - [x] 3.2 与现有 `cursor:project agents → .cursor/rules/` 规则保持对称
+- [x] Task 4: 实现 vscode-only 用户的 migration 兼容提示 (AC: #3)
+  - [x] 4.1 在 `src/stages/detect-tools.ts` 中新增辅助函数 `detectLegacyVscodeOnly(pathResolver)`：当 `~/.vscode/` 存在但 `~/.copilot/` 不存在时返回 true
+  - [x] 4.2 在 `detectTools()` 自动检测分支，若 `detectedTools` 不含 `copilot` 且 `detectLegacyVscodeOnly()` 为 true，调用 `reporter.warn(msg('detectTools.vscodeMergedNote'))` 输出 migration 提示（仅一次）
+  - [x] 4.3 该提示**不阻断**安装流程；仅做语义化告知。绝不读写 `~/.vscode/` 目录任何文件（NFR-C7）
+  - [x] 4.4 在 `src/core/messages.ts` 新增 i18n 键：
     - `detectTools.vscodeMergedNote`（中：⚠️ 检测到 ~/.vscode/ 但未检测到 ~/.copilot/。从 v2.0 起 VS Code 已归并到 GitHub Copilot 语境...；英：⚠️ Detected ~/.vscode/ without ~/.copilot/. Since v2.0, VS Code has been merged into the GitHub Copilot context...）
     - 提示中包含：① VS Code MCP 现由 Copilot 项目级规则承接；② 安装 GitHub Copilot 扩展后重新执行 `aiforge install`；③ 现有 `~/.vscode/` 文件不会被覆盖
-- [ ] Task 5: 编写 / 修订单元测试 (AC: #1, #2, #3)
-  - [ ] 5.1 修改 `tests/data/install-rules.test.ts`：
-    - 总数断言：`BUILTIN_RULES.length === 20`（原为 16）
+- [x] Task 5: 编写 / 修订单元测试 (AC: #1, #2, #3)
+  - [x] 5.1 修改 `tests/data/install-rules.test.ts`：
+    - 总数断言：`BUILTIN_RULES.length === 19`（Story 规格声明 20，实际净变化 +3，最终 19）
     - 不存在 `tool === 'vscode'` 的规则
     - 存在 `tool === 'copilot' && scope === 'project' && targetDir === '.vscode/'` 规则
     - 存在 claude 全局 + 项目 instructions 规则各 1 条
     - 存在 cursor 全局 agents 规则 1 条
-  - [ ] 5.2 修改 `tests/data/tool-registry.test.ts`（若存在；否则在 `install-rules.test.ts` 同测试文件中追加 describe 块）：
+  - [x] 5.2 修改 `tests/data/tool-registry.test.ts`：
     - `TOOL_DEFINITIONS` 中无 `id === 'vscode'`
-    - 工具数量为 4（copilot/claude/cursor + 后续 epic-7 工具会扩展，本 story 完成后仍为 4）
-  - [ ] 5.3 修改 `tests/stages/detect-tools.test.ts`：
-    - 新增用例：mock `~/.vscode/` 存在 + `~/.copilot/` 不存在 → reporter.warn 被调用且包含 `vscodeMergedNote` 文本片段
+    - 工具数量为 3（copilot/claude/cursor）
+  - [x] 5.3 修改 `tests/stages/detect-tools.test.ts`：
+    - 新增用例：mock `~/.vscode/` 存在 + `~/.copilot/` 不存在 → reporter.warn 被调用且包含 `~/.vscode/` 和 `v2.0` 文本
     - 新增用例：`~/.copilot/` 存在 → 不输出 vscodeMergedNote 提示
     - 验证 mock 调用次数：vscodeMergedNote 提示在单次 detectTools 调用内最多输出 1 次
-- [ ] Task 6: 文档与版本更新 (AC: #4, #5)
-  - [ ] 6.1 在 `package.json` 将 version 从 `1.x.x` 升级到 `2.0.0`
-  - [ ] 6.2 创建/更新 `CHANGELOG.md`：v2.0.0 章节包含 Breaking Changes（`vscode` 工具 ID 删除、归并到 copilot）+ Added（claude instructions 双路径、cursor 全局 agents、copilot 项目级 mcp `.vscode/`）
-  - [ ] 6.3 创建 `docs/migration-v2.md` + `docs/migration-v2.zh.md`：
+- [x] Task 6: 文档与版本更新 (AC: #4, #5)
+  - [x] 6.1 在 `package.json` 将 version 从 `1.x.x` 升级到 `2.0.0`
+  - [x] 6.2 创建/更新 `CHANGELOG.md`：v2.0.0 章节包含 Breaking Changes（`vscode` 工具 ID 删除、归并到 copilot）+ Added（claude instructions 双路径、cursor 全局 agents、copilot 项目级 mcp `.vscode/`）
+  - [x] 6.3 创建 `docs/migration-v2.md` + `docs/migration-v2.zh.md`：
     - 版本差异对照表
     - 旧 vscode 规则 → 新 copilot 规则映射表
     - 升级命令（`npm install -g aiforge@2.0.0`）
     - 用户操作步骤：① 升级；② 安装 Copilot 扩展（如未安装）；③ 重新执行 `aiforge install`；④ `~/.vscode/` 现有文件保留
-    - 常见问题（FAQ）至少 3 条
-  - [ ] 6.4 更新 `README.md` + `README.zh.md` 的工具支持章节，标注 v2.0 变更
-- [ ] Task 7: 质量门禁验证 (AC: #6)
-  - [ ] 7.1 `npm test` — 全绿
-  - [ ] 7.2 `npm run lint:src` — 退出码 0
-  - [ ] 7.3 `npm run build` — 构建通过
+    - 常见问题（FAQ）4 条
+  - [x] 6.4 更新 `README.md` + `README.zh.md` 的工具支持章节，标注 v2.0 变更；更新 `docs/install-rules-matrix.md` + `.zh.md`（移除 vscode 区块，新增规则行，覆盖率表格更新）
+- [x] Task 7: 质量门禁验证 (AC: #6)
+  - [x] 7.1 `npm test` — 全绿（831 tests passing）
+  - [x] 7.2 `npm run lint:src` — 退出码 0
+  - [x] 7.3 `npm run build` — 构建通过（ESM 17ms）
 
 ## Dev Notes
 
@@ -181,10 +181,55 @@ Epic 7 的核心架构约束是**所有新工具仅修改 `src/data/tool-registr
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Sonnet 4.6 (claude-sonnet-4-6)
 
 ### Debug Log References
 
+1. **动态 import 改为静态 import**：`detectLegacyVscodeOnly` 初版在函数体内使用 `const { join } = await import('node:path')`，修正为直接使用文件顶部已有的 `join` 静态导入。
+2. **规则数量决策：19 而非 20**：Story 规格说 "16 → 20（+5/-1）"，但实际显式 Task 只有 +4 条新规则 -1 条 vscode = net +3，最终为 19。更新测试断言为 19，CHANGELOG 也以 19 为准。
+3. **copilot:project 规则数量修正**：Task 1.3 新增 `.vscode/` 后 copilot:project 变为 5 条，对应测试断言从 4 更新为 5。
+4. **dry-run 测试修正**：新增 `cursor:global:agents`（Files 类型）后，dry-run 测试过滤逻辑从 `.endsWith('.md')` 改为 `.includes('.cursor')`，计划目标集合合并 Flatten + Files 两种类型。
+5. **Prettier 格式修正**：`src/data/install-rules.ts` 和 `tests/stages/detect-tools.test.ts` 在修改后均需执行 `npx prettier --write` 以通过 lint 检查。
+6. **vscodeMergedNote 测试断言修正**：初版测试用 `expect.stringContaining('vscodeMergedNote')` 检查 warn 调用，但实际 reporter.warn 接收的是消息内容字符串而非键名，修正为检查 `~/.vscode/` 和 `v2.0` 子串。
+
 ### Completion Notes List
 
+- BUILTIN_RULES 最终为 19 条（规格标注 20 疑为笔误，实际净变化 +3）
+- TOOL_DEFINITIONS 最终为 3 个工具（vscode 已删除）
+- tests/data/tool-registry.test.ts 工具数量断言为 3（不是规格中的 4）
+- vscodeMergedNote 警告在 NO_TOOLS 抛出前输出，不阻断流程（NFR-C7 合规）
+- docs/install-rules-matrix 中 Total = 23（19 工具规则 + 4 通用规则），与 BUILTIN_RULES 19 + UNIVERSAL_RULES 4 一致
+- integration/pipeline.test.ts 中原 vscode:global mcp-tools 测试已移除，注释说明将在 Story 7-10 统一补全
+
 ### File List
+
+**源码改动**：
+- `src/data/tool-registry.ts`
+- `src/data/install-rules.ts`
+- `src/stages/detect-tools.ts`
+- `src/core/messages.ts`
+- `package.json`
+
+**新建文档**：
+- `CHANGELOG.md`
+- `docs/migration-v2.md`
+- `docs/migration-v2.zh.md`
+
+**更新文档**：
+- `docs/install-rules-matrix.md`
+- `docs/install-rules-matrix.zh.md`
+- `README.md`
+- `README.zh.md`
+
+**测试改动**：
+- `tests/data/install-rules.test.ts`
+- `tests/data/tool-registry.test.ts`
+- `tests/stages/detect-tools.test.ts`
+- `tests/integration/pipeline.test.ts`
+- `tests/integration/dry-run.test.ts`
+
+### Change Log
+
+| 日期 | 变更 | 作者 |
+|------|------|------|
+| 2026-05-11 | Story 7-1 全部 7 个 Task 实施完成，质量门禁通过 | Claude Sonnet 4.6 |

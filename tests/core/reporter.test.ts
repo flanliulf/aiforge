@@ -16,6 +16,8 @@ function createSingleToolResult(): InstallResult {
         status: 'new',
         tool: 'copilot',
         toolDisplayName: 'GitHub Copilot',
+        targetGroupLabel: '~/.copilot/agents/',
+        targetGroupPath: '/home/user/.copilot/agents/',
         sourcePath: 'agents/coding-agent.md',
         targetPath: '/home/user/.copilot/agents/coding-agent.md',
       },
@@ -23,6 +25,8 @@ function createSingleToolResult(): InstallResult {
         status: 'updated',
         tool: 'copilot',
         toolDisplayName: 'GitHub Copilot',
+        targetGroupLabel: '~/.copilot/agents/',
+        targetGroupPath: '/home/user/.copilot/agents/',
         sourcePath: 'agents/review-agent.md',
         targetPath: '/home/user/.copilot/agents/review-agent.md',
       },
@@ -30,6 +34,8 @@ function createSingleToolResult(): InstallResult {
         status: 'skipped',
         tool: 'copilot',
         toolDisplayName: 'GitHub Copilot',
+        targetGroupLabel: '~/.copilot/skills/',
+        targetGroupPath: '/home/user/.copilot/skills/',
         sourcePath: 'skills/refactor/',
         targetPath: '/home/user/.copilot/skills/refactor/',
       },
@@ -45,6 +51,8 @@ function createMultiToolResult(): InstallResult {
         status: 'new',
         tool: 'copilot',
         toolDisplayName: 'GitHub Copilot',
+        targetGroupLabel: '~/.copilot/agents/',
+        targetGroupPath: '/home/user/.copilot/agents/',
         sourcePath: 'agents/coding-agent.md',
         targetPath: '/home/user/.copilot/agents/coding-agent.md',
       },
@@ -52,6 +60,8 @@ function createMultiToolResult(): InstallResult {
         status: 'updated',
         tool: 'copilot',
         toolDisplayName: 'GitHub Copilot',
+        targetGroupLabel: '~/.copilot/agents/',
+        targetGroupPath: '/home/user/.copilot/agents/',
         sourcePath: 'agents/review-agent.md',
         targetPath: '/home/user/.copilot/agents/review-agent.md',
       },
@@ -59,6 +69,8 @@ function createMultiToolResult(): InstallResult {
         status: 'new',
         tool: 'claude',
         toolDisplayName: 'Claude Code',
+        targetGroupLabel: '~/.claude/agents/',
+        targetGroupPath: '/home/user/.claude/agents/',
         sourcePath: 'agents/CLAUDE.md',
         targetPath: '/home/user/.claude/agents/CLAUDE.md',
       },
@@ -73,12 +85,16 @@ function createAllNewResult(): InstallResult {
       {
         status: 'new',
         tool: 'claude',
+        targetGroupLabel: '~/.claude/',
+        targetGroupPath: '/home/user/.claude/',
         sourcePath: 'a.md',
         targetPath: '/home/user/.claude/a.md',
       },
       {
         status: 'new',
         tool: 'claude',
+        targetGroupLabel: '~/.claude/',
+        targetGroupPath: '/home/user/.claude/',
         sourcePath: 'b.md',
         targetPath: '/home/user/.claude/b.md',
       },
@@ -93,16 +109,32 @@ function createAllSkippedResult(): InstallResult {
       {
         status: 'skipped',
         tool: 'claude',
+        targetGroupLabel: '~/.claude/',
+        targetGroupPath: '/home/user/.claude/',
         sourcePath: 'a.md',
         targetPath: '/home/user/.claude/a.md',
       },
       {
         status: 'skipped',
         tool: 'claude',
+        targetGroupLabel: '~/.claude/',
+        targetGroupPath: '/home/user/.claude/',
         sourcePath: 'b.md',
         targetPath: '/home/user/.claude/b.md',
       },
     ],
+  }
+}
+
+function createLargeSingleToolResult(count = 25): InstallResult {
+  return {
+    items: Array.from({ length: count }, (_, idx) => ({
+      status: 'new' as const,
+      tool: 'claude',
+      toolDisplayName: 'Claude Code',
+      sourcePath: `skills/tool-${String(idx + 1).padStart(2, '0')}.md`,
+      targetPath: `/home/user/.claude/skills/tool-${String(idx + 1).padStart(2, '0')}.md`,
+    })),
   }
 }
 
@@ -210,6 +242,14 @@ describe('PlainReporter', () => {
     stderrSpy.mockClear()
     reporter.completePhase()
     expect(stderrSpy).toHaveBeenCalled()
+  })
+
+  it('completePhase 可使用显式完成文案覆盖当前阶段名', () => {
+    reporter.startPhase('解析仓库地址...')
+    stderrSpy.mockClear()
+    reporter.completePhase('执行安装... 没有新增/更新文件，全部已是最新或被跳过')
+    const output = stderrSpy.mock.calls[0][0] as string
+    expect(output).toBe('[DONE] 执行安装... 没有新增/更新文件，全部已是最新或被跳过\n')
   })
 
   // Story 5-3 Task 2.3: completePhase 输出 [DONE] 阶段名
@@ -468,6 +508,8 @@ describe('TtyReporter', () => {
     const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
     expect(allOutput).toContain('🔧 GitHub Copilot')
     expect(allOutput).toContain('🔧 Claude Code')
+    expect(allOutput).toContain('📁 ~/.copilot/agents/')
+    expect(allOutput).toContain('📁 ~/.claude/agents/')
   })
 
   it('reportResult: 每行输出 sourcePath → targetPath 格式 (AC #1)', () => {
@@ -569,6 +611,41 @@ describe('TtyReporter', () => {
     expect(allOutput).not.toContain('├──')
   })
 
+  it('reportResult: TTY 模式下超长明细会折叠尾部项，避免刷屏', () => {
+    reporter.reportResult(createLargeSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+
+    expect(allOutput).toContain('其余 20 项已折叠')
+    expect(allOutput).toContain('skills/tool-05.md')
+    expect(allOutput).not.toContain('skills/tool-06.md')
+    expect(allOutput).not.toContain('skills/tool-25.md')
+  })
+
+  it('reportResult: 折叠摘要中的安装/更新/跳过统计使用区分彩色', () => {
+    const origLevel = chalk.level
+    chalk.level = 1
+    try {
+      reporter.reportResult(createLargeSingleToolResult())
+      const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+      // eslint-disable-next-line no-control-regex
+      expect(allOutput).toMatch(/其余 20 项已折叠[^\n]*\x1b\[32m安装: 20 项/)
+      // eslint-disable-next-line no-control-regex
+      expect(allOutput).toMatch(/其余 20 项已折叠[^\n]*\x1b\[34m更新: 0 项/)
+      // eslint-disable-next-line no-control-regex
+      expect(allOutput).toMatch(/其余 20 项已折叠[^\n]*\x1b\[33m跳过: 0 项/)
+    } finally {
+      chalk.level = origLevel
+    }
+  })
+
+  it('reportResult: 同一工具按本地安装主目录分组显示', () => {
+    reporter.reportResult(createSingleToolResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+
+    expect(allOutput).toContain('📁 ~/.copilot/agents/')
+    expect(allOutput).toContain('📁 ~/.copilot/skills/')
+  })
+
   it('reportPlan writes to stdout', () => {
     reporter.reportPlan({
       items: [
@@ -651,6 +728,75 @@ describe('TtyReporter', () => {
     expect(output).toContain('TTY 警告')
   })
 
+  it('warn inserts a newline when spinner is active', () => {
+    reporter.startPhase('执行安装...')
+    stderrSpy.mockClear()
+
+    reporter.warn('TTY 警告')
+
+    const output = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(output.startsWith('\n')).toBe(true)
+    expect(output).toContain('⚠ TTY 警告')
+  })
+
+  it('warn 不会给带缩进且自带 warning 图标的消息重复添加前缀', () => {
+    reporter.warn('  ⚠️ 已存在的告警文案')
+    const output = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(output).toContain('  ⚠️ 已存在的告警文案')
+    expect(output).not.toContain('⚠   ⚠️')
+  })
+
+  it('true-zero TTY warning 使用 warning/header/detail/suggestion 颜色层级', () => {
+    const origLevel = chalk.level
+    chalk.level = 1
+    try {
+      reporter.startPhase('执行安装...')
+      stderrSpy.mockClear()
+
+      reporter.warn('⚠️ 未安装任何文件')
+      const warningOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+      // eslint-disable-next-line no-control-regex
+      expect(warningOutput).toMatch(/\x1b\[33m⚠️ 未安装任何文件/)
+
+      stderrSpy.mockClear()
+      reporter.warn('诊断信息：')
+      const headerOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+      // eslint-disable-next-line no-control-regex
+      expect(headerOutput).toMatch(/\x1b\[1m/)
+      // eslint-disable-next-line no-control-regex
+      expect(headerOutput).toMatch(/\x1b\[36m⚠ 诊断信息：/)
+
+      stderrSpy.mockClear()
+      reporter.warn('  扫描目录: skills, agents')
+      const detailOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+      // eslint-disable-next-line no-control-regex
+      expect(detailOutput).toMatch(/\x1b\[90m⚠ {3}扫描目录: skills, agents/)
+
+      stderrSpy.mockClear()
+      reporter.warn('  1. 检查 --dirs / --filter / --tools 条件是否过窄')
+      const suggestionOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+      expect(suggestionOutput).toContain('\x1b[36m')
+      expect(suggestionOutput).toContain('⚠   1. 检查 --dirs / --filter / --tools 条件是否过窄')
+      expect(suggestionOutput).not.toContain('\x1b[90m')
+    } finally {
+      chalk.level = origLevel
+    }
+  })
+
+  it('连续 warn 在同一活跃 spinner 期间只插入一次换行', () => {
+    reporter.startPhase('执行安装...')
+    stderrSpy.mockClear()
+
+    reporter.warn('第一条警告')
+    reporter.warn('第二条警告')
+
+    const output = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(output.startsWith('\n')).toBe(true)
+    expect(output).toContain('⚠ 第一条警告')
+    expect(output).toContain('⚠ 第二条警告')
+    expect(output.match(/\n/g)?.length ?? 0).toBe(3)
+  })
+
   it('updatePhase writes to stderr when no spinner active', () => {
     reporter.updatePhase('fallback 消息')
     expect(stderrSpy).toHaveBeenCalled()
@@ -679,6 +825,14 @@ describe('TtyReporter', () => {
     const allOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
     // ora.succeed() 输出以 ✔ 开头的成功行，严格锁定 succeed() 语义
     expect(allOutput).toContain('✔')
+  })
+
+  it('completePhase 可使用显式完成文案更新 spinner 成功输出', () => {
+    reporter.startPhase('执行安装...')
+    stderrSpy.mockClear()
+    reporter.completePhase('执行安装... 没有新增/更新文件，全部已是最新或被跳过')
+    const allOutput = stderrSpy.mock.calls.map((c) => c[0] as string).join('')
+    expect(allOutput).toContain('执行安装... 没有新增/更新文件，全部已是最新或被跳过')
   })
 
   // AC #2: updatePhase 在 spinner 激活时更新 spinner.text 而非走 fallback 路径
@@ -788,15 +942,15 @@ describe('TtyReporter', () => {
     }
   })
 
-  it('reportResult: skipped 状态行使用 chalk.gray（包含 ANSI gray 码）(CR #1)', () => {
+  it('reportResult: skipped 状态行使用 chalk.green（包含 ANSI green 码）(CR #1)', () => {
     const origLevel = chalk.level
     chalk.level = 1
     try {
       reporter.reportResult(createSingleToolResult())
       const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
-      // chalk.gray 产生 \x1b[90m（bright black）
+      // chalk.green 产生 \x1b[32m
       // eslint-disable-next-line no-control-regex
-      expect(allOutput).toMatch(/\x1b\[90m/)
+      expect(allOutput).toMatch(/\x1b\[32m/)
     } finally {
       chalk.level = origLevel
     }
@@ -811,6 +965,20 @@ describe('TtyReporter', () => {
       // 统计行 '安装: N 项' 用 chalk.green
       // eslint-disable-next-line no-control-regex
       expect(allOutput).toMatch(/\x1b\[32m安装: \d+ 项/)
+    } finally {
+      chalk.level = origLevel
+    }
+  })
+
+  it('reportResult: 统计行跳过部分使用 chalk.yellow（包含 ANSI yellow 码）(CR #1)', () => {
+    const origLevel = chalk.level
+    chalk.level = 1
+    try {
+      reporter.reportResult(createAllSkippedResult())
+      const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+      // chalk.yellow 产生 \x1b[33m
+      // eslint-disable-next-line no-control-regex
+      expect(allOutput).toMatch(/\x1b\[33m跳过: \d+ 项/)
     } finally {
       chalk.level = origLevel
     }

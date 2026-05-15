@@ -433,9 +433,15 @@ describe('Story 5.5b AC #5: 零结果场景触发诊断输出', () => {
     // 所有项目都 skipped
     expect(result.items.every((i) => i.status === 'skipped')).toBe(true)
 
-    // 触发零结果诊断（warn 被调用）
+    // 全部跳过视为成功：completePhase 被调用，warn 不触发零结果诊断
+    const completePhase = vi.mocked(mockReporter.completePhase)
+    expect(completePhase).toHaveBeenCalled()
     const warnMock = vi.mocked(mockReporter.warn)
-    expect(warnMock).toHaveBeenCalled()
+    // warn 可能被其他阶段调用，但不应包含零结果诊断文案
+    const warnCalls = warnMock.mock.calls.map((call) => call[0])
+    expect(warnCalls.every((msg) => !msg.includes('已扫描目录') && !msg.includes('匹配规则'))).toBe(
+      true,
+    )
   })
 })
 

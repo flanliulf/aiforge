@@ -1,10 +1,12 @@
 # 安装规则矩阵
 
-aiforge 全部内置安装规则的完整参考：16 条工具规则 + 4 条通用目录规则。
+aiforge v2.0 全部内置安装规则的完整参考：19 条工具规则 + 4 条通用目录规则。
+
+> **v2.0 破坏性变更**：`vscode` 工具已移除。VS Code MCP 配置现由 `copilot` 项目级规则管理。升级说明请参见 [migration-v2.zh.md](migration-v2.zh.md)。
 
 ## 概览
 
-aiforge 将知识仓库中的 **4 种资源类型**映射到 **4 个 AI 工具**，跨 **2 个范围**（全局/项目），使用 **3 种安装模式**（Files/Directories/Flatten）。另外，**4 条通用目录规则**提供与具体工具无关的 `.agents/` 和 `.agent/` 访问。
+aiforge 将知识仓库中的 **4 种资源类型**映射到 **3 个 AI 工具**，跨 **2 个范围**（全局/项目），使用 **3 种安装模式**（Files/Directories/Flatten）。另外，**4 条通用目录规则**提供与具体工具无关的 `.agents/` 和 `.agent/` 访问。
 
 ## 完整矩阵
 
@@ -20,6 +22,7 @@ aiforge 将知识仓库中的 **4 种资源类型**映射到 **4 个 AI 工具**
 | 项目 | `skills/` | Directories | `.github/skills/` | 项目级 Skill 包 |
 | 项目 | `instructions/` | Files | `.github/` | 项目级指令 |
 | 项目 | `mcp-tools/` | Files | `.github/` | 项目级 MCP 配置 |
+| 项目 | `mcp-tools/` | Files | `.vscode/` | VS Code 项目 MCP 配置（文件名沿用 `mcp-tools/` 源目录）— v2.0 新增 |
 
 ### Claude Code
 
@@ -27,22 +30,19 @@ aiforge 将知识仓库中的 **4 种资源类型**映射到 **4 个 AI 工具**
 |------|--------|:--------:|----------|------|
 | 全局 | `agents/` | Files | `~/.claude/agents/` | 子代理定义 |
 | 全局 | `skills/` | Directories | `~/.claude/skills/` | Skill 包 |
+| 全局 | `instructions/` | Files | `~/.claude/` | 全局指令文件 — v2.0 新增 |
 | 项目 | `agents/` | Files | `.claude/agents/` | 项目级子代理 |
 | 项目 | `skills/` | Directories | `.claude/skills/` | 项目级 Skills |
+| 项目 | `instructions/` | Files | `.claude/` | 项目级指令文件 — v2.0 新增 |
 
 ### Cursor
 
 | 范围 | 源目录 | 安装类型 | 目标目录 | 说明 |
 |------|--------|:--------:|----------|------|
+| 全局 | `agents/` | Files | `~/.cursor/rules/` | 全局 Agent 文件作为规则 — v2.0 新增 |
 | 全局 | `skills/` | Flatten | `~/.cursor/rules/` | Skills 展平为规则文件 |
 | 项目 | `skills/` | Flatten | `.cursor/rules/` | 项目 Skills 展平为规则 |
 | 项目 | `agents/` | Files | `.cursor/rules/` | Agent 文件作为规则 |
-
-### VS Code
-
-| 范围 | 源目录 | 安装类型 | 目标目录 | 说明 |
-|------|--------|:--------:|----------|------|
-| 全局 | `mcp-tools/` | Files | `~/.vscode/` | MCP 服务器配置 |
 
 ### 通用目录（Universal）
 
@@ -100,21 +100,22 @@ skills/                          ~/.cursor/rules/
 
 | 工具 | 全局规则 | 项目规则 | 合计 |
 |------|:--------:|:--------:|:----:|
-| GitHub Copilot | 4 | 4 | **8** |
-| Claude Code | 2 | 2 | **4** |
-| Cursor | 1 | 2 | **3** |
-| VS Code | 1 | 0 | **1** |
+| GitHub Copilot | 4 | 5 | **9** |
+| Claude Code | 3 | 3 | **6** |
+| Cursor | 2 | 2 | **4** |
 | 通用目录 | 0 | 4 | **4** |
-| **合计** | **8** | **12** | **20** |
+| **合计** | **9** | **14** | **23** |
+
+> 注：`vscode` 工具已在 v2.0 移除。通用目录规则（4 条）与 19 条工具规则分开统计。
 
 ## 资源类型覆盖
 
-| 资源 | Copilot | Claude | Cursor | VS Code |
-|------|:-------:|:------:|:------:|:-------:|
-| Agents | ✅ 全局+项目 | ✅ 全局+项目 | ✅ 项目 | — |
-| Skills | ✅ 全局+项目 | ✅ 全局+项目 | ✅ 全局+项目 | — |
-| Instructions | ✅ 全局+项目 | — | — | — |
-| MCP Tools | ✅ 全局+项目 | — | — | ✅ 全局 |
+| 资源 | Copilot | Claude | Cursor |
+|------|:-------:|:------:|:------:|
+| Agents | ✅ 全局+项目 | ✅ 全局+项目 | ✅ 全局+项目 |
+| Skills | ✅ 全局+项目 | ✅ 全局+项目 | ✅ 全局+项目 |
+| Instructions | ✅ 全局+项目 | ✅ 全局+项目 | — |
+| MCP Tools | ✅ 全局+项目 | — | — |
 
 ## 精细化安装控制
 

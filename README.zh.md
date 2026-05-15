@@ -17,7 +17,7 @@
 │  agents/     │     │              │     │ GitHub Copilot │
 │  skills/     │────→│  自动检测     │────→│ Claude Code    │
 │  instructions│     │  规则匹配     │     │ Cursor         │
-│  mcp-tools/  │     │  安装分发     │     │ VS Code        │
+│  mcp-tools/  │     │  安装分发     │     │                │
 └──────────────┘     └──────────────┘     └────────────────┘
 ```
 
@@ -27,7 +27,7 @@
 
 ## 特性
 
-- **多工具支持** — 自动检测并安装到 GitHub Copilot、Claude Code、Cursor、VS Code
+- **多工具支持** — 自动检测并安装到 GitHub Copilot、Claude Code、Cursor
 - **全局 + 项目** — 支持用户级全局安装（`-g`）和项目级安装（默认）
 - **复制 / 符号链接** — 默认复制文件；`-l` 使用符号链接，`git pull` 即可自动更新
 - **四类资源** — Agents、Skills、Instructions、MCP Tools 全覆盖
@@ -187,18 +187,19 @@ npx aiforge update
 
 ## 支持的 AI 工具
 
+> **v2.0**：`vscode` 工具已移除，VS Code MCP 配置现由 `copilot` 项目规则管理。详见 [docs/migration-v2.zh.md](docs/migration-v2.zh.md)。
+
 | 工具 | 全局安装 | 项目安装 | 支持的资源类型 |
 |------|:------:|:------:|-------------|
 | GitHub Copilot | ✅ | ✅ | Agents, Skills, Instructions, MCP Tools |
-| Claude Code | ✅ | ✅ | Agents, Skills |
-| Cursor | ✅ | ✅ | Skills, Agents |
-| VS Code | ✅ | — | MCP Tools |
+| Claude Code | ✅ | ✅ | Agents, Skills, Instructions |
+| Cursor | ✅ | ✅ | Agents, Skills |
 | 通用目录 (`.agents/`, `.agent/`) | — | ✅ | Agents, Skills |
 
 ### 完整安装规则矩阵
 
 <details>
-<summary>点击展开 20 条规则详情（16 条工具规则 + 4 条通用目录规则）</summary>
+<summary>点击展开 23 条规则详情（19 条工具规则 + 4 条通用目录规则）</summary>
 
 | 工具 | 范围 | 源目录 | 安装类型 | 目标目录 |
 |------|------|-------|:------:|---------|
@@ -210,14 +211,17 @@ npx aiforge update
 | Copilot | 项目 | `skills/` | Directories | `.github/skills/` |
 | Copilot | 项目 | `instructions/` | Files | `.github/` |
 | Copilot | 项目 | `mcp-tools/` | Files | `.github/` |
+| Copilot | 项目 | `mcp-tools/` | Files | `.vscode/` |
 | Claude | 全局 | `agents/` | Files | `~/.claude/agents/` |
 | Claude | 全局 | `skills/` | Directories | `~/.claude/skills/` |
+| Claude | 全局 | `instructions/` | Files | `~/.claude/` |
 | Claude | 项目 | `agents/` | Files | `.claude/agents/` |
 | Claude | 项目 | `skills/` | Directories | `.claude/skills/` |
+| Claude | 项目 | `instructions/` | Files | `.claude/` |
+| Cursor | 全局 | `agents/` | Files | `~/.cursor/rules/` |
 | Cursor | 全局 | `skills/` | Flatten | `~/.cursor/rules/` |
 | Cursor | 项目 | `skills/` | Flatten | `.cursor/rules/` |
 | Cursor | 项目 | `agents/` | Files | `.cursor/rules/` |
-| VS Code | 全局 | `mcp-tools/` | Files | `~/.vscode/` |
 | 通用 | 项目 | `skills/` | Directories | `.agents/skills/` |
 | 通用 | 项目 | `agents/` | Files | `.agents/agents/` |
 | 通用 | 项目 | `skills/` | Directories | `.agent/skills/` |

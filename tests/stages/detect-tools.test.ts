@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { LocalRepo, ParsedArgs } from '../../src/core/types.js'
 import type { Reporter } from '../../src/core/reporter.js'
 import { AiforgeError } from '../../src/core/errors.js'
@@ -34,14 +34,6 @@ vi.mock('../../src/data/tool-registry.js', () => ({
       detect: {
         global: ['~/.cursor'],
         project: ['.cursor'],
-      },
-    },
-    {
-      id: 'vscode',
-      name: 'VS Code',
-      detect: {
-        global: ['~/.vscode'],
-        project: ['.vscode'],
       },
     },
   ],
@@ -100,6 +92,10 @@ describe('detectTools', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     mockPathResolver.home.mockReturnValue('/home/user')
+  })
+
+  afterEach(() => {
+    setLanguage('zh-CN')
   })
 
   // ──────────────────────────────────────────────────────────────
@@ -166,7 +162,6 @@ describe('detectTools', () => {
     expect(env.tools).toContain('copilot')
     expect(env.tools).toContain('claude')
     expect(env.tools).toContain('cursor')
-    expect(env.tools).not.toContain('vscode')
   })
 
   // ──────────────────────────────────────────────────────────────
@@ -409,6 +404,120 @@ describe('detectTools', () => {
     // fix[0] 应为英文 "Supported tools: ..."
     expect(caughtError!.fix[0]).toContain('Supported tools')
     expect(caughtError!.fix[0]).not.toContain('支持的工具')
+    // 清理
+    setLanguage('zh-CN')
+  })
+
+  // ──────────────────────────────────────────────────────────────
+  // Story 7-1: vscode-only migration 提示（AC: #3）
+  // ──────────────────────────────────────────────────────────────
+
+  it('Story 7-1 AC#3: ~/.vscode/ 存在 + ~/.copilot/ 不存在 → reporter.warn 输出 vscodeMergedNote', async () => {
+    // 模拟 ~/.vscode/ 存在但 ~/.copilot/ 不存在，其他工具也不存在
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.vscode') return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    await expect(
+      detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver),
+    ).rejects.toSatisfy((e: unknown) => e instanceof AiforgeError && e.code === 'NO_TOOLS')
+
+    // reporter.warn 被调用，且包含 migration 提示内容
+    const warnCalls = vi.mocked(mockReporter.warn).mock.calls
+    const vscodeMergedCall = warnCalls.find((call) => String(call[0]).includes('~/.vscode/'))
+    expect(vscodeMergedCall).toBeDefined()
+    expect(String(vscodeMergedCall![0])).toContain('v2.0')
+    expect(String(vscodeMergedCall![0])).toContain('~/.vscode/')
+  })
+
+  it('Story 7-1 AC#3: ~/.copilot/ 存在时不输出 vscodeMergedNote 提示', async () => {
+    // 模拟 ~/.copilot/ 存在（copilot 被检测到），不应触发 migration 提示
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.copilot') return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    const warnCalls = vi.mocked(mockReporter.warn).mock.calls
+    const vscodeMergedCall = warnCalls.find((call) => String(call[0]).includes('~/.vscode/'))
+    expect(vscodeMergedCall).toBeUndefined()
+  })
+
+  it('Story 7-1 AC#3: vscodeMergedNote 在单次 detectTools 调用内最多输出 1 次', async () => {
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.vscode') return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    await expect(
+      detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver),
+    ).rejects.toBeInstanceOf(AiforgeError)
+
+    const warnCalls = vi.mocked(mockReporter.warn).mock.calls
+    const vscodeMergedCount = warnCalls.filter((call) =>
+      String(call[0]).includes('~/.vscode/'),
+    ).length
+    expect(vscodeMergedCount).toBe(1)
+  })
+
+  // ── Story 7-1 CR Fix #1: 外移调用点（不再仅限于 NO_TOOLS 分支）────────────
+
+  it('CR Fix #1: ~/.vscode/ 存在 + claude 被检测到（无 copilot）→ vscodeMergedNote 仍然输出', async () => {
+    // claude 被检测到，但 copilot 未检测且 ~/.vscode/ 存在
+    // 修复前：仅在 detectedTools.length === 0 时输出，此场景不输出
+    // 修复后：只要 !detectedTools.includes('copilot') 且 vscode 存在就输出
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.claude') return
+      if (String(p) === '/home/user/.vscode') return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('claude')
+    expect(env.tools).not.toContain('copilot')
+    // vscodeMergedNote 应被输出（即便 claude 已被检测到）
+    const warnCalls = vi.mocked(mockReporter.warn).mock.calls
+    const vscodeMergedCall = warnCalls.find((call) => String(call[0]).includes('~/.vscode/'))
+    expect(vscodeMergedCall).toBeDefined()
+    // AC #3: 提示内容必须包含 "安装 GitHub Copilot 扩展"（防止文案回归；仅 /Copilot/i 不足以保护 ② 项）
+    expect(String(vscodeMergedCall![0])).toContain('GitHub Copilot 扩展')
+  })
+
+  it('R5 Fix #2: 仅项目级 .vscode/ 存在（无 home ~/.vscode/）→ vscodeMergedNote 不输出', async () => {
+    const cwd = process.cwd()
+    // 仅项目级 .vscode/ 存在（无 home/.vscode，无 ~/.copilot/）
+    // v2.0 修复后：detectLegacyVscodeOnly 仅检测 home 级 ~/.vscode/，项目级不触发
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === `${cwd}/.vscode`) return
+      if (String(p) === '/home/user/.claude') return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    const warnCalls = vi.mocked(mockReporter.warn).mock.calls
+    const vscodeMergedCall = warnCalls.find((call) => String(call[0]).includes('~/.vscode/'))
+    expect(vscodeMergedCall).toBeUndefined()
+  })
+
+  it('R6 Fix #2: setLanguage("en") 下 vscodeMergedNote 包含英文 "Install the GitHub Copilot extension"', async () => {
+    setLanguage('en')
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.claude') return // claude 被检测到，防止 NO_TOOLS
+      if (String(p) === '/home/user/.vscode') return // 触发 vscodeMergedNote
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    const warnCalls = vi.mocked(mockReporter.warn).mock.calls
+    const enWarnCall = warnCalls.find((call) => String(call[0]).includes('~/.vscode/'))
+    expect(enWarnCall).toBeDefined()
+    // AC #3 英文文案门禁：必须包含 "Install the GitHub Copilot extension"
+    expect(String(enWarnCall![0])).toContain('Install the GitHub Copilot extension')
     // 清理
     setLanguage('zh-CN')
   })
