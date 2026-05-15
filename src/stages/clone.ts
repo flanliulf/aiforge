@@ -194,6 +194,10 @@ export async function cloneRepo(
   pathResolver: PathResolver = new UnixPathResolver(),
 ): Promise<LocalRepo> {
   reporter.startPhase(msg('phases.clone'))
+  const finish = (repo: LocalRepo): LocalRepo => {
+    reporter.completePhase()
+    return repo
+  }
 
   const targetDir = getTargetDir(source, args, pathResolver)
   const isExisting = await hasLocalRepo(targetDir)
@@ -202,13 +206,13 @@ export async function cloneRepo(
     // 增量更新
     await incrementalUpdate(source, targetDir)
     const sourceFiles = await scanSourceFiles(targetDir)
-    return { repoDir: targetDir, isNew: false, sourceFiles }
+    return finish({ repoDir: targetDir, isNew: false, sourceFiles })
   } else {
     // 首次克隆
     await freshClone(source, targetDir)
     await sanitizeRemoteUrl(source, targetDir)
     const sourceFiles = await scanSourceFiles(targetDir)
-    return { repoDir: targetDir, isNew: true, sourceFiles }
+    return finish({ repoDir: targetDir, isNew: true, sourceFiles })
   }
 }
 

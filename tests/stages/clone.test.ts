@@ -139,6 +139,16 @@ describe('cloneRepo', () => {
 
       expect(mockReporter.startPhase).toHaveBeenCalledWith('克隆仓库...')
     })
+
+    it('首次克隆成功后调用 reporter.completePhase', async () => {
+      vi.mocked(access).mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
+      vi.mocked(readdir).mockResolvedValue([] as never)
+
+      const args = makeArgs()
+      await cloneRepo(mockSource, args, mockReporter, mockPathResolver)
+
+      expect(mockReporter.completePhase).toHaveBeenCalledOnce()
+    })
   })
 
   // AC #2: 增量更新
@@ -178,6 +188,16 @@ describe('cloneRepo', () => {
       const calls = vi.mocked(createGit).mock.calls
       const pullCall = calls.find((c) => c[0] === targetDir)
       expect(pullCall).toBeDefined()
+    })
+
+    it('增量更新成功后调用 reporter.completePhase', async () => {
+      vi.mocked(access).mockResolvedValue(undefined)
+      vi.mocked(readdir).mockResolvedValue([] as never)
+
+      const args = makeArgs()
+      await cloneRepo(mockSource, args, mockReporter, mockPathResolver)
+
+      expect(mockReporter.completePhase).toHaveBeenCalledOnce()
     })
   })
 

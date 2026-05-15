@@ -339,5 +339,22 @@ describe('authenticate', () => {
       expect(mockReporter.startPhase).toHaveBeenCalledOnce()
       expect(mockReporter.startPhase).toHaveBeenCalledWith('验证认证信息...')
     })
+
+    it('SSH 成功路径在返回前调用 reporter.completePhase', async () => {
+      const args = makeArgs({ ssh: true })
+
+      await authenticate(mockSource, args, mockReporter)
+
+      expect(mockReporter.completePhase).toHaveBeenCalledOnce()
+    })
+
+    it('环境变量成功路径在返回前调用 reporter.completePhase', async () => {
+      process.env['AIFORGE_TOKEN'] = 'glpat-secrettoken9999'
+      const args = makeArgs()
+
+      await authenticate(mockSource, args, mockReporter)
+
+      expect(mockReporter.completePhase).toHaveBeenCalledOnce()
+    })
   })
 })

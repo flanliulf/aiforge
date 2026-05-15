@@ -48,6 +48,10 @@ export async function authenticate(
   pathResolver?: PathResolver,
 ): Promise<AuthenticatedSource> {
   reporter.startPhase(msg('phases.auth'))
+  const finish = (result: AuthenticatedSource): AuthenticatedSource => {
+    reporter.completePhase()
+    return result
+  }
 
   // Layer 0: 互斥校验（--ssh 与 --token 不能同时使用）
   if (args.ssh && args.token) {
@@ -63,19 +67,19 @@ export async function authenticate(
 
   // Layer 1: CLI 参数（最高优先级）
   if (args.ssh) {
-    return {
+    return finish({
       ...source,
       cloneUrl: buildSshUrl(source),
       authMethod: 'ssh',
-    }
+    })
   }
 
   if (args.token) {
-    return {
+    return finish({
       ...source,
       cloneUrl: buildTokenUrl(source, args.token),
       authMethod: 'token',
-    }
+    })
   }
 
   // Layer 2: 环境变量（AIFORGE_TOKEN 优先于 GITLAB_TOKEN）
@@ -84,11 +88,11 @@ export async function authenticate(
     reporter.updatePhase(
       `${msg('phases.auth').replace('...', '')}... (Token: ${sanitizeToken(envToken)})`,
     )
-    return {
+    return finish({
       ...source,
       cloneUrl: buildTokenUrl(source, envToken),
       authMethod: 'token',
-    }
+    })
   }
 
   // Layer 3: 配置文件 per-host
@@ -99,18 +103,18 @@ export async function authenticate(
 
     if (hostAuth) {
       if (hostAuth.method === 'ssh') {
-        return {
+        return finish({
           ...source,
           cloneUrl: buildSshUrl(source),
           authMethod: 'ssh',
-        }
+        })
       }
       if (hostAuth.method === 'token' && hostAuth.token) {
-        return {
+        return finish({
           ...source,
           cloneUrl: buildTokenUrl(source, hostAuth.token),
           authMethod: 'token',
-        }
+        })
       }
     }
   } catch (error) {
@@ -124,11 +128,11 @@ export async function authenticate(
   }
 
   // Layer 4: 系统 Git 凭据管理器（不注入认证信息，依赖 git credential manager）
-  return {
+  return finish({
     ...source,
     cloneUrl: buildPlainUrl(source),
     authMethod: 'credential-manager',
-  }
+  })
 }
 
 // ── 内部辅助 ──────────────────────────────────────────────────
