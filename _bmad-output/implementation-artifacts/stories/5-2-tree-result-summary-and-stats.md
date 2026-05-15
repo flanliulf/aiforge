@@ -62,7 +62,8 @@ import chalk from 'chalk';
 
 const toolHeader = chalk.bold(`🔧 ${toolName} (${count} 项)`);
 const newItem = chalk.green(`✅ ${source} → ${target}`);
-const statsLine = `${chalk.green(`安装: ${stats.installed} 项`)}  ${chalk.blue(`更新: ${stats.updated} 项`)}  ${chalk.gray(`跳过: ${stats.skipped} 项`)}`;
+const statsLine = `${chalk.green(`安装: ${chalk.green(stats.installed)} 项`)}  ${chalk.blue(`更新: ${chalk.blue(stats.updated)} 项`)}  ${chalk.gray(`跳过: ${chalk.yellow(stats.skipped)} 项`)}`;
+// 双层语义：明细行 skipped=green（成功）；汇总数字 skipped=yellow（需关注）
 ```
 
 chalk v5+ 是 ESM-only，与项目配置兼容。
@@ -113,7 +114,7 @@ claude-sonnet-4.6
 
 - **Task 1 (TtyReporter.reportResult 树形输出)**：
   - 在 `src/core/reporter.ts` 中增强 `TtyReporter.reportResult()`：工具标题行追加项数 `(N 项)`，每个工具组内文件行使用 `├──`/`└──` 树形连接符
-  - chalk 着色：工具标题用 `chalk.bold`；结果行按状态着色（`new → chalk.green`，`updated → chalk.blue`，`skipped → chalk.gray`）；统计行按段分段着色（安装=green，更新=blue，跳过=gray）
+  - chalk 着色（TTY 双层语义）：工具标题用 `chalk.bold`；**明细行**按状态着色（`new → chalk.green`，`updated → chalk.blue`，`skipped → chalk.green` 同 new，成功语义）；**汇总数字**按语义着色（安装=green、更新=blue、跳过=yellow）——yellow 仅作用于「跳过数量」提示「需关注」；明细行超 5 条折叠为「… 其余 N 项已折叠」（`MAX_TTY_RESULT_DETAILS_PER_TOOL = 5`）
   - 输出到 stdout，符合 Reporter stdout/stderr 分工规范（architecture/03-core-decisions.md#D4）
 
 - **Task 2 (PlainReporter.reportResult)**：4.6b 已完整实现，本 Story 无需改动
@@ -131,7 +132,7 @@ claude-sonnet-4.6
       7. 工具标题使用 chalk.bold（ANSI bold 码验证）
       8. new 状态行使用 chalk.green（ANSI green 码验证）
       9. updated 状态行使用 chalk.blue（ANSI blue 码验证）
-      10. skipped 状态行使用 chalk.gray（ANSI gray 码验证）
+      10. skipped 状态明细行使用 chalk.green（ANSI green 码验证）；汇总数字「跳过: N 项」中的数字使用 chalk.yellow（ANSI yellow 码验证）
       11. 统计行安装部分使用 chalk.green（ANSI green 码验证）
 
 - **质量门禁验证**：
@@ -146,3 +147,15 @@ claude-sonnet-4.6
 - `_bmad-output/project-context.md` — Output Rules：移除 `❌ failed` 图标和统计行 `失败: N 项`（CR 修复）
 - `_bmad-output/planning-artifacts/architecture/04-implementation-patterns.md` — 结果状态图标和统计行：移除 `❌ 失败`（CR 修复）
 - `_bmad-output/planning-artifacts/architecture/03-core-decisions.md` — Reporter 接口和 Stage 类型签名：`InstallResult[]` → `InstallResult`（CR 修复）
+
+---
+
+## 后续修订（2026-04-24 UX 收敛）
+
+> 本次修订源于 TTY 颜色双层语义及明细折叠阈值。已原地更新上文 chalk 代码示例、Dev Notes、AC #10，本块保留变更对照供审计追溯。
+
+| 章节 / 行 | 变更前 | 变更后 | 依据 |
+|----------|--------|--------|------|
+| chalk 使用示例（L65） | `跳过: ${stats.skipped}` 整体 chalk.gray | 明细行 skipped=green；汇总数字 skipped=yellow（仅数字，異口 「需关注」） | 代码：src/core/reporter.ts |
+| Dev Notes·chalk 着色（L116） | skipped=gray、跳过=gray | 明细行与汇总数字双层语义分离；补充明细超 5 条折叠 | 代码：src/core/reporter.ts `MAX_TTY_RESULT_DETAILS_PER_TOOL=5` |
+| AC #10（L134） | skipped 状态行=chalk.gray | skipped 明细行=chalk.green；汇总「跳过」数字=chalk.yellow | 测试：tests/core/reporter.test.ts |

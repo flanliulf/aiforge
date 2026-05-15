@@ -14,7 +14,7 @@ So that 不会丢失花时间调试的自定义配置。
 2. **Given** 用户选择"备份后覆盖" **When** 执行安装 **Then** 将用户文件备份为 `{filename}.aiforge-backup-{YYYYMMDD}`（FR-028），然后执行正常安装
 3. **Given** 用户指定 `--force` **When** 检测到冲突 **Then** 跳过交互式确认，直接覆盖（FR-029）
 4. **Given** 非 TTY 环境下检测到冲突 **When** 需要用户决策 **Then** 直接失败（不进入交互式选择），exit code = 1
-5. **Given** 安装结果为零项（无文件被安装）**When** 安装完成 **Then** 触发零结果诊断（FR-032）
+5. **Given** 安装结果中未产生任何可处理项（`resultItems.length === 0`，如未匹配到任何文件或目标目录为空）**When** 安装完成 **Then** 触发零结果诊断（FR-032）；全部项为 `skipped` 的场景不在此列，视为成功路径输出「没有新增/更新文件，全部已是最新或被跳过」成功摘要
 6. **Given** 临时文件在安装过程中创建 **When** 安装完成（无论成功或失败）**Then** 所有临时文件被清理删除（NFR-S6）
 
 ## Tasks / Subtasks
@@ -33,14 +33,14 @@ So that 不会丢失花时间调试的自定义配置。
   - [x] 2.4 "查看差异"：显示源文件和目标文件的简要对比，然后重新询问
   - [x] 2.5 "中止"：停止整个安装流程
 - [x] Task 3: 实现零结果诊断 (AC: #5)
-  - [x] 3.1 安装完成后检查 results 是否全部为 skipped 或空
-  - [x] 3.2 输出诊断：扫描了哪些目录、匹配了哪些模式、建议修复方式
+  - [x] 3.1 安装完成后区分双分支：`resultItems.length === 0` 走诊断分支；全部 `skipped` 走成功摘要分支（不诊断）
+  - [x] 3.2 诊断分支输出：扫描了哪些目录、匹配了哪些模式、建议如何修复（不含 `--force`）
 - [x] Task 4: 实现临时文件清理 (AC: #6)
   - [x] 4.1 使用 try/finally 确保清理逻辑执行
   - [x] 4.2 清理 manifest.json.tmp 等临时文件
 - [x] Task 5: 编写单元测试 (AC: #1-6)
   - [x] 5.1 扩展 `tests/stages/execute-install.test.ts`
-  - [x] 5.2 测试用例：用户文件冲突交互、备份后覆盖、--force 跳过交互、非 TTY 失败、零结果诊断、临时文件清理
+  - [x] 5.2 测试用例：用户文件冲突交互、备份后覆盖、--force 跳过交互、非 TTY 失败、零结果诊断（未产生可处理项）、全 skipped 成功摘要（不诊断）、临时文件清理
   - [x] 5.3 Mock `@inquirer/prompts`
 
 ## Dev Notes
@@ -106,17 +106,32 @@ if (needsUserDecision) {
 
 ### 零结果诊断 [Source: FR-032]
 
+**分支判定规则：**
+
+- `resultItems.length === 0`（未产生任何可处理项）→ 走诊断分支，调用 `reporter.warn(...)` 输出诊断信息
+- `resultItems.length > 0` 但无 `new` / `updated`（全部 `skipped`）→ 视为成功路径，调用 `reporter.completePhase(chalk.gray('没有新增/更新文件，全部已是最新或被跳过'))`，**不**触发诊断
+
+**诊断分支输出示例（未产生可处理项）：**
+
 ```
-⚠️ 未安装任何文件
+⚠️ 未产生任何可安装项
 
 诊断信息：
   扫描目录: agents/, skills/, instructions/, mcp-tools/
   匹配规则: copilot:global (3 条)
-  所有文件已是最新或被跳过
+  未匹配到任何文件，或目标目录为空
 
 建议：
-  1. 使用 --force 强制重新安装
-  2. 检查知识仓库是否有新内容
+  1. 检查知识仓库是否包含预期子目录
+  2. 检查安装范围过滤 (--filter / config.json)
+```
+
+> 扫描目录与匹配规则超 5 条时折叠为「… 其余 N 项已折叠」；修复建议**不**含 `--force`（避免误导用户覆盖本地修改）。
+
+**成功摘要分支输出示例（全 skipped）：**
+
+```
+✓ 安装完成 · 没有新增/更新文件，全部已是最新或被跳过（灰色）
 ```
 
 ### 临时文件清理
@@ -201,3 +216,16 @@ Claude (claude-sonnet-4-20250514)
 ### Change Log
 
 - 2026-03-30: Story 4.5 实现 — 冲突处理与安全保护（AC #1-6 全部满足）
+
+---
+
+## 后续修订（2026-04-24 UX 收敛）
+
+> 本次修订源于安装阶段 UX 收敛：将原「全 skipped 也触发诊断」拆分为「未产生可处理项=诊断」与「全 skipped=成功摘要」双分支。已原地更新上文 AC #5、Task 3 / Task 5.2、Dev Notes 示例，本块保留变更对照供审计追溯。
+
+| 章节 / 行 | 变更前 | 变更后 | 依据 |
+|----------|--------|--------|------|
+| AC #5 | 安装结果为零项→ 诊断 | `resultItems.length === 0` 走诊断；全 skipped 走成功摘要（不诊断） | 代码：src/stages/execute-install.ts / 测试：tests/integration/edge-cases.test.ts |
+| Task 3 | 「全部为 skipped 或空」为诊断条件 | 明确拆分为双分支处理 | 同上 |
+| Task 5.2 | 零结果诊断各代表不同含义 | 区分诊断与成功摘要两个测试点 | 同上 |
+| Dev Notes·零结果诊断 | 文案「未安装任何文件 + 建议 --force 重装」 | 文案「未产生任何可安装项 + 建议不含 --force」；新增全 skipped 成功摘要示例；说明明细超 5 条折叠 | 代码：src/core/messages.ts 文案键·src/core/reporter.ts MAX_TTY_RESULT_DETAILS_PER_TOOL=5 |

@@ -64,7 +64,7 @@ So that 团队对产品是否达到发布标准有客观、一致、可追溯的
 | B1 | 新员工首次配置旅程 | ⬜ | 手动验证 | |
 | B2 | dry-run 一致性 | ⬜ | E2E 测试 | NFR-U5 |
 | B3 | 冲突备份保护 | ⬜ | E2E 测试 | FR-028 |
-| B4 | 零结果诊断 | ⬜ | E2E 测试 | FR-032 |
+| B4 | 零结果诊断（双分支：`length===0` warn / 全 skipped 成功） | ⚬ | E2E 测试 | FR-032 |
 | B5 | npm 包安全审计 | ⬜ | npm pack 检查 | NFR-S1 |
 | B6 | E2E 测试全部通过 | ⬜ | vitest --run | |
 | B7 | 退出码正确性 | ⬜ | E2E 测试 | 0/1/2/3 |
@@ -154,3 +154,14 @@ claude-opus-4-5 (Amelia — bmad-agent-dev)
 - `_bmad-output/implementation-artifacts/mvp-go-nogo-checklist.md` — 新增，MVP Go/No-Go 发布门禁完整验收清单
 - `_bmad-output/implementation-artifacts/5-5c-mvp-go-nogo-gate.md` — 修改，Story 状态更新为 review，Dev Agent Record 填写完毕
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — 修改，5-5c 状态 ready-for-dev → review
+
+---
+
+## 后续修订（2026-04-24 UX 收敛）
+
+> 本次修订源于零结果诊断分支拆分，只是描述精化（活动路径不变）。已原地更新 B4 门禁描述，本块保留变更对照供审计追溯。
+
+| 章节 / 行 | 变更前 | 变更后 | 依据 |
+|----------|--------|--------|------|
+| B4 门禁 | 零结果诊断 | 零结果诊断（双分支：`length===0` warn / 全 skipped 成功） | 代码：src/stages/execute-install.ts / 测试：tests/integration/edge-cases.test.ts |
+

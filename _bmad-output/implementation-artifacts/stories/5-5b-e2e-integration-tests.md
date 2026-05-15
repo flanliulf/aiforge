@@ -14,7 +14,8 @@ So that 在发布前能够自动验证系统整体可用性，并及时发现回
 2. **Given** 三种安装模式 **When** 分别执行复制、符号链接、flatten **Then** 三种模式均通过验证，输出符合预期
 3. **Given** `--dry-run` 模式 **When** 执行测试 **Then** 不发生任何文件写入，dry-run 输出的完整目标路径列表和安装模式与实际安装结果一致（NFR-U5）
 4. **Given** 文件冲突场景 **When** 执行安装测试 **Then** 至少覆盖三条主路径：`--force` 覆盖、备份后覆盖、跳过，行为符合设计
-5. **Given** 零结果场景 **When** 执行测试 **Then** 触发零结果诊断输出
+5. **Given** 未产生任何可处理项场景（`resultItems.length === 0`，如空仓库或未匹配任何文件）**When** 执行测试 **Then** 触发零结果诊断输出（`reporter.warn`）
+5b. **Given** 全部项为 `skipped` 场景（`resultItems.length > 0` 但无 `new` / `updated`）**When** 执行测试 **Then** 视为成功路径，调用 `reporter.completePhase(...)` 输出成功摘要，**不**触发诊断警告
 6. **Given** macOS 环境 **When** 执行测试 **Then** 所有测试通过（NFR-C1）
 7. **Given** Linux 环境（CI）**When** 执行测试 **Then** 所有测试通过（NFR-C2）。若当前无 CI 环境，先作为手动 runner 验证项，后续补充 CI 自动化。
 
@@ -44,7 +45,7 @@ So that 在发布前能够自动验证系统整体可用性，并及时发现回
   - [x] 5.1 冲突场景 — `--force` 覆盖：预先在目标路径创建文件，验证 `--force` 直接覆盖行为
   - [x] 5.2 冲突场景 — 备份后覆盖：验证 `{filename}.aiforge-backup-{YYYYMMDD}` 备份文件生成
   - [x] 5.3 冲突场景 — 跳过：验证用户选择跳过时文件未被修改，结果为 `status: 'skipped'`
-  - [x] 5.4 零结果场景：空仓库或全部跳过，验证诊断输出
+  - [x] 5.4 零结果场景（拆为两个测试）：空仓库/未匹配验证 `reporter.warn` 诊断输出；全部跳过验证 `reporter.completePhase` 成功摘要（**不**触发诊断 warn）
   - [x] 5.5 排除列表：验证 README.md 等文件不被安装
 
 ## Dev Notes
@@ -203,3 +204,14 @@ claude-sonnet-4-5 (claude-sonnet-4.6)
 - `_bmad-output/project-context.md` — CR 规则提炼：新增"禁止通过选择性测试路径绕行已知缺陷"规则
 - `_bmad-output/planning-artifacts/architecture/04-implementation-patterns.md` — 同步上述新规则（含代码示例）
 - `_bmad-output/implementation-artifacts/cr-todo-backlog.md` — 新增 TODO-013、TODO-014
+
+---
+
+## 后续修订（2026-04-24 UX 收敛）
+
+> 本次修订源于零结果诊断分支拆分。已原地更新上文 AC #5、Task 5.4，本块保留变更对照供审计追溯。
+
+| 章节 / 行 | 变更前 | 变更后 | 依据 |
+|----------|--------|--------|------|
+| AC #5 | 单一场景：零结果触发诊断 | 拆为 #5（`length===0` 验证 `reporter.warn`）与 #5b（全 skipped 验证 `reporter.completePhase`，不诊断） | 代码：src/stages/execute-install.ts / 测试：tests/integration/edge-cases.test.ts |
+| Task 5.4 | 「空仓库或全部跳过」合并为单项验证 | 拆为两个测试（warn vs completePhase） | 同上 |

@@ -64,7 +64,7 @@ This document provides the complete epic and story breakdown for ai-forge, decom
 - FR-029: 用户可以通过 `--force` 参数跳过冲突确认直接覆盖
 - FR-030: 系统在安装前执行预检查（目标路径可写性、权限验证）
 - FR-031: 系统在任何安装步骤失败时立即停止（fail-fast），并输出已完成的操作清单
-- FR-032: 系统在安装结果为零项时触发零结果诊断模式
+- FR-032: 系统在「未产生任何可处理项」（`resultItems.length === 0`）时触发零结果诊断模式；「全部跳过」场景视为成功路径，不触发诊断
 
 **用户交互与体验（FR-033~039）：**
 - FR-033: 用户可以通过 `aiforge init` 完成交互式首次配置（仓库 URL、认证方式、连接验证）
@@ -206,7 +206,7 @@ This document provides the complete epic and story breakdown for ai-forge, decom
 | FR-029 | Epic 4 | --force 跳过确认 |
 | FR-030 | Epic 4 | 预检查（权限验证） |
 | FR-031 | Epic 4 | fail-fast + 操作清单 |
-| FR-032 | Epic 4 | 零结果诊断 |
+| FR-032 | Epic 4 | 零结果诊断（拆为真·零结果 warn / 全部跳过成功双分支） |
 | FR-033 | Epic 2 | aiforge init 交互式配置 |
 | FR-034 | Epic 3 | --dry-run 预览 |
 | FR-035 | Epic 5 | 阶段式进度展示 |
@@ -290,3 +290,15 @@ This document provides the complete epic and story breakdown for ai-forge, decom
 **FRs 覆盖：** FR-047~053（共 7 条）
 **关键交付：** `--list` 子命令逻辑 + `--filter` 参数解析与 Match 阶段过滤 + `BUILTIN_RULES` 通用目录规则 + `config.json universalDirs` 字段 + `aiforge init` 新增偏好步骤
 **NFRs：** NFR-P6, NFR-U6, NFR-C7
+
+---
+
+## 后续修订（2026-04-24 UX 收敛）
+
+> 本次修订源于安装阶段 UX 收敛。已原地更新上文 FR-032 描述与映射表，本块保留变更对照供审计追溯。
+
+| 章节 / 行 | 变更前 | 变更后 | 依据 |
+|----------|--------|--------|------|
+| FR-032 描述 | 「安装结果为零项」触发诊断 | 区分「`length===0` 诊断」与「全 skipped 成功」双分支 | 代码：src/stages/execute-install.ts |
+| FR-032 映射表（L209） | 零结果诊断 | 标注「拆为真·零结果 warn / 全部跳过成功双分支」 | 同上 |
+

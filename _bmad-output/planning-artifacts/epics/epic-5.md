@@ -171,10 +171,14 @@ So that 在发布前能够自动验证系统整体可用性，并及时发现回
 **Then** 系统触发冲突处理流程
 **And** 备份、跳过、覆盖等行为符合设计预期
 
-**Given** 安装结果为零项的场景
+**Given** 安装结果中未产生任何可处理项（`resultItems.length === 0`）的场景
 **When** 执行端到端测试
-**Then** 系统触发零结果诊断输出
-**And** 输出包含扫描路径、匹配结果和修复建议
+**Then** 系统触发零结果诊断输出（`reporter.warn`）
+**And** 输出包含扫描路径、匹配结果和修复建议（不含 `--force`）
+
+**Given** 安装结果全部项为 `skipped`（`resultItems.length > 0` 但无 `new` / `updated`）的场景
+**When** 执行端到端测试
+**Then** 系统视为成功路径，调用 `reporter.completePhase()` 输出成功摘要，**不**触发诊断警告
 
 **Given** macOS 环境
 **When** 执行端到端测试
@@ -278,4 +282,15 @@ So that 发布后代码变更有自动化测试守护，不会因回归而损害
 **Given** `BUILTIN_RULES` 共 16 条规则
 **When** 执行 E2E 集成测试
 **Then** 覆盖率从 ~31% 提升到 80%+（CR TODO-013）
+
+---
+
+## 后续修订（2026-04-24 UX 收敛）
+
+> 本次修订源于安装阶段 UX 收敛。已原地更新上文 AC，本块保留变更对照供审计追溯。
+
+| 章节 / 行 | 变更前 | 变更后 | 依据 |
+|----------|--------|--------|------|
+| AC·E2E 零结果场景（L176 附近） | 单一场景：零项触发诊断 | 拆为两场景：`length===0` 验证 `reporter.warn`；全 skipped 验证 `reporter.completePhase` | 代码：src/stages/execute-install.ts / 测试：tests/integration/edge-cases.test.ts |
+| TTY 颜色语义 | 未记录 | 明细行与摘要数字颜色语义分离；skipped 明细=green、摘要数字=yellow | 代码：src/core/reporter.ts |
 
