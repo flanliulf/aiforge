@@ -7,7 +7,7 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 32 |
+| 🔴 open | 33 |
 | 🟡 in-progress | 0 |
 | ✅ resolved | 12 |
 
@@ -114,6 +114,17 @@
 - **描述**: `executeInstallForRule()` 的 Directories copy 分支使用 `walkDirFiles()` 递归枚举源目录内容，该函数仅 yield 常规文件（`entry.isFile()`），静默跳过空目录和符号链接条目。若规则包源目录中包含空子目录（作为占位结构）或符号链接文件，安装后目标目录将缺少这些条目，可能导致工具运行时找不到预期的目录结构或链接目标。当前规则包生态中尚无实际依赖空目录或 symlink 的场景，风险较低。修复方向：（1）空目录：在 walkDirFiles 或调用侧补充 `mkdirSync` 保证目录结构完整性；（2）符号链接：需先明确 symlink 策略决策（复制目标 vs 重建链接 vs 忽略），再统一实现。
 - **涉及文件**: `src/stages/execute-install.ts`
 - **建议时机**: 后续 symlink 策略设计决策时或空目录处理优化 Story 中
+- **状态**: open
+- **解决记录**:
+
+### TODO-040: Story 7-5 规则总量规格口径需统一澄清为 40
+
+- **来源**: 7-5 CR round 1-2 (2026-05-18 ~ 2026-05-18)
+- **优先级**: P2
+- **类别**: docs
+- **描述**: Story 7-5 CR 已裁定 `BUILTIN_RULES` 的有效验收口径为 `33 条当前基线 + 7 条 OpenCode 新增规则 = 40 条`，而非 Story/Epic/PLAN 中残留的 41 条。当前残留位置包括：`_bmad-output/implementation-artifacts/stories/7-5-opencode-xdg-integration.md:34` 的 AC #5、同文件 `:65` 的 Task 5.1、`_bmad-output/planning-artifacts/epics/epic-7.md:353`、`_bmad-output/implementation-artifacts/code-reviews/7-5-code-review/PLAN.md:12`。这些不影响代码验收，但会导致后续 finalizer 或文档审计重复误判。
+- **涉及文件**: `_bmad-output/implementation-artifacts/stories/7-5-opencode-xdg-integration.md`, `_bmad-output/planning-artifacts/epics/epic-7.md`, `_bmad-output/implementation-artifacts/code-reviews/7-5-code-review/PLAN.md`
+- **建议时机**: 下次进行 Epic 7 文档收敛、Story 7-5 文档归档或发布前规格一致性整理时统一修正为 40，并保留“41 为累计计数误差”的说明。
 - **状态**: open
 - **解决记录**:
 

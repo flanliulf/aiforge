@@ -245,6 +245,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - Tool detection: data-driven `TOOL_DEFINITIONS` registry (not hardcoded functions)
 - Path resolution: `PathResolver` interface centralizes all platform-specific paths
 - **Adding a new AI tool = add data to registry + add rules to BUILTIN_RULES, no engine changes**
+- **`BUILTIN_RULES` 总量验收必须绑定已批准基线 + 本 Story 明确增减范围：** 当 Story / Epic / PLAN 中的规则总量数字与当前实现、测试或 Dev Agent Record 不一致时，先确认最近已批准的基线，再按本 Story 明确新增/删除的规则数计算目标总量。禁止为了凑齐过期总量数字而新增无需求来源的安装规则；若裁定为规格累计计数误差，应同步记录有效口径，并将残留规格文档澄清进入 CR TODO，而不是扩大代码变更范围。（来源：Story 7-3 CR — 30 vs 29；Story 7-5 CR — 41 vs 40）
 - **v2.0 (Story 7-1)**: `vscode` tool removed from `TOOL_DEFINITIONS`; supported tools = `copilot | claude | cursor` (3 tools). `BUILTIN_RULES` count: 16 → 19 (+4 new rules, -1 vscode rule). New rules: claude global/project instructions, cursor global agents, copilot project mcp-tools → `.vscode/`. Reserved name protection added to `execute-install.ts` for `claude:*:instructions` chain. Full reserved-name set (case-insensitive, 7 items): `claude.md`, `claude.local.md`, `agents.md`, `agents.local.md`, `settings.json`, `settings.local.json`, `.claudeignore`. Protection applies to all three InstallType (Files / Directories / Flatten) for `claude:*:instructions`; `--force` has no effect on reserved-name skips. When all source files are blocked by reserved-name protection, `completePhase` outputs the dedicated yellow `reservedSkippedOnlySummary` instead of the generic gray skipped summary.
 
 ### Critical Don't-Miss Rules

@@ -234,6 +234,7 @@ interface MessageSet {
   mcp: {
     mergeHintTitle: string
     codexMergeHint: string
+    opencodeMergeHint: string
   }
   conflictResolver: {
     conflictMessage: string
@@ -524,6 +525,8 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       mergeHintTitle: '⚠️  以下 MCP 配置文件需手动合并到目标工具配置',
       codexMergeHint:
         '目标文件: {targetFile}\n  需合并的块: {section} 段\n  操作: 将模板内容追加或合并到上述文件的 {section} 段',
+      opencodeMergeHint:
+        '目标文件: {targetFile}\n  需合并的块: {section} 字段（JSON 对象）\n  操作: 将模板内容合并到上述 JSON 文件的 {section} 字段下',
     },
     conflictResolver: {
       conflictMessage: '⚠️ 文件冲突: {target} 已存在（用户手写文件）',
@@ -825,6 +828,8 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
         '⚠️  The following MCP configurations require manual merging into the target tool config',
       codexMergeHint:
         'Target file: {targetFile}\n  Section to merge: {section}\n  Action: append or merge the template content into the {section} section of the file above',
+      opencodeMergeHint:
+        'Target file: {targetFile}\n  Section to merge: {section} field (JSON object)\n  Action: merge the template content into the {section} field of the JSON file above',
     },
     conflictResolver: {
       conflictMessage: '⚠️ File conflict: {target} already exists (user-written file)',

@@ -3,17 +3,18 @@ import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { TOOL_DEFINITIONS } from '../../src/data/tool-registry.js'
 
-describe('data/tool-registry — TOOL_DEFINITIONS (AC: #2, Story 7-4)', () => {
-  it('Story 7-4: contains exactly 6 tool definitions (vscode removed, codex, auggie, and gemini added)', () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(6)
+describe('data/tool-registry — TOOL_DEFINITIONS (AC: #1, Story 7-5)', () => {
+  it('Story 7-5: contains exactly 7 tool definitions (opencode added on top of v2.0 set)', () => {
+    expect(TOOL_DEFINITIONS).toHaveLength(7)
   })
 
-  it('Story 7-4: covers copilot, claude, cursor, codex, auggie, gemini (no vscode)', () => {
+  it('Story 7-5: covers copilot, claude, cursor, codex, opencode, auggie, gemini (no vscode)', () => {
     const ids = TOOL_DEFINITIONS.map((t) => t.id)
     expect(ids).toContain('copilot')
     expect(ids).toContain('claude')
     expect(ids).toContain('cursor')
     expect(ids).toContain('codex')
+    expect(ids).toContain('opencode')
     expect(ids).toContain('auggie')
     expect(ids).toContain('gemini')
     expect(ids).not.toContain('vscode')
@@ -65,6 +66,13 @@ describe('data/tool-registry — TOOL_DEFINITIONS (AC: #2, Story 7-4)', () => {
     expect(codex.name).toBe('Codex CLI')
     expect(codex.detect.global).toEqual(['~/.codex'])
     expect(codex.detect.project).toEqual(['.codex'])
+  })
+
+  it('Story 7-5: opencode detects via XDG global path and .opencode project path', () => {
+    const opencode = TOOL_DEFINITIONS.find((t) => t.id === 'opencode')!
+    expect(opencode.name).toBe('OpenCode')
+    expect(opencode.detect.global).toEqual(['~/.config/opencode'])
+    expect(opencode.detect.project).toEqual(['.opencode'])
   })
 
   it('Story 7-3: auggie detects via .augment (global and project)', () => {

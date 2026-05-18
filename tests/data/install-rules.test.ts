@@ -11,9 +11,9 @@ import {
   loadRules,
 } from '../../src/data/install-rules.js'
 
-describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-4)', () => {
-  it('contains exactly 33 rules (current 29-rule baseline + 4 Gemini rules)', () => {
-    expect(BUILTIN_RULES).toHaveLength(33)
+describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-5)', () => {
+  it('contains exactly 40 rules (current 33-rule baseline + 7 OpenCode rules)', () => {
+    expect(BUILTIN_RULES).toHaveLength(40)
   })
 
   it('every rule has required fields: tool, scope, sourceDir, type, targetDir', () => {
@@ -26,9 +26,11 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-4)', () => {
     }
   })
 
-  it('Story 7-4: covers 6 tools (vscode removed, codex, auggie, and gemini added)', () => {
+  it('Story 7-5: covers 7 tools (opencode added on top of v2.0 set)', () => {
     const tools = new Set(BUILTIN_RULES.map((r) => r.tool))
-    expect(tools).toEqual(new Set(['copilot', 'claude', 'cursor', 'codex', 'auggie', 'gemini']))
+    expect(tools).toEqual(
+      new Set(['copilot', 'claude', 'cursor', 'codex', 'opencode', 'auggie', 'gemini']),
+    )
   })
 
   it('v2.0: no vscode rules exist in BUILTIN_RULES', () => {
@@ -182,6 +184,73 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-4)', () => {
     })
   })
 
+  it('Story 7-5: opencode has 7 rules (4 global + 3 project)', () => {
+    const opencodeRules = BUILTIN_RULES.filter((r) => r.tool === 'opencode')
+    expect(opencodeRules).toHaveLength(7)
+    expect(opencodeRules.filter((r) => r.scope === 'global')).toHaveLength(4)
+    expect(opencodeRules.filter((r) => r.scope === 'project')).toHaveLength(3)
+  })
+
+  it('Story 7-5: opencode rule matrix uses expected install types, targets, and AGENTS filter', () => {
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'opencode',
+      scope: 'global',
+      sourceDir: 'skills',
+      type: InstallType.Directories,
+      targetDir: '~/.config/opencode/skills/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'opencode',
+      scope: 'global',
+      sourceDir: 'agents',
+      type: InstallType.Files,
+      targetDir: '~/.config/opencode/agents/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'opencode',
+      scope: 'global',
+      sourceDir: 'instructions',
+      type: InstallType.Files,
+      targetDir: '~/.config/opencode/',
+      fileFilter: ['AGENTS.md'],
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'opencode',
+      scope: 'global',
+      sourceDir: 'mcp-tools',
+      type: InstallType.Files,
+      targetDir: '~/.config/opencode/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'opencode',
+      scope: 'project',
+      sourceDir: 'skills',
+      type: InstallType.Directories,
+      targetDir: '.opencode/skills/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'opencode',
+      scope: 'project',
+      sourceDir: 'agents',
+      type: InstallType.Files,
+      targetDir: '.opencode/agents/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'opencode',
+      scope: 'project',
+      sourceDir: 'mcp-tools',
+      type: InstallType.Files,
+      targetDir: '.opencode/',
+    })
+  })
+
+  it('Story 7-5: opencode MCP merge hint points to opencode.json "mcp" field', () => {
+    expect(MCP_MERGE_HINTS.opencode).toEqual({
+      targetFile: '~/.config/opencode/opencode.json',
+      section: '"mcp"',
+    })
+  })
+
   it('Story 7-3: auggie has 5 rules (skills global/project, agents global/project, instructions project)', () => {
     const auggieRules = BUILTIN_RULES.filter((r) => r.tool === 'auggie')
     expect(auggieRules).toHaveLength(5)
@@ -310,6 +379,18 @@ describe('data/install-rules — RULE_INDEX (AC: #1)', () => {
     const rules = RULE_INDEX.get('codex:project')
     expect(rules).toBeDefined()
     expect(rules).toHaveLength(2)
+  })
+
+  it('Story 7-5: lookup opencode:global returns 4 rules', () => {
+    const rules = RULE_INDEX.get('opencode:global')
+    expect(rules).toBeDefined()
+    expect(rules).toHaveLength(4)
+  })
+
+  it('Story 7-5: lookup opencode:project returns 3 rules', () => {
+    const rules = RULE_INDEX.get('opencode:project')
+    expect(rules).toBeDefined()
+    expect(rules).toHaveLength(3)
   })
 
   it('Story 7-3: lookup auggie:global returns 2 rules', () => {

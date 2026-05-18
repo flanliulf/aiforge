@@ -40,6 +40,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    id: 'opencode',
+    name: 'OpenCode',
+    detect: {
+      global: ['~/.config/opencode'],
+      project: ['.opencode'],
+    },
+  },
+  {
     id: 'auggie',
     name: 'Auggie (Augment Code)',
     detect: {

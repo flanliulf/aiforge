@@ -149,6 +149,25 @@ function makeCodexMcpPlan(sourceFiles: string[], targetPath: string): MatchedPla
   }
 }
 
+function makeOpencodeMcpPlan(sourceFiles: string[], targetPath: string): MatchedPlan {
+  return {
+    items: [
+      {
+        rule: {
+          tool: 'opencode',
+          scope: 'global',
+          sourceDir: 'mcp-tools',
+          type: InstallType.Files,
+          targetDir: '~/.config/opencode/',
+        },
+        sourceFiles,
+        targetPath,
+        mode: 'copy',
+      },
+    ],
+  }
+}
+
 // ── describe: stages/execute-install ─────────────────────────────────────────
 
 describe('stages/execute-install', () => {
@@ -612,6 +631,22 @@ describe('stages/execute-install', () => {
 
       expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('~/.codex/config.toml'))
       expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('[mcp]'))
+      expect(result.items[0]?.manualAction).toBe('mcp-merge-required')
+    })
+
+    it('Story 7-5: opencode mcp-tools 安装后输出手动合并提示', async () => {
+      const srcFile = join(tmpDir, 'opencode-mcp.json')
+      const targetDir = join(tmpDir, '.config', 'opencode')
+      await mkdir(targetDir, { recursive: true })
+      await writeFile(srcFile, '{"mcp":{"server":"test"}}')
+
+      const plan = makeOpencodeMcpPlan([srcFile], targetDir)
+      const result = await executeInstall(plan, makeArgs(), reporter, pathResolver)
+
+      expect(reporter.warn).toHaveBeenCalledWith(
+        expect.stringContaining('~/.config/opencode/opencode.json'),
+      )
+      expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('"mcp"'))
       expect(result.items[0]?.manualAction).toBe('mcp-merge-required')
     })
   })

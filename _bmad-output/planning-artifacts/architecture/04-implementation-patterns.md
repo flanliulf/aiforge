@@ -714,6 +714,7 @@ reporter.completePhase()
   - 新增：copilot 项目 mcp-tools → `.vscode/`（承接原 vscode 项目级 MCP 语义）
   - 删除：vscode 全局 mcp（`~/.vscode/`）
 - 新增/删除工具只修改 `src/data/tool-registry.ts` + `src/data/install-rules.ts`，引擎层（`src/stages/`）零改动（NFR-I5）
+- `BUILTIN_RULES` 总量验收必须从“已批准基线 + 当前 Story 明确增减范围”推导。若 Story/Epic/PLAN 的累计数字与实现、测试、Dev Agent Record 的自洽口径冲突，禁止为了凑数新增无需求来源的规则；应先裁定有效基线，更新测试与 Story 记录口径，并把残留规格文档澄清交给 CR TODO 跟踪。（来源：Story 7-3 CR — 30 vs 29；Story 7-5 CR — 41 vs 40）
 
 **删除工具时必须提供一次性 migration 提示（vscodeMergedNote 模式）：**
 
@@ -1517,4 +1518,3 @@ Story 开发及 CR 修复的质量门禁验证必须使用 `npm run lint:src`（
 | CLI Output Patterns — 结果状态图标 | 仅列出图标类型，未明确颜色语义 | 新增「TTY 结果着色双重语义」表：明细行 new/updated/skipped = green/blue/green；汇总数字 安装/更新/跳过 = green/blue/yellow | 代码 `src/core/reporter.ts` |
 | CLI Output Patterns — 折叠阈值 | 未设定 | 新增「TTY 结果折叠阈值」区域：`MAX_TTY_RESULT_DETAILS_PER_TOOL = 5`，工具+本地根二级分组 | 代码 `src/core/reporter.ts` |
 | CLI Output Patterns — 零结果诊断 | 未拆分零结果与全部跳过两种场景 | 新增「零结果诊断双分支」区域：拆为真·零结果（warn）与全部跳过（completePhase 成功路径）；修复建议禁含 `--force`；diag 明细超 5 条折叠 | 代码 `src/stages/execute-install.ts`、`src/core/messages.ts` |
-

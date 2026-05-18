@@ -45,6 +45,14 @@ vi.mock('../../src/data/tool-registry.js', () => ({
       },
     },
     {
+      id: 'opencode',
+      name: 'OpenCode',
+      detect: {
+        global: ['~/.config/opencode'],
+        project: ['.opencode'],
+      },
+    },
+    {
       id: 'auggie',
       name: 'Auggie (Augment Code)',
       detect: {
@@ -180,6 +188,7 @@ describe('detectTools', () => {
       '/home/user/.claude',
       '/home/user/.cursor',
       '/home/user/.codex',
+      '/home/user/.config/opencode',
       '/home/user/.augment',
       '/home/user/.gemini',
     ])
@@ -194,6 +203,7 @@ describe('detectTools', () => {
     expect(env.tools).toContain('claude')
     expect(env.tools).toContain('cursor')
     expect(env.tools).toContain('codex')
+    expect(env.tools).toContain('opencode')
     expect(env.tools).toContain('auggie')
     expect(env.tools).toContain('gemini')
   })
@@ -219,6 +229,42 @@ describe('detectTools', () => {
     const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
 
     expect(env.tools).toContain('codex')
+  })
+
+  it('Story 7-5 AC #1 全局侧命中 XDG 路径时返回包含 opencode 的工具列表', async () => {
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.config/opencode') return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('opencode')
+  })
+
+  it('Story 7-5 AC #1 项目侧命中 .opencode 时返回包含 opencode 的工具列表', async () => {
+    const cwd = process.cwd()
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === `${cwd}/.opencode`) return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('opencode')
+  })
+
+  it('Story 7-5 AC #1 仅存在旧路径 ~/.opencode 时不会检测到 opencode', async () => {
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.copilot') return
+      if (String(p) === '/home/user/.opencode') return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('copilot')
+    expect(env.tools).not.toContain('opencode')
   })
 
   it('Story 7-3 AC #1 全局侧命中 auggie 时返回包含 auggie 的工具列表', async () => {

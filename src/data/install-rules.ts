@@ -6,7 +6,7 @@ const Directories: InstallType = 'Directories' as InstallType
 const Flatten: InstallType = 'Flatten' as InstallType
 
 /**
- * v2.0 内置安装规则表 — 33 条规则覆盖 6 工具 × 全局/项目
+ * v2.0 内置安装规则表 — 40 条规则覆盖 7 工具 × 全局/项目
  *
  * v2.0 变更（Breaking Change）:
  *   - 删除: vscode:global:mcp-tools（VS Code 归并到 Copilot 语境）
@@ -197,6 +197,59 @@ export const BUILTIN_RULES: InstallRule[] = [
     targetDir: '~/.codex/',
   },
 
+  // ── OpenCode: 全局 + 项目 (7 条，XDG + MCP 降级) ──
+  {
+    tool: 'opencode',
+    scope: 'global',
+    sourceDir: 'skills',
+    type: Directories,
+    targetDir: '~/.config/opencode/skills/',
+  },
+  {
+    tool: 'opencode',
+    scope: 'global',
+    sourceDir: 'agents',
+    type: Files,
+    targetDir: '~/.config/opencode/agents/',
+  },
+  {
+    tool: 'opencode',
+    scope: 'global',
+    sourceDir: 'instructions',
+    type: Files,
+    targetDir: '~/.config/opencode/',
+    fileFilter: ['AGENTS.md'],
+  },
+  // mcp-tools 降级策略：模板文件复制到 ~/.config/opencode/，不直接修改 opencode.json
+  {
+    tool: 'opencode',
+    scope: 'global',
+    sourceDir: 'mcp-tools',
+    type: Files,
+    targetDir: '~/.config/opencode/',
+  },
+  {
+    tool: 'opencode',
+    scope: 'project',
+    sourceDir: 'skills',
+    type: Directories,
+    targetDir: '.opencode/skills/',
+  },
+  {
+    tool: 'opencode',
+    scope: 'project',
+    sourceDir: 'agents',
+    type: Files,
+    targetDir: '.opencode/agents/',
+  },
+  {
+    tool: 'opencode',
+    scope: 'project',
+    sourceDir: 'mcp-tools',
+    type: Files,
+    targetDir: '.opencode/',
+  },
+
   // ── Auggie: 全局 + 项目 (5 条) ──
   {
     tool: 'auggie',
@@ -270,6 +323,7 @@ export const BUILTIN_RULES: InstallRule[] = [
 
 export const MCP_MERGE_HINTS: Record<string, { targetFile: string; section: string }> = {
   codex: { targetFile: '~/.codex/config.toml', section: '[mcp]' },
+  opencode: { targetFile: '~/.config/opencode/opencode.json', section: '"mcp"' },
 }
 
 export interface ToolPreconditionResult {

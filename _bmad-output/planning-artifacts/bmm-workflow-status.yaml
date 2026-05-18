@@ -63,6 +63,7 @@ current_activity:
     - "7-2-codex-cli-integration: done"  # 2026-05-18 CR Approved (Round 2)
     - "7-3-auggie-augment-code-integration: done"  # 2026-05-18 CR Approved (Round 2)
     - "7-4-gemini-cli-integration: done"  # 2026-05-18 CR Approved (Round 1)
-  notes: "Epic 7 进行中（4/10 Stories 完成）。Story 7-4 CR 通过（Round 1，2026-05-18）。剩余未完成 Story：7-5、7-6、7-7、7-8、7-9、7-10。CR TODO 32 open / 12 resolved。CR-001~006 规则已提炼并纳入全局文档。"
+    - "7-5-opencode-xdg-integration: done"  # 2026-05-18 CR Approved (Round 2)
+  notes: "Epic 7 进行中（5/10 Stories 完成）。Story 7-5 CR 通过（Round 2，2026-05-18）。剩余未完成 Story：7-6、7-7、7-8、7-9、7-10。CR TODO 33 open / 12 resolved。CR-001~006 与 Story 7-5 规则数量口径规则已提炼并纳入全局文档。"
   next_steps:
     - "Epic 6 Retrospective"
