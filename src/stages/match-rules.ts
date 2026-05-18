@@ -109,26 +109,36 @@ async function scanSourceFiles(repoDir: string, rule: InstallRule): Promise<stri
     throw error
   }
 
+  let sourceFiles: string[]
   switch (rule.type) {
     case InstallType.Files:
       // 只扫描文件，过滤排除列表
-      return entries
+      sourceFiles = entries
         .filter(
           (e: { isFile(): boolean; name: string }) =>
             e.isFile() && !DEFAULT_EXCLUDES.includes(e.name),
         )
         .map((e: { name: string }) => join(sourceDir, e.name))
+      break
 
     case InstallType.Directories:
     case InstallType.Flatten:
       // 扫描子目录，过滤排除列表
-      return entries
+      sourceFiles = entries
         .filter(
           (e: { isDirectory(): boolean; name: string }) =>
             e.isDirectory() && !DEFAULT_EXCLUDES.includes(e.name),
         )
         .map((e: { name: string }) => join(sourceDir, e.name))
+      break
   }
+
+  if (rule.fileFilter && rule.fileFilter.length > 0) {
+    const allowedNames = new Set(rule.fileFilter)
+    sourceFiles = sourceFiles.filter((sourceFile) => allowedNames.has(basename(sourceFile)))
+  }
+
+  return sourceFiles
 }
 
 // ── 主入口 ───────────────────────────────────────────────────────────────────
@@ -254,23 +264,15 @@ export async function matchRules(
           : rules
       for (const rule of relevantRules) {
         if (dirPrefix && dirPrefix !== rule.sourceDir) continue
-        const ruleDir = join(repo.repoDir, rule.sourceDir)
-        try {
-          const entries = await readdir(ruleDir, { withFileTypes: true })
-          for (const entry of entries) {
-            if (DEFAULT_EXCLUDES.includes(entry.name) || entry.name.startsWith('.')) continue
-            const relevant = rule.type === InstallType.Files ? entry.isFile() : entry.isDirectory()
-            if (!relevant) continue
-            const value = dirPrefix
-              ? `${dirPrefix}/${entry.name}`
-              : `${rule.sourceDir}/${entry.name}`
-            if (!seen.has(value)) {
-              seen.add(value)
-              candidateChoices.push({ name: entry.name, value })
-            }
+        const matchedSourceFiles = await scanSourceFiles(repo.repoDir, rule)
+        for (const matchedSourceFile of matchedSourceFiles) {
+          const entryName = basename(matchedSourceFile)
+          if (entryName.startsWith('.')) continue
+          const value = dirPrefix ? `${dirPrefix}/${entryName}` : `${rule.sourceDir}/${entryName}`
+          if (!seen.has(value)) {
+            seen.add(value)
+            candidateChoices.push({ name: entryName, value })
           }
-        } catch {
-          // ENOENT/ENOTDIR: skip this sourceDir
         }
       }
     }

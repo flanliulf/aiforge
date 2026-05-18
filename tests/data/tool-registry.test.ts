@@ -3,17 +3,18 @@ import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { TOOL_DEFINITIONS } from '../../src/data/tool-registry.js'
 
-describe('data/tool-registry — TOOL_DEFINITIONS (AC: #2, Story 7-2)', () => {
-  it('Story 7-2: contains exactly 4 tool definitions (vscode removed, codex added)', () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(4)
+describe('data/tool-registry — TOOL_DEFINITIONS (AC: #2, Story 7-3)', () => {
+  it('Story 7-3: contains exactly 5 tool definitions (vscode removed, codex and auggie added)', () => {
+    expect(TOOL_DEFINITIONS).toHaveLength(5)
   })
 
-  it('Story 7-2: covers copilot, claude, cursor, codex (no vscode)', () => {
+  it('Story 7-3: covers copilot, claude, cursor, codex, auggie (no vscode)', () => {
     const ids = TOOL_DEFINITIONS.map((t) => t.id)
     expect(ids).toContain('copilot')
     expect(ids).toContain('claude')
     expect(ids).toContain('cursor')
     expect(ids).toContain('codex')
+    expect(ids).toContain('auggie')
     expect(ids).not.toContain('vscode')
   })
 
@@ -63,6 +64,13 @@ describe('data/tool-registry — TOOL_DEFINITIONS (AC: #2, Story 7-2)', () => {
     expect(codex.name).toBe('Codex CLI')
     expect(codex.detect.global).toEqual(['~/.codex'])
     expect(codex.detect.project).toEqual(['.codex'])
+  })
+
+  it('Story 7-3: auggie detects via .augment (global and project)', () => {
+    const auggie = TOOL_DEFINITIONS.find((t) => t.id === 'auggie')!
+    expect(auggie.name).toBe('Auggie (Augment Code)')
+    expect(auggie.detect.global).toEqual(['~/.augment'])
+    expect(auggie.detect.project).toEqual(['.augment'])
   })
 
   it('all tool ids are unique', () => {

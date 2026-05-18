@@ -95,6 +95,8 @@ export interface InstallRule {
   sourceDir: string
   type: InstallType
   targetDir: string
+  /** 可选白名单；仅分发列出的 basename（如 AGENTS.md / CLAUDE.md） */
+  fileFilter?: string[]
   /** flatten 模式下的主文件名（默认 'index.md'），仅 type=Flatten 时有效 */
   mainFile?: string
 }

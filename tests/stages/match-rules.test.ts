@@ -38,6 +38,7 @@ vi.mock('../../src/data/install-rules.js', () => ({
           sourceDir: 'instructions',
           type: InstallType.Files,
           targetDir: '~/.copilot/',
+          fileFilter: ['AGENTS.md'],
         },
       ],
     ],
@@ -57,6 +58,41 @@ vi.mock('../../src/data/install-rules.js', () => ({
           sourceDir: 'skills',
           type: InstallType.Directories,
           targetDir: '.claude/skills/',
+        },
+        {
+          tool: 'claude',
+          scope: 'project',
+          sourceDir: 'instructions',
+          type: InstallType.Files,
+          targetDir: '.claude/',
+          fileFilter: ['CLAUDE.md'],
+        },
+      ],
+    ],
+    [
+      'auggie:project',
+      [
+        {
+          tool: 'auggie',
+          scope: 'project',
+          sourceDir: 'skills',
+          type: InstallType.Directories,
+          targetDir: '.augment/skills/',
+        },
+        {
+          tool: 'auggie',
+          scope: 'project',
+          sourceDir: 'agents',
+          type: InstallType.Files,
+          targetDir: '.augment/agents/',
+        },
+        {
+          tool: 'auggie',
+          scope: 'project',
+          sourceDir: 'instructions',
+          type: InstallType.Files,
+          targetDir: './',
+          fileFilter: ['AGENTS.md'],
         },
       ],
     ],
@@ -571,6 +607,60 @@ describe('matchRules', () => {
     expect(agentsItem!.targetPath).not.toContain('~')
     // 应以 cwd 开头
     expect(agentsItem!.targetPath).toContain(process.cwd())
+  })
+
+  it('Story 7-3 fileFilter: auggie 项目级 instructions 只匹配 AGENTS.md', async () => {
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/instructions')) {
+        return [
+          { name: 'AGENTS.md', isFile: () => true, isDirectory: () => false },
+          { name: 'CLAUDE.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['auggie'], 'project'),
+      makeArgs({ global: false, dirs: ['instructions'] }),
+      mockReporter,
+      mockPathResolver,
+    )
+
+    const instructionsItem = plan.items.find((i) => i.rule.sourceDir === 'instructions')
+    expect(instructionsItem).toBeDefined()
+    expect(instructionsItem!.sourceFiles).toHaveLength(1)
+    expect(instructionsItem!.sourceFiles[0]).toContain('AGENTS.md')
+    expect(instructionsItem!.sourceFiles.some((f) => f.includes('CLAUDE.md'))).toBe(false)
+  })
+
+  it('Story 7-3 fileFilter: claude 项目级 instructions 只匹配 CLAUDE.md', async () => {
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/instructions')) {
+        return [
+          { name: 'AGENTS.md', isFile: () => true, isDirectory: () => false },
+          { name: 'CLAUDE.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['claude'], 'project'),
+      makeArgs({ global: false, dirs: ['instructions'] }),
+      mockReporter,
+      mockPathResolver,
+    )
+
+    const instructionsItem = plan.items.find((i) => i.rule.sourceDir === 'instructions')
+    expect(instructionsItem).toBeDefined()
+    expect(instructionsItem!.sourceFiles).toHaveLength(1)
+    expect(instructionsItem!.sourceFiles[0]).toContain('CLAUDE.md')
+    expect(instructionsItem!.sourceFiles.some((f) => f.includes('AGENTS.md'))).toBe(false)
   })
 
   // ──────────────────────────────────────────────────────────────

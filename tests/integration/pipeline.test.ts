@@ -858,8 +858,8 @@ describe('Story 5.7 Task 4: BUILTIN_RULES E2E 覆盖扩展 (CR TODO-013)', () =>
     const plan = await stages.match(env, args, mockReporter)
     const result = await stages.install(plan, args, mockReporter)
 
-    // instructions(Files) 安装：CLAUDE.md 应被安装到 ~/.copilot/
-    const instructionsTarget = pathJoin(homeDir, '.copilot', 'CLAUDE.md')
+    // instructions(Files) 安装：AGENTS.md 应被安装到 ~/.copilot/
+    const instructionsTarget = pathJoin(homeDir, '.copilot', 'AGENTS.md')
     await expect(fsAccess(instructionsTarget)).resolves.toBeUndefined()
 
     const instrItem = plan.items.find((i) => i.rule.sourceDir === 'instructions')
@@ -935,7 +935,7 @@ describe('Story 5.7 Task 4: BUILTIN_RULES E2E 覆盖扩展 (CR TODO-013)', () =>
     const env = await stages.detect(repo, args, mockReporter)
     const plan = await stages.match(env, args, mockReporter)
 
-    // copilot:project 4 条规则全部匹配
+    // copilot:project 全部规则均应匹配
     const copilotProjectRules = BUILTIN_RULES.filter(
       (r) => r.tool === 'copilot' && r.scope === 'project',
     )
@@ -947,8 +947,8 @@ describe('Story 5.7 Task 4: BUILTIN_RULES E2E 覆盖扩展 (CR TODO-013)', () =>
     const skillsTarget = pathJoin(tmpDir, '.github', 'skills', 'code-review')
     await expect(fsAccess(skillsTarget)).resolves.toBeUndefined()
 
-    // instructions(Files) → .github/CLAUDE.md
-    const instrTarget = pathJoin(tmpDir, '.github', 'CLAUDE.md')
+    // instructions(Files) → .github/AGENTS.md
+    const instrTarget = pathJoin(tmpDir, '.github', 'AGENTS.md')
     await expect(fsAccess(instrTarget)).resolves.toBeUndefined()
 
     // mcp-tools(Files) → .github/server.json
@@ -960,6 +960,50 @@ describe('Story 5.7 Task 4: BUILTIN_RULES E2E 覆盖扩展 (CR TODO-013)', () =>
     await expect(fsAccess(vscodeMcpTarget)).resolves.toBeUndefined()
 
     expect(result.items.filter((i) => i.status === 'new').length).toBeGreaterThan(0)
+  })
+
+  // ── auggie:project (Story 7-3) ────────────────────────────────────────────
+
+  it('auggie:project — skills(Directories) + agents(Files) + instructions(Files) 全链路安装', async () => {
+    const stages = createProductionStages(mockPathResolver)
+    const args = createE2ETestArgs({ tools: ['auggie'], global: false })
+
+    const source = await stages.resolve(args, mockReporter)
+    const authed = await stages.authenticate(source, args, mockReporter)
+    const repo = await stages.clone(authed, args, mockReporter)
+    const env = await stages.detect(repo, args, mockReporter)
+    const plan = await stages.match(env, args, mockReporter)
+
+    const auggieProjectRules = BUILTIN_RULES.filter(
+      (r) => r.tool === 'auggie' && r.scope === 'project',
+    )
+    expect(plan.items.length).toBe(auggieProjectRules.length + UNIVERSAL_RULES.length)
+
+    const instructionsItem = plan.items.find((i) => i.rule.sourceDir === 'instructions')
+    expect(instructionsItem!.rule.tool).toBe('auggie')
+    expect(instructionsItem!.rule.type).toBe('Files')
+    expect(instructionsItem!.rule.targetDir).toBe('./')
+    expect(instructionsItem!.sourceFiles).toHaveLength(1)
+    expect(instructionsItem!.sourceFiles[0]).toContain('AGENTS.md')
+    expect(instructionsItem!.sourceFiles.some((f) => f.includes('CLAUDE.md'))).toBe(false)
+
+    const result = await stages.install(plan, args, mockReporter)
+
+    const skillsTarget = pathJoin(tmpDir, '.augment', 'skills', 'code-review')
+    await expect(fsAccess(skillsTarget)).resolves.toBeUndefined()
+
+    const agentTarget = pathJoin(tmpDir, '.augment', 'agents', 'coding-agent.md')
+    await expect(fsAccess(agentTarget)).resolves.toBeUndefined()
+
+    const instructionsTarget = pathJoin(tmpDir, 'AGENTS.md')
+    await expect(fsAccess(instructionsTarget)).resolves.toBeUndefined()
+
+    const claudeInstructionsTarget = pathJoin(tmpDir, 'CLAUDE.md')
+    await expect(fsAccess(claudeInstructionsTarget)).rejects.toThrow()
+
+    const auggieResults = result.items.filter((i) => i.tool === 'auggie')
+    expect(auggieResults.length).toBeGreaterThan(0)
+    expect(auggieResults.every((i) => i.status === 'new' || i.status === 'updated')).toBe(true)
   })
 
   // ── vscode:global (v2.0: removed, VS Code merged into Copilot context) ───────

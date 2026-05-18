@@ -101,7 +101,7 @@ development_status:
   epic-7: in-progress
   7-1-vscode-merge-and-mvp-rules-completion: done
   7-2-codex-cli-integration: done
-  7-3-auggie-augment-code-integration: ready-for-dev
+  7-3-auggie-augment-code-integration: done
   7-4-gemini-cli-integration: ready-for-dev
   7-5-opencode-xdg-integration: ready-for-dev
   7-6-windsurf-integration: ready-for-dev

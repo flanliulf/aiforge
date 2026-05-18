@@ -38,6 +38,7 @@ export const BUILTIN_RULES: InstallRule[] = [
     sourceDir: 'instructions',
     type: Files,
     targetDir: '~/.copilot/',
+    fileFilter: ['AGENTS.md'],
   },
   // mcp-tools 目标为工具根目录：MCP 配置文件需放在工具能识别的固定位置（如 mcp.json），不是子目录
   {
@@ -69,6 +70,7 @@ export const BUILTIN_RULES: InstallRule[] = [
     sourceDir: 'instructions',
     type: Files,
     targetDir: '.github/',
+    fileFilter: ['AGENTS.md'],
   },
   // mcp-tools 同上，目标为工具项目根目录（.github/）
   { tool: 'copilot', scope: 'project', sourceDir: 'mcp-tools', type: Files, targetDir: '.github/' },
@@ -98,6 +100,7 @@ export const BUILTIN_RULES: InstallRule[] = [
     sourceDir: 'instructions',
     type: Files,
     targetDir: '~/.claude/',
+    fileFilter: ['CLAUDE.md'],
   },
   {
     tool: 'claude',
@@ -120,6 +123,7 @@ export const BUILTIN_RULES: InstallRule[] = [
     sourceDir: 'instructions',
     type: Files,
     targetDir: '.claude/',
+    fileFilter: ['CLAUDE.md'],
   },
 
   // ── Cursor: 全局 + 项目 (4 条) ──
@@ -191,6 +195,44 @@ export const BUILTIN_RULES: InstallRule[] = [
     sourceDir: 'mcp-tools',
     type: Files,
     targetDir: '~/.codex/',
+  },
+
+  // ── Auggie: 全局 + 项目 (5 条) ──
+  {
+    tool: 'auggie',
+    scope: 'global',
+    sourceDir: 'skills',
+    type: Directories,
+    targetDir: '~/.augment/skills/',
+  },
+  {
+    tool: 'auggie',
+    scope: 'global',
+    sourceDir: 'agents',
+    type: Files,
+    targetDir: '~/.augment/agents/',
+  },
+  {
+    tool: 'auggie',
+    scope: 'project',
+    sourceDir: 'skills',
+    type: Directories,
+    targetDir: '.augment/skills/',
+  },
+  {
+    tool: 'auggie',
+    scope: 'project',
+    sourceDir: 'agents',
+    type: Files,
+    targetDir: '.augment/agents/',
+  },
+  {
+    tool: 'auggie',
+    scope: 'project',
+    sourceDir: 'instructions',
+    type: Files,
+    targetDir: './',
+    fileFilter: ['AGENTS.md'],
   },
 ]
 

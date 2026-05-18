@@ -44,6 +44,14 @@ vi.mock('../../src/data/tool-registry.js', () => ({
         project: ['.codex'],
       },
     },
+    {
+      id: 'auggie',
+      name: 'Auggie (Augment Code)',
+      detect: {
+        global: ['~/.augment'],
+        project: ['.augment'],
+      },
+    },
   ],
 }))
 
@@ -164,6 +172,7 @@ describe('detectTools', () => {
       '/home/user/.claude',
       '/home/user/.cursor',
       '/home/user/.codex',
+      '/home/user/.augment',
     ])
     vi.mocked(access).mockImplementation(async (p) => {
       if (hitPaths.has(String(p))) return
@@ -176,6 +185,7 @@ describe('detectTools', () => {
     expect(env.tools).toContain('claude')
     expect(env.tools).toContain('cursor')
     expect(env.tools).toContain('codex')
+    expect(env.tools).toContain('auggie')
   })
 
   it('Story 7-2 AC #1 全局侧命中 codex 时返回包含 codex 的工具列表', async () => {
@@ -199,6 +209,29 @@ describe('detectTools', () => {
     const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
 
     expect(env.tools).toContain('codex')
+  })
+
+  it('Story 7-3 AC #1 全局侧命中 auggie 时返回包含 auggie 的工具列表', async () => {
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.augment') return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('auggie')
+  })
+
+  it('Story 7-3 AC #1 项目侧命中 .augment 时返回包含 auggie 的工具列表', async () => {
+    const cwd = process.cwd()
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === `${cwd}/.augment`) return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('auggie')
   })
 
   // ──────────────────────────────────────────────────────────────

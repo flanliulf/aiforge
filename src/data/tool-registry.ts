@@ -39,4 +39,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       project: ['.codex'],
     },
   },
+  {
+    id: 'auggie',
+    name: 'Auggie (Augment Code)',
+    detect: {
+      global: ['~/.augment'],
+      project: ['.augment'],
+    },
+  },
 ]

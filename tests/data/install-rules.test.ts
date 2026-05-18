@@ -10,9 +10,9 @@ import {
   loadRules,
 } from '../../src/data/install-rules.js'
 
-describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-2)', () => {
-  it('contains exactly 24 rules (current 19-rule v2.0 baseline + 5 Codex rules)', () => {
-    expect(BUILTIN_RULES).toHaveLength(24)
+describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-3)', () => {
+  it('contains exactly 29 rules (current 24-rule baseline + 5 Auggie rules)', () => {
+    expect(BUILTIN_RULES).toHaveLength(29)
   })
 
   it('every rule has required fields: tool, scope, sourceDir, type, targetDir', () => {
@@ -25,9 +25,9 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-2)', () => {
     }
   })
 
-  it('Story 7-2: covers 4 tools (vscode removed, codex added)', () => {
+  it('Story 7-3: covers 5 tools (vscode removed, codex and auggie added)', () => {
     const tools = new Set(BUILTIN_RULES.map((r) => r.tool))
-    expect(tools).toEqual(new Set(['copilot', 'claude', 'cursor', 'codex']))
+    expect(tools).toEqual(new Set(['copilot', 'claude', 'cursor', 'codex', 'auggie']))
   })
 
   it('v2.0: no vscode rules exist in BUILTIN_RULES', () => {
@@ -70,6 +70,7 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-2)', () => {
     expect(rule).toBeDefined()
     expect(rule!.targetDir).toBe('~/.claude/')
     expect(rule!.type).toBe(InstallType.Files)
+    expect(rule!.fileFilter).toEqual(['CLAUDE.md'])
   })
 
   it('v2.0: claude has project instructions rule targeting .claude/', () => {
@@ -79,6 +80,17 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-2)', () => {
     expect(rule).toBeDefined()
     expect(rule!.targetDir).toBe('.claude/')
     expect(rule!.type).toBe(InstallType.Files)
+    expect(rule!.fileFilter).toEqual(['CLAUDE.md'])
+  })
+
+  it('Story 7-3: copilot instructions rules filter AGENTS.md only', () => {
+    const rules = BUILTIN_RULES.filter(
+      (r) => r.tool === 'copilot' && r.sourceDir === 'instructions',
+    )
+    expect(rules).toHaveLength(2)
+    for (const rule of rules) {
+      expect(rule.fileFilter).toEqual(['AGENTS.md'])
+    }
   })
 
   it('v2.0: cursor has 4 rules (2 global + 2 project, including new global agents rule)', () => {
@@ -168,6 +180,53 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-2)', () => {
       section: '[mcp]',
     })
   })
+
+  it('Story 7-3: auggie has 5 rules (skills global/project, agents global/project, instructions project)', () => {
+    const auggieRules = BUILTIN_RULES.filter((r) => r.tool === 'auggie')
+    expect(auggieRules).toHaveLength(5)
+    expect(auggieRules.filter((r) => r.sourceDir === 'skills')).toHaveLength(2)
+    expect(auggieRules.filter((r) => r.sourceDir === 'agents')).toHaveLength(2)
+    expect(auggieRules.filter((r) => r.sourceDir === 'instructions')).toHaveLength(1)
+  })
+
+  it('Story 7-3: auggie rule matrix uses expected install types, targets, and instructions filter', () => {
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'auggie',
+      scope: 'global',
+      sourceDir: 'skills',
+      type: InstallType.Directories,
+      targetDir: '~/.augment/skills/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'auggie',
+      scope: 'global',
+      sourceDir: 'agents',
+      type: InstallType.Files,
+      targetDir: '~/.augment/agents/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'auggie',
+      scope: 'project',
+      sourceDir: 'skills',
+      type: InstallType.Directories,
+      targetDir: '.augment/skills/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'auggie',
+      scope: 'project',
+      sourceDir: 'agents',
+      type: InstallType.Files,
+      targetDir: '.augment/agents/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'auggie',
+      scope: 'project',
+      sourceDir: 'instructions',
+      type: InstallType.Files,
+      targetDir: './',
+      fileFilter: ['AGENTS.md'],
+    })
+  })
 })
 
 describe('data/install-rules — RULE_INDEX (AC: #1)', () => {
@@ -210,6 +269,18 @@ describe('data/install-rules — RULE_INDEX (AC: #1)', () => {
     const rules = RULE_INDEX.get('codex:project')
     expect(rules).toBeDefined()
     expect(rules).toHaveLength(2)
+  })
+
+  it('Story 7-3: lookup auggie:global returns 2 rules', () => {
+    const rules = RULE_INDEX.get('auggie:global')
+    expect(rules).toBeDefined()
+    expect(rules).toHaveLength(2)
+  })
+
+  it('Story 7-3: lookup auggie:project returns 3 rules', () => {
+    const rules = RULE_INDEX.get('auggie:project')
+    expect(rules).toBeDefined()
+    expect(rules).toHaveLength(3)
   })
 
   it('lookup for non-existent key returns undefined', () => {
