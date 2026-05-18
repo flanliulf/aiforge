@@ -47,4 +47,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       project: ['.augment'],
     },
   },
+  {
+    id: 'gemini',
+    name: 'Gemini CLI',
+    detect: {
+      global: ['~/.gemini'],
+      project: ['.gemini'],
+    },
+  },
 ]

@@ -22,7 +22,7 @@ import type { Reporter } from '../core/reporter.js'
 import type { PathResolver } from '../core/path-resolver.js'
 import { AiforgeError } from '../core/errors.js'
 import { EXIT_ARG_ERROR } from '../core/errors.js'
-import { RULE_INDEX, UNIVERSAL_RULES } from '../data/install-rules.js'
+import { RULE_INDEX, TOOL_PRECONDITIONS, UNIVERSAL_RULES } from '../data/install-rules.js'
 import { DEFAULT_EXCLUDES } from '../data/excludes.js'
 import { msg } from '../core/messages.js'
 import { parseFilterPattern, matchesGlob, FilterCancelledSignal } from './filter-utils.js'
@@ -245,8 +245,40 @@ export async function matchRules(
     }
   }
 
+  const hadMatchesBeforePreconditions = items.length > 0
+
+  for (const toolId of env.tools) {
+    const precondition = TOOL_PRECONDITIONS[toolId]
+    if (!precondition) continue
+
+    const hasInstallableAffectedItems = items.some(
+      (item) =>
+        item.rule.tool === toolId &&
+        precondition.affectedSourceDirs.includes(item.rule.sourceDir) &&
+        item.sourceFiles.length > 0,
+    )
+    if (!hasInstallableAffectedItems) continue
+
+    const result = await precondition.check()
+    if (result.ok) continue
+
+    for (let index = items.length - 1; index >= 0; index--) {
+      const item = items[index]!
+      if (
+        item.rule.tool === toolId &&
+        precondition.affectedSourceDirs.includes(item.rule.sourceDir)
+      ) {
+        items.splice(index, 1)
+      }
+    }
+
+    if (result.reason) {
+      reporter.warn(result.reason)
+    }
+  }
+
   // 零匹配检测（Task 4）：全部 items 处理完毕后，若 args.filter 非空且 items 为空，触发交互式询问
-  if (args.filter && items.length === 0) {
+  if (args.filter && items.length === 0 && !hadMatchesBeforePreconditions) {
     const { dirPrefix } = parseFilterPattern(args.filter)
 
     // 按 rule.type 收集真实可命中的候选安装项（fix CR#1 + CR#2）：

@@ -52,6 +52,14 @@ vi.mock('../../src/data/tool-registry.js', () => ({
         project: ['.augment'],
       },
     },
+    {
+      id: 'gemini',
+      name: 'Gemini CLI',
+      detect: {
+        global: ['~/.gemini'],
+        project: ['.gemini'],
+      },
+    },
   ],
 }))
 
@@ -173,6 +181,7 @@ describe('detectTools', () => {
       '/home/user/.cursor',
       '/home/user/.codex',
       '/home/user/.augment',
+      '/home/user/.gemini',
     ])
     vi.mocked(access).mockImplementation(async (p) => {
       if (hitPaths.has(String(p))) return
@@ -186,6 +195,7 @@ describe('detectTools', () => {
     expect(env.tools).toContain('cursor')
     expect(env.tools).toContain('codex')
     expect(env.tools).toContain('auggie')
+    expect(env.tools).toContain('gemini')
   })
 
   it('Story 7-2 AC #1 全局侧命中 codex 时返回包含 codex 的工具列表', async () => {
@@ -232,6 +242,29 @@ describe('detectTools', () => {
     const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
 
     expect(env.tools).toContain('auggie')
+  })
+
+  it('Story 7-4 AC #1 全局侧命中 gemini 时返回包含 gemini 的工具列表', async () => {
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.gemini') return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('gemini')
+  })
+
+  it('Story 7-4 AC #1 项目侧命中 .gemini 时返回包含 gemini 的工具列表', async () => {
+    const cwd = process.cwd()
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === `${cwd}/.gemini`) return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('gemini')
   })
 
   // ──────────────────────────────────────────────────────────────

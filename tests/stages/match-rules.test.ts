@@ -4,6 +4,10 @@ import type { Reporter } from '../../src/core/reporter.js'
 import { InstallType } from '../../src/core/types.js'
 import { setLanguage } from '../../src/core/messages.js'
 
+const { mockGeminiPreconditionCheck } = vi.hoisted(() => ({
+  mockGeminiPreconditionCheck: vi.fn(),
+}))
+
 // ── Mocks ──────────────────────────────────────────────────────
 
 vi.mock('node:fs/promises', () => ({
@@ -108,7 +112,33 @@ vi.mock('../../src/data/install-rules.js', () => ({
         },
       ],
     ],
+    [
+      'gemini:global',
+      [
+        {
+          tool: 'gemini',
+          scope: 'global',
+          sourceDir: 'skills',
+          type: InstallType.Directories,
+          targetDir: '~/.gemini/skills/',
+        },
+        {
+          tool: 'gemini',
+          scope: 'global',
+          sourceDir: 'instructions',
+          type: InstallType.Files,
+          targetDir: '~/.gemini/',
+          fileFilter: ['AGENTS.md', 'GEMINI.md'],
+        },
+      ],
+    ],
   ]),
+  TOOL_PRECONDITIONS: {
+    gemini: {
+      check: mockGeminiPreconditionCheck,
+      affectedSourceDirs: ['skills'],
+    },
+  },
   UNIVERSAL_RULES: [
     {
       tool: 'universal',
@@ -203,6 +233,7 @@ describe('matchRules', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     mockPathResolver.home.mockReturnValue('/home/user')
+    mockGeminiPreconditionCheck.mockResolvedValue({ ok: true })
   })
 
   // ──────────────────────────────────────────────────────────────
@@ -661,6 +692,75 @@ describe('matchRules', () => {
     expect(instructionsItem!.sourceFiles).toHaveLength(1)
     expect(instructionsItem!.sourceFiles[0]).toContain('CLAUDE.md')
     expect(instructionsItem!.sourceFiles.some((f) => f.includes('AGENTS.md'))).toBe(false)
+  })
+
+  it('Story 7-4 precondition: gemini version too low skips skills but keeps instructions and warns', async () => {
+    mockGeminiPreconditionCheck.mockResolvedValue({
+      ok: false,
+      reason: 'Gemini version too low',
+    })
+
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/skills')) {
+        return [
+          { name: 'skill-a', isFile: () => false, isDirectory: () => true },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      if (p.endsWith('/instructions')) {
+        return [
+          { name: 'AGENTS.md', isFile: () => true, isDirectory: () => false },
+          { name: 'GEMINI.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['gemini'], 'global'),
+      makeArgs({ global: true }),
+      mockReporter,
+      mockPathResolver,
+    )
+
+    expect(mockGeminiPreconditionCheck).toHaveBeenCalledTimes(1)
+    expect(plan.items).toHaveLength(1)
+    expect(plan.items[0]!.rule.tool).toBe('gemini')
+    expect(plan.items[0]!.rule.sourceDir).toBe('instructions')
+    expect(mockReporter.warn).toHaveBeenCalledWith('Gemini version too low')
+  })
+
+  it('Story 7-4 precondition: gemini version ok keeps full 2-rule plan', async () => {
+    mockGeminiPreconditionCheck.mockResolvedValue({ ok: true })
+
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/skills')) {
+        return [
+          { name: 'skill-a', isFile: () => false, isDirectory: () => true },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      if (p.endsWith('/instructions')) {
+        return [
+          { name: 'AGENTS.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['gemini'], 'global'),
+      makeArgs({ global: true }),
+      mockReporter,
+      mockPathResolver,
+    )
+
+    expect(mockGeminiPreconditionCheck).toHaveBeenCalledTimes(1)
+    expect(plan.items).toHaveLength(2)
+    expect(plan.items.map((item) => item.rule.sourceDir)).toEqual(['skills', 'instructions'])
+    expect(mockReporter.warn).not.toHaveBeenCalled()
   })
 
   // ──────────────────────────────────────────────────────────────

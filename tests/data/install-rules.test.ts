@@ -6,13 +6,14 @@ import {
   BUILTIN_RULES,
   MCP_MERGE_HINTS,
   RULE_INDEX,
+  TOOL_PRECONDITIONS,
   UNIVERSAL_RULES,
   loadRules,
 } from '../../src/data/install-rules.js'
 
-describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-3)', () => {
-  it('contains exactly 29 rules (current 24-rule baseline + 5 Auggie rules)', () => {
-    expect(BUILTIN_RULES).toHaveLength(29)
+describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-4)', () => {
+  it('contains exactly 33 rules (current 29-rule baseline + 4 Gemini rules)', () => {
+    expect(BUILTIN_RULES).toHaveLength(33)
   })
 
   it('every rule has required fields: tool, scope, sourceDir, type, targetDir', () => {
@@ -25,9 +26,9 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-3)', () => {
     }
   })
 
-  it('Story 7-3: covers 5 tools (vscode removed, codex and auggie added)', () => {
+  it('Story 7-4: covers 6 tools (vscode removed, codex, auggie, and gemini added)', () => {
     const tools = new Set(BUILTIN_RULES.map((r) => r.tool))
-    expect(tools).toEqual(new Set(['copilot', 'claude', 'cursor', 'codex', 'auggie']))
+    expect(tools).toEqual(new Set(['copilot', 'claude', 'cursor', 'codex', 'auggie', 'gemini']))
   })
 
   it('v2.0: no vscode rules exist in BUILTIN_RULES', () => {
@@ -227,6 +228,46 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-3)', () => {
       fileFilter: ['AGENTS.md'],
     })
   })
+
+  it('Story 7-4: gemini has 4 rules (skills global/project, instructions global/project)', () => {
+    const geminiRules = BUILTIN_RULES.filter((r) => r.tool === 'gemini')
+    expect(geminiRules).toHaveLength(4)
+    expect(geminiRules.filter((r) => r.sourceDir === 'skills')).toHaveLength(2)
+    expect(geminiRules.filter((r) => r.sourceDir === 'instructions')).toHaveLength(2)
+  })
+
+  it('Story 7-4: gemini rule matrix uses expected install types, targets, and instructions filter', () => {
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'gemini',
+      scope: 'global',
+      sourceDir: 'skills',
+      type: InstallType.Directories,
+      targetDir: '~/.gemini/skills/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'gemini',
+      scope: 'global',
+      sourceDir: 'instructions',
+      type: InstallType.Files,
+      targetDir: '~/.gemini/',
+      fileFilter: ['AGENTS.md', 'GEMINI.md'],
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'gemini',
+      scope: 'project',
+      sourceDir: 'skills',
+      type: InstallType.Directories,
+      targetDir: '.gemini/skills/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'gemini',
+      scope: 'project',
+      sourceDir: 'instructions',
+      type: InstallType.Files,
+      targetDir: './',
+      fileFilter: ['AGENTS.md', 'GEMINI.md'],
+    })
+  })
 })
 
 describe('data/install-rules — RULE_INDEX (AC: #1)', () => {
@@ -283,6 +324,18 @@ describe('data/install-rules — RULE_INDEX (AC: #1)', () => {
     expect(rules).toHaveLength(3)
   })
 
+  it('Story 7-4: lookup gemini:global returns 2 rules', () => {
+    const rules = RULE_INDEX.get('gemini:global')
+    expect(rules).toBeDefined()
+    expect(rules).toHaveLength(2)
+  })
+
+  it('Story 7-4: lookup gemini:project returns 2 rules', () => {
+    const rules = RULE_INDEX.get('gemini:project')
+    expect(rules).toBeDefined()
+    expect(rules).toHaveLength(2)
+  })
+
   it('lookup for non-existent key returns undefined', () => {
     expect(RULE_INDEX.get('nonexistent:global')).toBeUndefined()
   })
@@ -306,6 +359,14 @@ describe('data/install-rules — loadRules() (AC: #1)', () => {
     const rules = loadRules()
     expect(rules).toBeDefined()
     expect(Array.isArray(rules)).toBe(true)
+  })
+})
+
+describe('data/install-rules — TOOL_PRECONDITIONS (Story 7-4)', () => {
+  it('registers gemini version precondition for skills only', () => {
+    expect(TOOL_PRECONDITIONS.gemini).toBeDefined()
+    expect(TOOL_PRECONDITIONS.gemini.affectedSourceDirs).toEqual(['skills'])
+    expect(typeof TOOL_PRECONDITIONS.gemini.check).toBe('function')
   })
 })
 

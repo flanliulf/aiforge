@@ -205,6 +205,10 @@ interface MessageSet {
     linkProjectRejected: string
     linkProjectRejectedWhy: string
   }
+  precondition: {
+    geminiVersion: string
+    geminiNotFound: string
+  }
   executeInstall: {
     skippedOnlySummary: string
     zeroResultsWarning: string
@@ -484,6 +488,12 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
     matchRules: {
       linkProjectRejected: '符号链接模式不支持项目级安装',
       linkProjectRejectedWhy: '-l/--link 仅支持全局安装模式（-g）',
+    },
+    precondition: {
+      geminiVersion:
+        '⚠️  Gemini CLI 版本 {current} < v0.26.0；跳过 skills 安装。请升级：npm install -g @google/gemini-cli@latest',
+      geminiNotFound:
+        '⚠️  未检测到 gemini 命令；跳过 skills 安装。请确认 Gemini CLI 已安装且在 PATH 中',
     },
     executeInstall: {
       skippedOnlySummary: '执行安装... 没有新增/更新文件，全部已是最新或被跳过',
@@ -774,6 +784,12 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
     matchRules: {
       linkProjectRejected: 'Symlink mode does not support project-scope installation',
       linkProjectRejectedWhy: '-l/--link only supports global installation mode (-g)',
+    },
+    precondition: {
+      geminiVersion:
+        '⚠️  Gemini CLI version {current} < v0.26.0; skip skills installation. Upgrade with: npm install -g @google/gemini-cli@latest',
+      geminiNotFound:
+        '⚠️  gemini command not found; skip skills installation. Confirm Gemini CLI is installed and available in PATH',
     },
     executeInstall: {
       skippedOnlySummary:

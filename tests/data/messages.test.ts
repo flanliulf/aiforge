@@ -116,6 +116,20 @@ describe('data/messages — setLanguage / msg (AC: #3)', () => {
     const result = m.msg('nonexistent.key.deep')
     expect(result).toBe('')
   })
+
+  it('Story 7-4: precondition.geminiNotFound returns Chinese warning message', async () => {
+    const m = await import('../../src/data/messages.js')
+    m.setLanguage('zh-CN')
+    expect(m.msg('precondition.geminiNotFound')).toContain('gemini')
+    expect(m.msg('precondition.geminiNotFound')).toContain('跳过 skills 安装')
+  })
+
+  it('Story 7-4: precondition.geminiVersion returns English warning template', async () => {
+    const m = await import('../../src/data/messages.js')
+    m.setLanguage('en')
+    expect(m.msg('precondition.geminiVersion')).toContain('v0.26.0')
+    expect(m.msg('precondition.geminiVersion')).toContain('skip skills installation')
+  })
 })
 
 describe('data/messages — English message content (AC: #3, Task 1.3-1.5)', () => {

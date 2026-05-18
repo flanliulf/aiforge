@@ -33,7 +33,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-19
-last_updated: 2026-05-18
+last_updated: 2026-05-18 17:08
 project: ai-forge
 tracking_system: file-system
 story_location: "_bmad-output/implementation-artifacts"
@@ -102,7 +102,7 @@ development_status:
   7-1-vscode-merge-and-mvp-rules-completion: done
   7-2-codex-cli-integration: done
   7-3-auggie-augment-code-integration: done
-  7-4-gemini-cli-integration: ready-for-dev
+  7-4-gemini-cli-integration: done
   7-5-opencode-xdg-integration: ready-for-dev
   7-6-windsurf-integration: ready-for-dev
   7-7-kiro-aws-integration: ready-for-dev

@@ -6,7 +6,7 @@ const Directories: InstallType = 'Directories' as InstallType
 const Flatten: InstallType = 'Flatten' as InstallType
 
 /**
- * v2.0 内置安装规则表 — 24 条规则覆盖 4 工具 × 全局/项目
+ * v2.0 内置安装规则表 — 33 条规则覆盖 6 工具 × 全局/项目
  *
  * v2.0 变更（Breaking Change）:
  *   - 删除: vscode:global:mcp-tools（VS Code 归并到 Copilot 语境）
@@ -234,10 +234,81 @@ export const BUILTIN_RULES: InstallRule[] = [
     targetDir: './',
     fileFilter: ['AGENTS.md'],
   },
+
+  // ── Gemini CLI: 全局 + 项目 (4 条) ──
+  {
+    tool: 'gemini',
+    scope: 'global',
+    sourceDir: 'skills',
+    type: Directories,
+    targetDir: '~/.gemini/skills/',
+  },
+  {
+    tool: 'gemini',
+    scope: 'global',
+    sourceDir: 'instructions',
+    type: Files,
+    targetDir: '~/.gemini/',
+    fileFilter: ['AGENTS.md', 'GEMINI.md'],
+  },
+  {
+    tool: 'gemini',
+    scope: 'project',
+    sourceDir: 'skills',
+    type: Directories,
+    targetDir: '.gemini/skills/',
+  },
+  {
+    tool: 'gemini',
+    scope: 'project',
+    sourceDir: 'instructions',
+    type: Files,
+    targetDir: './',
+    fileFilter: ['AGENTS.md', 'GEMINI.md'],
+  },
 ]
 
 export const MCP_MERGE_HINTS: Record<string, { targetFile: string; section: string }> = {
   codex: { targetFile: '~/.codex/config.toml', section: '[mcp]' },
+}
+
+export interface ToolPreconditionResult {
+  ok: boolean
+  reason?: string
+}
+
+export interface ToolPreconditionDefinition {
+  check: () => Promise<ToolPreconditionResult>
+  affectedSourceDirs: string[]
+}
+
+export const TOOL_PRECONDITIONS: Record<string, ToolPreconditionDefinition> = {
+  gemini: {
+    affectedSourceDirs: ['skills'],
+    async check() {
+      const [{ checkGeminiVersion }, { msg }] = await Promise.all([
+        import('../services/version-check.js'),
+        import('../core/messages.js'),
+      ])
+
+      const result = await checkGeminiVersion()
+      if (result.version === null) {
+        return {
+          ok: false,
+          reason: msg('precondition.geminiNotFound'),
+        }
+      }
+
+      if (!result.meetsRequirement) {
+        return {
+          ok: false,
+          reason: msg('precondition.geminiVersion').replace('{current}', `v${result.version}`),
+        }
+      }
+
+      return { ok: true }
+    },
+  },
 }
 
 /**
