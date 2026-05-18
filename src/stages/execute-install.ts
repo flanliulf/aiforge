@@ -39,6 +39,7 @@ import type { MatchedPlan, ParsedArgs, InstallResult, ManifestEntry } from '../c
 import { InstallType } from '../core/types.js'
 import type { Reporter } from '../core/reporter.js'
 import type { PathResolver } from '../core/path-resolver.js'
+import { MCP_MERGE_HINTS } from '../data/install-rules.js'
 import { TOOL_DEFINITIONS } from '../data/tool-registry.js'
 import {
   preflight,
@@ -353,6 +354,34 @@ function diagnoseZeroResults(
   reporter.warn(msg('executeInstall.suggestCheckDirectoryContents'))
 }
 
+export function emitMcpMergeHintsForPlan(plan: MatchedPlan, reporter: Reporter): void {
+  const mcpToolsInstalled = new Set<string>(
+    plan.items
+      .filter((item) => item.rule.sourceDir === 'mcp-tools' && item.sourceFiles.length > 0)
+      .map((item) => item.rule.tool),
+  )
+
+  for (const toolId of mcpToolsInstalled) {
+    const hint = MCP_MERGE_HINTS[toolId]
+    if (!hint) continue
+
+    const toolHint = msg(`mcp.${toolId}MergeHint`)
+      .replace('{targetFile}', hint.targetFile)
+      .replaceAll('{section}', hint.section)
+    reporter.warn(`${msg('mcp.mergeHintTitle')}\n${toolHint}`)
+  }
+}
+
+function resolveManualActionForPlanItem(
+  item: MatchedPlan['items'][number],
+): InstallResult['items'][number]['manualAction'] {
+  if (item.rule.sourceDir === 'mcp-tools' && MCP_MERGE_HINTS[item.rule.tool]) {
+    return 'mcp-merge-required'
+  }
+
+  return undefined
+}
+
 // ── manifest 冲突上下文 ─────────────────────────────────────────────────────
 
 /**
@@ -429,6 +458,8 @@ export async function executeInstall(
     // 空 sourceFiles 静默跳过：不创建目录、不产生副作用（CR R4-#1）
     if (item.sourceFiles.length === 0) continue
 
+    const manualAction = resolveManualActionForPlanItem(item)
+
     // 根据 scope 推导 allowedRoot（与 preflight 保持一致）
     const allowedRoot = item.rule.scope === 'global' ? pathResolver.home() : process.cwd()
 
@@ -468,6 +499,7 @@ export async function executeInstall(
             toolDisplayName: toolNameMap.get(item.rule.tool),
             targetGroupLabel: item.rule.targetDir,
             targetGroupPath: item.targetPath,
+            manualAction,
             sourcePath: srcDir,
             targetPath: destPath,
           })
@@ -495,6 +527,7 @@ export async function executeInstall(
               toolDisplayName: toolNameMap.get(item.rule.tool),
               targetGroupLabel: item.rule.targetDir,
               targetGroupPath: item.targetPath,
+              manualAction,
               sourcePath: srcDir,
               targetPath: destPath,
             })
@@ -522,6 +555,7 @@ export async function executeInstall(
             toolDisplayName: toolNameMap.get(item.rule.tool),
             targetGroupLabel: item.rule.targetDir,
             targetGroupPath: item.targetPath,
+            manualAction,
             sourcePath: mainPath,
             targetPath: destPath,
           })
@@ -544,6 +578,7 @@ export async function executeInstall(
             toolDisplayName: toolNameMap.get(item.rule.tool),
             targetGroupLabel: item.rule.targetDir,
             targetGroupPath: item.targetPath,
+            manualAction,
             sourcePath: mainPath,
             targetPath: destPath,
           })
@@ -560,6 +595,7 @@ export async function executeInstall(
             toolDisplayName: toolNameMap.get(item.rule.tool),
             targetGroupLabel: item.rule.targetDir,
             targetGroupPath: item.targetPath,
+            manualAction,
             sourcePath: mainPath,
             targetPath: destPath,
           })
@@ -593,6 +629,7 @@ export async function executeInstall(
             toolDisplayName: toolNameMap.get(item.rule.tool),
             targetGroupLabel: item.rule.targetDir,
             targetGroupPath: item.targetPath,
+            manualAction,
             sourcePath: srcPath,
             targetPath: destPath,
           })
@@ -621,6 +658,7 @@ export async function executeInstall(
               toolDisplayName: toolNameMap.get(item.rule.tool),
               targetGroupLabel: item.rule.targetDir,
               targetGroupPath: item.targetPath,
+              manualAction,
               sourcePath: srcPath,
               targetPath: destPath,
             })
@@ -644,6 +682,7 @@ export async function executeInstall(
               toolDisplayName: toolNameMap.get(item.rule.tool),
               targetGroupLabel: item.rule.targetDir,
               targetGroupPath: item.targetPath,
+              manualAction,
               sourcePath: srcPath,
               targetPath: destPath,
             })
@@ -661,6 +700,7 @@ export async function executeInstall(
               toolDisplayName: toolNameMap.get(item.rule.tool),
               targetGroupLabel: item.rule.targetDir,
               targetGroupPath: item.targetPath,
+              manualAction,
               sourcePath: srcPath,
               targetPath: destPath,
             })
@@ -683,6 +723,7 @@ export async function executeInstall(
                 toolDisplayName: toolNameMap.get(item.rule.tool),
                 targetGroupLabel: item.rule.targetDir,
                 targetGroupPath: item.targetPath,
+                manualAction,
                 sourcePath: srcPath,
                 targetPath: destPath,
               })
@@ -705,6 +746,7 @@ export async function executeInstall(
               toolDisplayName: toolNameMap.get(item.rule.tool),
               targetGroupLabel: item.rule.targetDir,
               targetGroupPath: item.targetPath,
+              manualAction,
               sourcePath: srcPath,
               targetPath: destPath,
             })
@@ -735,6 +777,7 @@ export async function executeInstall(
                 toolDisplayName: toolNameMap.get(item.rule.tool),
                 targetGroupLabel: item.rule.targetDir,
                 targetGroupPath: item.targetPath,
+                manualAction,
                 sourcePath: srcFilePath,
                 targetPath: destFilePath,
               })
@@ -758,6 +801,8 @@ export async function executeInstall(
   if (itemModes.size > 0) {
     await checkBrokenLinks(resultItems, itemModes, reporter)
   }
+
+  emitMcpMergeHintsForPlan(plan, reporter)
 
   const hasActualInstall = resultItems.some(
     (item) => item.status === 'new' || item.status === 'updated',

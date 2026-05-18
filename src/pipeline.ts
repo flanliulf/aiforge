@@ -31,7 +31,7 @@ import { authenticate as authenticateStage } from './stages/authenticate.js'
 import { cloneRepo } from './stages/clone.js'
 import { detectTools } from './stages/detect-tools.js'
 import { matchRules } from './stages/match-rules.js'
-import { executeInstall } from './stages/execute-install.js'
+import { executeInstall, emitMcpMergeHintsForPlan } from './stages/execute-install.js'
 import { loadManifest, saveManifest, mergeManifest } from './services/manifest.js'
 import { fileHash } from './services/fs-utils.js'
 import { listContents } from './stages/list-contents.js'
@@ -443,6 +443,7 @@ export async function runPipeline(
       await stages.saveManifest(result)
       stages.report(result, reporter, 'result')
     } else {
+      emitMcpMergeHintsForPlan(plan, reporter)
       stages.report(plan, reporter, 'plan')
     }
   } catch (error) {

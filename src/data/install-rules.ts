@@ -6,7 +6,7 @@ const Directories: InstallType = 'Directories' as InstallType
 const Flatten: InstallType = 'Flatten' as InstallType
 
 /**
- * v2.0 内置安装规则表 — 19 条规则覆盖 3 工具 × 全局/项目
+ * v2.0 内置安装规则表 — 24 条规则覆盖 4 工具 × 全局/项目
  *
  * v2.0 变更（Breaking Change）:
  *   - 删除: vscode:global:mcp-tools（VS Code 归并到 Copilot 语境）
@@ -193,6 +193,10 @@ export const BUILTIN_RULES: InstallRule[] = [
     targetDir: '~/.codex/',
   },
 ]
+
+export const MCP_MERGE_HINTS: Record<string, { targetFile: string; section: string }> = {
+  codex: { targetFile: '~/.codex/config.toml', section: '[mcp]' },
+}
 
 /**
  * 通用目录安装规则 — Story 6-3

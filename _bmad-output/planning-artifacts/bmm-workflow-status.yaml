@@ -60,6 +60,7 @@ current_activity:
     - "6-3-universal-directory-install: done"  # 2026-04-20 CR Approved (Round 2)
     - "6-4-init-universal-directory-preference: done"  # 2026-04-20 CR Approved (Round 1)
     - "7-1-vscode-merge-and-mvp-rules-completion: done"  # 2026-05-12 CR Approved (Round 9)
-  notes: "Epic 7 进行中（1/10 Stories 完成）。Story 7-1 CR 通过（Round 9，2026-05-12）。CR TODO 11 open / 12 resolved。CR-001~006 规则已提炼并纳入全局文档。"
+    - "7-2-codex-cli-integration: done"  # 2026-05-18 CR Approved (Round 2)
+  notes: "Epic 7 进行中（2/10 Stories 完成）。Story 7-2 CR 通过（Round 2，2026-05-18）。CR TODO 32 open / 12 resolved。CR-001~006 规则已提炼并纳入全局文档。"
   next_steps:
     - "Epic 6 Retrospective"

@@ -3,16 +3,17 @@ import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { TOOL_DEFINITIONS } from '../../src/data/tool-registry.js'
 
-describe('data/tool-registry — TOOL_DEFINITIONS (AC: #2, v2.0)', () => {
-  it('v2.0: contains exactly 3 tool definitions (vscode removed)', () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(3)
+describe('data/tool-registry — TOOL_DEFINITIONS (AC: #2, Story 7-2)', () => {
+  it('Story 7-2: contains exactly 4 tool definitions (vscode removed, codex added)', () => {
+    expect(TOOL_DEFINITIONS).toHaveLength(4)
   })
 
-  it('v2.0: covers copilot, claude, cursor (no vscode)', () => {
+  it('Story 7-2: covers copilot, claude, cursor, codex (no vscode)', () => {
     const ids = TOOL_DEFINITIONS.map((t) => t.id)
     expect(ids).toContain('copilot')
     expect(ids).toContain('claude')
     expect(ids).toContain('cursor')
+    expect(ids).toContain('codex')
     expect(ids).not.toContain('vscode')
   })
 
@@ -55,6 +56,13 @@ describe('data/tool-registry — TOOL_DEFINITIONS (AC: #2, v2.0)', () => {
     const cursor = TOOL_DEFINITIONS.find((t) => t.id === 'cursor')!
     expect(cursor.detect.global.some((p) => p.includes('.cursor'))).toBe(true)
     expect(cursor.detect.project.some((p) => p.includes('.cursor'))).toBe(true)
+  })
+
+  it('Story 7-2: codex detects via .codex (global and project)', () => {
+    const codex = TOOL_DEFINITIONS.find((t) => t.id === 'codex')!
+    expect(codex.name).toBe('Codex CLI')
+    expect(codex.detect.global).toEqual(['~/.codex'])
+    expect(codex.detect.project).toEqual(['.codex'])
   })
 
   it('all tool ids are unique', () => {

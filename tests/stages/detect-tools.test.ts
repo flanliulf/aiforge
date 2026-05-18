@@ -36,6 +36,14 @@ vi.mock('../../src/data/tool-registry.js', () => ({
         project: ['.cursor'],
       },
     },
+    {
+      id: 'codex',
+      name: 'Codex CLI',
+      detect: {
+        global: ['~/.codex'],
+        project: ['.codex'],
+      },
+    },
   ],
 }))
 
@@ -151,7 +159,12 @@ describe('detectTools', () => {
   // ──────────────────────────────────────────────────────────────
 
   it('AC #2 多工具同时存在时全部返回', async () => {
-    const hitPaths = new Set(['/home/user/.copilot', '/home/user/.claude', '/home/user/.cursor'])
+    const hitPaths = new Set([
+      '/home/user/.copilot',
+      '/home/user/.claude',
+      '/home/user/.cursor',
+      '/home/user/.codex',
+    ])
     vi.mocked(access).mockImplementation(async (p) => {
       if (hitPaths.has(String(p))) return
       throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
@@ -162,6 +175,30 @@ describe('detectTools', () => {
     expect(env.tools).toContain('copilot')
     expect(env.tools).toContain('claude')
     expect(env.tools).toContain('cursor')
+    expect(env.tools).toContain('codex')
+  })
+
+  it('Story 7-2 AC #1 全局侧命中 codex 时返回包含 codex 的工具列表', async () => {
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.codex') return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('codex')
+  })
+
+  it('Story 7-2 AC #1 项目侧命中 .codex 时返回包含 codex 的工具列表', async () => {
+    const cwd = process.cwd()
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === `${cwd}/.codex`) return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('codex')
   })
 
   // ──────────────────────────────────────────────────────────────

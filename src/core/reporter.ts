@@ -77,21 +77,37 @@ function countResultStatuses(items: InstallResult['items']): {
   installed: number
   updated: number
   skipped: number
+  manualMergeRequired: number
 } {
   return {
     installed: items.filter((item) => item.status === 'new').length,
     updated: items.filter((item) => item.status === 'updated').length,
     skipped: items.filter((item) => item.status === 'skipped').length,
+    manualMergeRequired: items.filter((item) => item.manualAction === 'mcp-merge-required').length,
   }
 }
 
 function compactResultSummary(items: InstallResult['items']): string {
-  const { installed, updated, skipped } = countResultStatuses(items)
+  const { installed, updated, skipped, manualMergeRequired } = countResultStatuses(items)
   const installedStr = msg('reporter.statsInstalled').replace('{n}', String(installed))
   const updatedStr = msg('reporter.statsUpdated').replace('{n}', String(updated))
   const skippedStr = msg('reporter.statsSkipped').replace('{n}', String(skipped))
+  const manualMergeStr = msg('reporter.manualMergeStats').replace(
+    '{n}',
+    String(manualMergeRequired),
+  )
+  const manualMergeSuffix =
+    manualMergeRequired > 0 ? `${chalk.gray(' / ')}${chalk.yellow(manualMergeStr)}` : ''
 
-  return `${chalk.gray(msg('reporter.collapsedItems').replace('{count}', String(items.length)))}${chalk.gray(' (')}${chalk.green(installedStr)}${chalk.gray(' / ')}${chalk.blue(updatedStr)}${chalk.gray(' / ')}${chalk.yellow(skippedStr)}${chalk.gray(')')}`
+  return `${chalk.gray(msg('reporter.collapsedItems').replace('{count}', String(items.length)))}${chalk.gray(' (')}${chalk.green(installedStr)}${chalk.gray(' / ')}${chalk.blue(updatedStr)}${chalk.gray(' / ')}${chalk.yellow(skippedStr)}${manualMergeSuffix}${chalk.gray(')')}`
+}
+
+function manualActionLabel(item: ResultItem): string | undefined {
+  if (item.manualAction === 'mcp-merge-required') {
+    return msg('reporter.manualMergeRequired')
+  }
+
+  return undefined
 }
 
 function formatTtyWarnMessage(message: string): string {
@@ -316,14 +332,18 @@ class TtyReporter implements Reporter {
         const lastVisibleIdx = visibleItems.length - 1
 
         visibleItems.forEach((item, idx) => {
-          const icon = STATUS_ICONS[item.status] ?? '❓'
+          const manualLabel = manualActionLabel(item)
+          const icon = manualLabel ? '⚠️' : (STATUS_ICONS[item.status] ?? '❓')
           // 树形连接符：若存在折叠摘要，则最后一条明细也保留 ├──，由摘要占用最终 └──
           const connector =
             idx === lastVisibleIdx && hiddenItems.length === 0 ? '    └──' : '    ├──'
           // 按状态着色：new=green, updated=blue, skipped=green（跳过也属成功，保持一致的绿色）
-          const line = `${connector} ${icon} ${item.sourcePath}     → ${item.targetPath}`
+          const manualSuffix = manualLabel ? ` (${manualLabel})` : ''
+          const line = `${connector} ${icon} ${item.sourcePath}     → ${item.targetPath}${manualSuffix}`
           let coloredLine: string
-          if (item.status === 'new') {
+          if (manualLabel) {
+            coloredLine = chalk.yellow(line)
+          } else if (item.status === 'new') {
             coloredLine = chalk.green(line)
           } else if (item.status === 'updated') {
             coloredLine = chalk.blue(line)
@@ -508,7 +528,10 @@ class PlainReporter implements Reporter {
 
     for (const [tool, items] of byTool) {
       for (const item of items) {
-        process.stdout.write(`${item.status}\t${tool}\t${item.sourcePath}\t${item.targetPath}\n`)
+        const manualAction = item.manualAction ? `\t${item.manualAction}` : ''
+        process.stdout.write(
+          `${item.status}\t${tool}\t${item.sourcePath}\t${item.targetPath}${manualAction}\n`,
+        )
       }
     }
 
@@ -592,10 +615,12 @@ class QuietReporter implements Reporter {
   }
 
   reportResult(results: InstallResult): void {
-    const installed = results.items.filter((i) => i.status === 'new').length
-    const updated = results.items.filter((i) => i.status === 'updated').length
-    const skipped = results.items.filter((i) => i.status === 'skipped').length
-    process.stdout.write(`✓ ${resultStatsLine(installed, updated, skipped)}\n`)
+    const { installed, updated, skipped, manualMergeRequired } = countResultStatuses(results.items)
+    const manualMergeSuffix =
+      manualMergeRequired > 0
+        ? `  ${msg('reporter.manualMergeStats').replace('{n}', String(manualMergeRequired))}`
+        : ''
+    process.stdout.write(`✓ ${resultStatsLine(installed, updated, skipped)}${manualMergeSuffix}\n`)
   }
 
   /**

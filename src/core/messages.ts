@@ -94,6 +94,8 @@ interface MessageSet {
     statsUpdated: string
     statsSkipped: string
     statsFailed: string
+    manualMergeRequired: string
+    manualMergeStats: string
     planStats: string
     resultStats: string
     itemCount: string
@@ -224,6 +226,10 @@ interface MessageSet {
     claudeInstructionsReservedSkip: string
     reservedSkippedSummary: string
     reservedSkippedOnlySummary: string
+  }
+  mcp: {
+    mergeHintTitle: string
+    codexMergeHint: string
   }
   conflictResolver: {
     conflictMessage: string
@@ -367,6 +373,8 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       statsUpdated: '更新: {n} 项',
       statsSkipped: '跳过: {n} 项',
       statsFailed: '失败: {n} 项',
+      manualMergeRequired: '需手动合并',
+      manualMergeStats: '需手动合并: {n} 项',
       planStats: '计划安装: {total} 项 ({tools} 个工具)',
       resultStats: '安装: {installed} 项  更新: {updated} 项  跳过: {skipped} 项',
       itemCount: '{count} 项',
@@ -501,6 +509,11 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
         '⚠️ {count} 个 Claude Code 保留文件被拦截，未写入目标目录（--force 对此无效）',
       reservedSkippedOnlySummary:
         '⚠️ 全部源文件均被 Claude Code reserved-name 保护拦截，未执行任何写入（--force 对此无效）',
+    },
+    mcp: {
+      mergeHintTitle: '⚠️  以下 MCP 配置文件需手动合并到目标工具配置',
+      codexMergeHint:
+        '目标文件: {targetFile}\n  需合并的块: {section} 段\n  操作: 将模板内容追加或合并到上述文件的 {section} 段',
     },
     conflictResolver: {
       conflictMessage: '⚠️ 文件冲突: {target} 已存在（用户手写文件）',
@@ -645,6 +658,8 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       statsUpdated: 'Updated: {n}',
       statsSkipped: 'Skipped: {n}',
       statsFailed: 'Failed: {n}',
+      manualMergeRequired: 'manual merge required',
+      manualMergeStats: 'Manual merge required: {n}',
       planStats: 'Plan: {total} items ({tools} tools)',
       resultStats: 'Installed: {installed}  Updated: {updated}  Skipped: {skipped}',
       itemCount: '{count} items',
@@ -788,6 +803,12 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
         '⚠️ {count} Claude Code reserved file(s) blocked and not written (--force has no effect on these)',
       reservedSkippedOnlySummary:
         '⚠️ All source files were blocked by Claude Code reserved-name protection; no writes performed (--force has no effect)',
+    },
+    mcp: {
+      mergeHintTitle:
+        '⚠️  The following MCP configurations require manual merging into the target tool config',
+      codexMergeHint:
+        'Target file: {targetFile}\n  Section to merge: {section}\n  Action: append or merge the template content into the {section} section of the file above',
     },
     conflictResolver: {
       conflictMessage: '⚠️ File conflict: {target} already exists (user-written file)',

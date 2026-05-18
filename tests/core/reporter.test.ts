@@ -126,6 +126,23 @@ function createAllSkippedResult(): InstallResult {
   }
 }
 
+function createManualMergeResult(): InstallResult {
+  return {
+    items: [
+      {
+        status: 'new',
+        tool: 'codex',
+        toolDisplayName: 'Codex CLI',
+        targetGroupLabel: '~/.codex/',
+        targetGroupPath: '/home/user/.codex/',
+        manualAction: 'mcp-merge-required',
+        sourcePath: 'mcp-tools/codex.toml',
+        targetPath: '/home/user/.codex/codex.toml',
+      },
+    ],
+  }
+}
+
 function createLargeSingleToolResult(count = 25): InstallResult {
   return {
     items: Array.from({ length: count }, (_, idx) => ({
@@ -314,6 +331,15 @@ describe('PlainReporter', () => {
     )
     expect(allOutput).toContain(
       'skipped\tcopilot\tskills/refactor/\t/home/user/.copilot/skills/refactor/',
+    )
+  })
+
+  it('Story 7-2: mcp-tools 结果行输出 manual-merge-required 标记', () => {
+    reporter.reportResult(createManualMergeResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+
+    expect(allOutput).toContain(
+      'new\tcodex\tmcp-tools/codex.toml\t/home/user/.codex/codex.toml\tmcp-merge-required',
     )
   })
 
@@ -529,6 +555,15 @@ describe('TtyReporter', () => {
     reporter.reportResult(createAllNewResult())
     const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
     expect(allOutput).toContain('✅')
+  })
+
+  it('Story 7-2: mcp-tools 手动合并项显示警告图标而不是普通完成图标', () => {
+    reporter.reportResult(createManualMergeResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+
+    expect(allOutput).toContain('⚠️')
+    expect(allOutput).toContain('需手动合并')
+    expect(allOutput).not.toContain('✅')
   })
 
   it('reportResult: 状态图标 🔄 对应 updated (AC #1)', () => {
@@ -1045,6 +1080,13 @@ describe('QuietReporter', () => {
     expect(allOutput).toContain('安装: 1 项')
     expect(allOutput).toContain('更新: 1 项')
     expect(allOutput).toContain('跳过: 1 项')
+  })
+
+  it('Story 7-2: reportResult 统计摘要包含需手动合并计数', () => {
+    reporter.reportResult(createManualMergeResult())
+    const allOutput = stdoutSpy.mock.calls.map((c) => c[0] as string).join('')
+
+    expect(allOutput).toContain('需手动合并: 1 项')
   })
 
   it('reportError writes to stderr', async () => {

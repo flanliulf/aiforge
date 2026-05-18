@@ -7,6 +7,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { InstallType } from '../src/core/types.js'
 import type { ParsedArgs, MatchedPlan, InstallResult } from '../src/core/types.js'
 import type { Reporter } from '../src/core/reporter.js'
 import type { PathResolver } from '../src/core/path-resolver.js'
@@ -288,6 +289,34 @@ describe('pipeline — 管道编排器', () => {
       expect(stages.report).toHaveBeenCalledOnce()
       // 验证 runPipeline 传入了正确的 mode
       expect(stages.report).toHaveBeenCalledWith(expect.anything(), mockReporter, 'plan')
+    })
+
+    it('Story 7-2: dryRun 计划包含 codex mcp-tools 时输出手动合并提示', async () => {
+      const stages = createMockStages()
+      const codexMcpPlan: MatchedPlan = {
+        items: [
+          {
+            rule: {
+              tool: 'codex',
+              scope: 'global',
+              sourceDir: 'mcp-tools',
+              type: InstallType.Files,
+              targetDir: '~/.codex/',
+            },
+            sourceFiles: ['/repo/mcp-tools/codex.toml'],
+            targetPath: '/home/user/.codex',
+            mode: 'copy',
+          },
+        ],
+      }
+      vi.mocked(stages.match).mockResolvedValue(codexMcpPlan)
+
+      await runPipeline(createTestArgs({ dryRun: true }), mockReporter, stages)
+
+      expect(mockReporter.warn).toHaveBeenCalledWith(
+        expect.stringContaining('~/.codex/config.toml'),
+      )
+      expect(mockReporter.warn).toHaveBeenCalledWith(expect.stringContaining('[mcp]'))
     })
 
     it('dryRun 为 false 时执行 install、saveManifest 和 report（mode=result）', async () => {

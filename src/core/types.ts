@@ -81,6 +81,8 @@ export interface InstallResult {
     targetGroupLabel?: string
     /** 安装主目录的本地解析路径，用于在缺少 label 时兜底分组 */
     targetGroupPath?: string
+    /** 结果项需要用户后续手动处理的动作，不改变 status 三态统计 */
+    manualAction?: 'mcp-merge-required'
     sourcePath: string
     targetPath: string
   }>

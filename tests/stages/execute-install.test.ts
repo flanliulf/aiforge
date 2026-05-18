@@ -130,6 +130,25 @@ function makeDirPlan(sourceDirs: string[], targetPath: string): MatchedPlan {
   }
 }
 
+function makeCodexMcpPlan(sourceFiles: string[], targetPath: string): MatchedPlan {
+  return {
+    items: [
+      {
+        rule: {
+          tool: 'codex',
+          scope: 'global',
+          sourceDir: 'mcp-tools',
+          type: InstallType.Files,
+          targetDir: '~/.codex/',
+        },
+        sourceFiles,
+        targetPath,
+        mode: 'copy',
+      },
+    ],
+  }
+}
+
 // ── describe: stages/execute-install ─────────────────────────────────────────
 
 describe('stages/execute-install', () => {
@@ -581,6 +600,19 @@ describe('stages/execute-install', () => {
       await executeInstall(plan, makeArgs(), reporter, pathResolver)
 
       expect(reporter.completePhase).toHaveBeenCalledOnce()
+    })
+
+    it('Story 7-2: codex mcp-tools 安装后输出手动合并提示', async () => {
+      const srcFile = join(tmpDir, 'codex-mcp.toml')
+      const targetDir = join(tmpDir, '.codex')
+      await writeFile(srcFile, '[mcp]\nserver = "test"')
+
+      const plan = makeCodexMcpPlan([srcFile], targetDir)
+      const result = await executeInstall(plan, makeArgs(), reporter, pathResolver)
+
+      expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('~/.codex/config.toml'))
+      expect(reporter.warn).toHaveBeenCalledWith(expect.stringContaining('[mcp]'))
+      expect(result.items[0]?.manualAction).toBe('mcp-merge-required')
     })
   })
 

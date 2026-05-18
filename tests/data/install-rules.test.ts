@@ -4,14 +4,15 @@ import { resolve } from 'path'
 import { InstallType } from '../../src/core/types.js'
 import {
   BUILTIN_RULES,
+  MCP_MERGE_HINTS,
   RULE_INDEX,
   UNIVERSAL_RULES,
   loadRules,
 } from '../../src/data/install-rules.js'
 
-describe('data/install-rules — BUILTIN_RULES (AC: #1, v2.0)', () => {
-  it('contains exactly 19 rules (v2.0: +4 new rules -1 vscode = 16+3)', () => {
-    expect(BUILTIN_RULES).toHaveLength(19)
+describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-2)', () => {
+  it('contains exactly 24 rules (current 19-rule v2.0 baseline + 5 Codex rules)', () => {
+    expect(BUILTIN_RULES).toHaveLength(24)
   })
 
   it('every rule has required fields: tool, scope, sourceDir, type, targetDir', () => {
@@ -24,9 +25,9 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, v2.0)', () => {
     }
   })
 
-  it('v2.0: covers 3 tools (vscode removed): copilot, claude, cursor', () => {
+  it('Story 7-2: covers 4 tools (vscode removed, codex added)', () => {
     const tools = new Set(BUILTIN_RULES.map((r) => r.tool))
-    expect(tools).toEqual(new Set(['copilot', 'claude', 'cursor']))
+    expect(tools).toEqual(new Set(['copilot', 'claude', 'cursor', 'codex']))
   })
 
   it('v2.0: no vscode rules exist in BUILTIN_RULES', () => {
@@ -112,6 +113,61 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, v2.0)', () => {
       expect(rule.type).toBe(InstallType.Flatten)
     }
   })
+
+  it('Story 7-2: codex has 5 rules (skills global/project, agents global/project, mcp-tools global)', () => {
+    const codexRules = BUILTIN_RULES.filter((r) => r.tool === 'codex')
+    expect(codexRules).toHaveLength(5)
+    expect(codexRules.filter((r) => r.sourceDir === 'skills')).toHaveLength(2)
+    expect(codexRules.filter((r) => r.sourceDir === 'agents')).toHaveLength(2)
+    expect(codexRules.filter((r) => r.sourceDir === 'mcp-tools')).toHaveLength(1)
+  })
+
+  it('Story 7-2: codex rule matrix uses expected install types and targets', () => {
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'codex',
+      scope: 'global',
+      sourceDir: 'skills',
+      type: InstallType.Directories,
+      targetDir: '~/.codex/skills/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'codex',
+      scope: 'project',
+      sourceDir: 'skills',
+      type: InstallType.Directories,
+      targetDir: '.codex/skills/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'codex',
+      scope: 'global',
+      sourceDir: 'agents',
+      type: InstallType.Files,
+      targetDir: '~/.codex/agents/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'codex',
+      scope: 'project',
+      sourceDir: 'agents',
+      type: InstallType.Files,
+      targetDir: '.codex/agents/',
+    })
+  })
+
+  it('Story 7-2: codex mcp-tools downgrade rule targets tool root, not a subdirectory', () => {
+    const rule = BUILTIN_RULES.find(
+      (r) => r.tool === 'codex' && r.scope === 'global' && r.sourceDir === 'mcp-tools',
+    )
+    expect(rule).toBeDefined()
+    expect(rule!.type).toBe(InstallType.Files)
+    expect(rule!.targetDir).toBe('~/.codex/')
+  })
+
+  it('Story 7-2: codex MCP merge hint points to config.toml [mcp]', () => {
+    expect(MCP_MERGE_HINTS.codex).toEqual({
+      targetFile: '~/.codex/config.toml',
+      section: '[mcp]',
+    })
+  })
 })
 
 describe('data/install-rules — RULE_INDEX (AC: #1)', () => {
@@ -142,6 +198,18 @@ describe('data/install-rules — RULE_INDEX (AC: #1)', () => {
     const rules = RULE_INDEX.get('claude:global')
     expect(rules).toBeDefined()
     expect(rules).toHaveLength(3)
+  })
+
+  it('Story 7-2: lookup codex:global returns 3 rules', () => {
+    const rules = RULE_INDEX.get('codex:global')
+    expect(rules).toBeDefined()
+    expect(rules).toHaveLength(3)
+  })
+
+  it('Story 7-2: lookup codex:project returns 2 rules', () => {
+    const rules = RULE_INDEX.get('codex:project')
+    expect(rules).toBeDefined()
+    expect(rules).toHaveLength(2)
   })
 
   it('lookup for non-existent key returns undefined', () => {
