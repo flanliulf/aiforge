@@ -31,4 +31,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       project: ['.cursor'],
     },
   },
+  {
+    id: 'codex',
+    name: 'Codex CLI',
+    detect: {
+      global: ['~/.codex'],
+      project: ['.codex'],
+    },
+  },
 ]

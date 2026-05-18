@@ -152,6 +152,46 @@ export const BUILTIN_RULES: InstallRule[] = [
     type: Files,
     targetDir: '.cursor/rules/',
   },
+
+  // ── Codex CLI: 全局 + 项目 (5 条，含 MCP 降级) ──
+  // Story 7-2: Codex CLI 接入（含 MCP 降级策略）
+  {
+    tool: 'codex',
+    scope: 'global',
+    sourceDir: 'skills',
+    type: Directories,
+    targetDir: '~/.codex/skills/',
+  },
+  {
+    tool: 'codex',
+    scope: 'global',
+    sourceDir: 'agents',
+    type: Files,
+    targetDir: '~/.codex/agents/',
+  },
+  {
+    tool: 'codex',
+    scope: 'project',
+    sourceDir: 'skills',
+    type: Directories,
+    targetDir: '.codex/skills/',
+  },
+  {
+    tool: 'codex',
+    scope: 'project',
+    sourceDir: 'agents',
+    type: Files,
+    targetDir: '.codex/agents/',
+  },
+  // mcp-tools 降级策略：模板文件复制到 ~/.codex/，不直接修改 config.toml
+  // Reporter 在安装汇总阶段输出手动合并提示（见 MCP_MERGE_HINTS + execute-install.ts）
+  {
+    tool: 'codex',
+    scope: 'global',
+    sourceDir: 'mcp-tools',
+    type: Files,
+    targetDir: '~/.codex/',
+  },
 ]
 
 /**
