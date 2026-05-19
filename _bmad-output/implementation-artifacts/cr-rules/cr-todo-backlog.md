@@ -7,7 +7,7 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 37 |
+| 🔴 open | 38 |
 | 🟡 in-progress | 0 |
 | ✅ resolved | 12 |
 
@@ -147,6 +147,17 @@
 - **描述**: Story 7-8 新增 antigravity project skills 规则后，`antigravity:project` 与 `universal:project` 会同时指向 `.agents/skills/`。当前安装计划可保留两条 plan item，但 manifest 仍按单 target 单 tool 归属处理：`src/stages/execute-install.ts` 逐 plan item 执行，`src/pipeline.ts` 从 target/source 反查单个 planInfo 生成 manifest entry，`src/services/manifest.ts` 的 `mergeManifest` 以 target 覆盖旧 entry。结果是同一轮安装不阻塞，但 manifest 无法同时表达 antigravity + universal 对同一 target 的双 owner。后续需单独设计：支持 `owners/tools[]`、定义安装计划去重优先级，或文档化当前“最后 target owner 生效”的既有语义。
 - **涉及文件**: `src/stages/execute-install.ts`, `src/pipeline.ts`, `src/services/manifest.ts`, `src/data/install-rules.ts`
 - **建议时机**: Story 7-10 Epic 7 收尾或 manifest schema/安装计划归属模型专项设计时，先明确同 target 多 owner 的兼容性与迁移策略
+- **状态**: open
+- **解决记录**:
+
+### TODO-045: Reporter 接口新增方法后补齐既有测试 mock
+
+- **来源**: 7-9 CR round 1-2 (2026-05-19 ~ 2026-05-19)
+- **优先级**: P2
+- **类别**: test-gap
+- **描述**: Story 7-9 为满足 Trae Skills 能力边界的 info 级提示新增了 `Reporter.info()` 必需接口，但部分既有测试中的 `Reporter` mock 仍只实现 `warn()`，未同步补齐 `info: vi.fn()`。Round 1 reviewer 点名位置包括 `tests/stages/authenticate.test.ts`、`tests/stages/clone.test.ts`、`tests/stages/execute-install.test.ts`、`tests/stages/resolve-source.test.ts`。Round 1/2 evaluator 均确认该问题事实成立，但当前 `tsconfig.json` 排除 tests，现有 `npm test`、`npm run lint:src`、`npm run build` 门禁未暴露类型错误，因此不阻塞 Story 7-9。建议后续统一补齐这些 mock，或引入 `makeMockReporter()` helper，避免 Reporter 接口继续扩展时重复漏改。
+- **涉及文件**: `tests/stages/authenticate.test.ts`, `tests/stages/clone.test.ts`, `tests/stages/execute-install.test.ts`, `tests/stages/resolve-source.test.ts`
+- **建议时机**: 下次触及 Reporter 测试 mock、补充 tests 类型检查门禁，或统一抽取测试 helper 时
 - **状态**: open
 - **解决记录**:
 

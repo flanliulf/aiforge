@@ -11,6 +11,7 @@
 | CR-PROCESS-01 | 规则数量验收口径必须绑定已批准基线与本 Story 明确新增范围 | 7-3, 7-5 | 8/12 | global-doc | 已同步全局文档 |
 | CR-PROCESS-02 | 交互式确认中断必须统一转换为管道取消信号 | 7-6 | 8/12 | global-doc | 已同步全局文档 |
 | CR-TEST-01 | 新增工具安装规则必须用端到端测试锁定真实落盘路径 | 7-3 | 7/12 | rules-summary | 已写入规则总结 |
+| CR-API-01 | 能力边界提示必须按契约触发条件检查 | 7-9 | 7/12 | rules-summary | 已写入规则总结 |
 
 ---
 
@@ -222,3 +223,67 @@
 | 候选规则 | 硬性门槛 | 总分 | 建议去向 | 用户确认结果 |
 |----------|----------|------|----------|--------------|
 | 无候选规则 | 不适用（无 Findings） | - | none | 无需升格/无需写入 |
+
+### Story 7-9 / 2026-05-19
+
+- **Story**: 7-9
+- **分析来源**:
+  - `7-9-code-review-summary-20260519-round-1.md`
+  - `7-9-code-review-evaluation-20260519-round-1.md`
+  - `7-9-code-review-summary-20260519-round-2.md`
+  - `7-9-code-review-evaluation-20260519-round-2.md`
+- **结论概览**:
+  - Round 1 发现 2 个 `patch` 项：Trae unsupported notice 误用安装项扫描结果作为触发条件、`Reporter.info()` 新增后部分既有测试 mock 未补齐。
+  - Round 1 evaluation 确认 Finding #1 为 AC #3 边界合规缺口并要求修复；Finding #2 降级为 P2 非阻塞 CR TODO。
+  - 修复后 Round 2 reviewer/evaluator 均确认通过；本次仅将已修复且可复用的能力边界提示规则写入规则总结，不升格全局文档。
+
+#### 升格判定摘要
+
+| 候选规则 | 硬性门槛 | 总分 | 建议去向 | 用户确认结果 |
+|----------|----------|------|----------|--------------|
+| 能力边界提示必须按契约触发条件检查 | 通过 | 7/12 | rules-summary | 按默认保守决策 record-only |
+| Reporter 接口新增必需方法时同步补齐既有测试 mock | 通过 | 6/12 | todo-tracker | 交给 05 TODO Tracker |
+
+### 提炼规则
+
+#### CR-API-01：能力边界提示必须按契约触发条件检查
+
+- **来源问题**: Trae Skills 明确不支持文件系统安装，Story AC #3 要求当知识仓库包含 `skills/` 目录时输出 info 级能力边界提示。初始实现复用 `scanSourceFiles(... Directories ...)` 的非空结果判断是否提示，导致空 `skills/` 目录或仅含 `.gitkeep` 占位文件时不输出说明。
+- **CR 证据**:
+  - `7-9-code-review-summary-20260519-round-1.md`: Finding #1 指出 unsupported notice 依赖可扫描子目录，和 AC #3 的目录存在性语义不一致。
+  - `7-9-code-review-evaluation-20260519-round-1.md`: 确认该问题为 P1 必修，并要求改为按 `sourceDir` 存在且为目录触发提示。
+  - `7-9-code-review-evaluation-20260519-round-1.md`: 修复记录显示已新增 `sourceDirExists()`，并补充空目录与占位文件测试。
+  - `7-9-code-review-evaluation-20260519-round-2.md`: 确认 Round 1 Finding #1 已修复，且非空、空目录、仅占位文件三类场景均有测试覆盖。
+- **硬性门槛**:
+  - 有证据: 是
+  - 可规则化: 是
+  - 非纯特例: 是
+  - 不重复: 是
+  - 状态明确: 是
+- **量化评分**:
+
+  | 维度 | 分数 | 理由 |
+  |------|------|------|
+  | 复现频次 | 1 | 单 Story 中由 reviewer、evaluator、fixer、复审连续确认，且 Story 7-10 已规划类似 `reporter.info()` 通知场景。 |
+  | 影响范围 | 1 | 影响数据驱动能力边界提示、match 阶段用户反馈与 AC 验收语义。 |
+  | 风险等级 | 1 | 可能导致用户无法获知能力边界，误以为 unsupported 资源被静默忽略。 |
+  | 根因稳定性 | 1 | 根因是将“可安装项扫描结果”误作“提示触发契约”，未来新增类似 notice 时容易复现。 |
+  | 可执行性 | 2 | 可明确检查：提示触发条件必须直接验证契约要求，并覆盖空目录、占位文件等边界测试。 |
+  | 文档缺口 | 1 | 全局文档未覆盖 unsupported notice 的触发语义，但该模式目前仍局限于 match 阶段通知。 |
+
+- **总分**: 7/12
+- **建议去向**: rules-summary
+- **适用范围**: `TOOL_UNSUPPORTED_NOTICES`、停服/不支持能力提示、数据驱动 info 级用户通知，以及类似“无安装规则但需要解释”的 match 阶段场景。
+- **规避指南**:
+  - 禁止用安装项扫描结果替代能力边界提示的契约触发条件。
+  - 禁止让提示行为依赖目录内容形态，而 Story/AC 明确要求按目录存在性触发。
+- **最佳实践**:
+  - 为每类 unsupported/stale notice 明确触发契约，例如目录存在、配置文件存在或工具命中。
+  - 对目录存在性触发的 notice，应直接检查 `sourceDir` 是否存在且为目录，并覆盖空目录和仅占位文件场景。
+  - 保持提示为 `reporter.info()` 等非失败通道，避免把能力边界说明误呈现为安装失败。
+- **全局文档建议**:
+  - 不建议本轮升格全局文档。该规则当前主要约束 `TOOL_UNSUPPORTED_NOTICES` 的局部实现模式，总分 7/12，按默认保守决策仅写入规则总结；若后续 Story 7-10 或更多工具通知复现同类问题，再评估升格到 Rule Document Registry 三文档。
+- **本次落地**:
+  - `src/stages/match-rules.ts` 已改为通过 `sourceDirExists()` 按 `skills/` 目录存在性触发 Trae unsupported notice。
+  - `tests/stages/match-rules.test.ts` 已新增空 `skills/` 目录和仅 `.gitkeep` 占位文件场景测试。
+- **同步状态**: 已写入规则总结

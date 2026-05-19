@@ -92,6 +92,14 @@ vi.mock('../../src/data/tool-registry.js', () => ({
         project: ['.kiro'],
       },
     },
+    {
+      id: 'trae',
+      name: 'Trae (ByteDance)',
+      detect: {
+        global: ['~/.trae'],
+        project: ['.trae'],
+      },
+    },
   ],
 }))
 
@@ -113,6 +121,7 @@ const mockReporter: Reporter = {
   reportResult: vi.fn(),
   reportPlan: vi.fn(),
   reportError: vi.fn(),
+  info: vi.fn(),
   warn: vi.fn(),
 }
 
@@ -218,6 +227,7 @@ describe('detectTools', () => {
       '/home/user/.gemini',
       '/home/user/.gemini/antigravity',
       '/home/user/.kiro',
+      '/home/user/.trae',
     ])
     vi.mocked(access).mockImplementation(async (p) => {
       if (hitPaths.has(String(p))) return
@@ -236,6 +246,7 @@ describe('detectTools', () => {
     expect(env.tools).toContain('gemini')
     expect(env.tools).toContain('antigravity')
     expect(env.tools).toContain('kiro')
+    expect(env.tools).toContain('trae')
   })
 
   it('Story 7-2 AC #1 全局侧命中 codex 时返回包含 codex 的工具列表', async () => {
@@ -435,6 +446,29 @@ describe('detectTools', () => {
     const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
 
     expect(env.tools).toContain('kiro')
+  })
+
+  it('Story 7-9 AC #1 全局侧命中 ~/.trae 时返回包含 trae 的工具列表', async () => {
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.trae') return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('trae')
+  })
+
+  it('Story 7-9 AC #1 项目侧命中 .trae 时返回包含 trae 的工具列表', async () => {
+    const cwd = process.cwd()
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === `${cwd}/.trae`) return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('trae')
   })
 
   // ──────────────────────────────────────────────────────────────

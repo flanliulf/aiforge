@@ -6,7 +6,7 @@ const Directories: InstallType = 'Directories' as InstallType
 const Flatten: InstallType = 'Flatten' as InstallType
 
 /**
- * v2.0 内置安装规则表 — 53 条规则覆盖 10 工具 × 全局/项目
+ * v2.0 内置安装规则表 — 55 条规则覆盖 11 工具 × 全局/项目
  *
  * v2.0 变更（Breaking Change）:
  *   - 删除: vscode:global:mcp-tools（VS Code 归并到 Copilot 语境）
@@ -421,6 +421,23 @@ export const BUILTIN_RULES: InstallRule[] = [
     targetDir: '.kiro/steering/',
     fileFilter: ['AGENTS.md'],
   },
+
+  // ── Trae (ByteDance): 项目 (2 条，明确不支持 skills 文件安装) ──
+  {
+    tool: 'trae',
+    scope: 'project',
+    sourceDir: 'rules',
+    type: Files,
+    targetDir: '.trae/rules/',
+  },
+  {
+    tool: 'trae',
+    scope: 'project',
+    sourceDir: 'instructions',
+    type: Files,
+    targetDir: './',
+    fileFilter: ['AGENTS.md'],
+  },
 ]
 
 export const MCP_MERGE_HINTS: Record<string, { targetFile: string; section: string }> = {
@@ -436,6 +453,11 @@ export interface ToolPreconditionResult {
 export interface ToolPreconditionDefinition {
   check: () => Promise<ToolPreconditionResult>
   affectedSourceDirs: string[]
+}
+
+export interface ToolUnsupportedNoticeDefinition {
+  sourceDirs: string[]
+  messageKey: string
 }
 
 export const TOOL_PRECONDITIONS: Record<string, ToolPreconditionDefinition> = {
@@ -464,6 +486,13 @@ export const TOOL_PRECONDITIONS: Record<string, ToolPreconditionDefinition> = {
 
       return { ok: true }
     },
+  },
+}
+
+export const TOOL_UNSUPPORTED_NOTICES: Record<string, ToolUnsupportedNoticeDefinition> = {
+  trae: {
+    sourceDirs: ['skills'],
+    messageKey: 'unsupported.traeSkills',
   },
 }
 

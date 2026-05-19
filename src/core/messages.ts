@@ -209,6 +209,9 @@ interface MessageSet {
     geminiVersion: string
     geminiNotFound: string
   }
+  unsupported: {
+    traeSkills: string
+  }
   executeInstall: {
     skippedOnlySummary: string
     zeroResultsWarning: string
@@ -501,6 +504,10 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
         '⚠️  Gemini CLI 版本 {current} < v0.26.0；跳过 skills 安装。请升级：npm install -g @google/gemini-cli@latest',
       geminiNotFound:
         '⚠️  未检测到 gemini 命令；跳过 skills 安装。请确认 Gemini CLI 已安装且在 PATH 中',
+    },
+    unsupported: {
+      traeSkills:
+        'ℹ️  Trae Skills 通过 UI 驱动管理，无稳定文件路径，aiforge 无法安装。请通过 Trae UI 配置 Skills',
     },
     executeInstall: {
       skippedOnlySummary: '执行安装... 没有新增/更新文件，全部已是最新或被跳过',
@@ -806,6 +813,10 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
         '⚠️  Gemini CLI version {current} < v0.26.0; skip skills installation. Upgrade with: npm install -g @google/gemini-cli@latest',
       geminiNotFound:
         '⚠️  gemini command not found; skip skills installation. Confirm Gemini CLI is installed and available in PATH',
+    },
+    unsupported: {
+      traeSkills:
+        'ℹ️  Trae Skills are managed through a UI-driven flow with no stable filesystem path, so aiforge cannot install them. Please configure Skills in the Trae UI',
     },
     executeInstall: {
       skippedOnlySummary:

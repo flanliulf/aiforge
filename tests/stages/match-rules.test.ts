@@ -172,11 +172,37 @@ vi.mock('../../src/data/install-rules.js', () => ({
         },
       ],
     ],
+    [
+      'trae:project',
+      [
+        {
+          tool: 'trae',
+          scope: 'project',
+          sourceDir: 'rules',
+          type: InstallType.Files,
+          targetDir: '.trae/rules/',
+        },
+        {
+          tool: 'trae',
+          scope: 'project',
+          sourceDir: 'instructions',
+          type: InstallType.Files,
+          targetDir: './',
+          fileFilter: ['AGENTS.md'],
+        },
+      ],
+    ],
   ]),
   TOOL_PRECONDITIONS: {
     gemini: {
       check: mockGeminiPreconditionCheck,
       affectedSourceDirs: ['skills'],
+    },
+  },
+  TOOL_UNSUPPORTED_NOTICES: {
+    trae: {
+      sourceDirs: ['skills'],
+      messageKey: 'unsupported.traeSkills',
     },
   },
   UNIVERSAL_RULES: [
@@ -226,6 +252,7 @@ const mockReporter: Reporter = {
   reportResult: vi.fn(),
   reportPlan: vi.fn(),
   reportError: vi.fn(),
+  info: vi.fn(),
   warn: vi.fn(),
 }
 
@@ -801,6 +828,137 @@ describe('matchRules', () => {
     expect(mockGeminiPreconditionCheck).toHaveBeenCalledTimes(1)
     expect(plan.items).toHaveLength(2)
     expect(plan.items.map((item) => item.rule.sourceDir)).toEqual(['skills', 'instructions'])
+    expect(mockReporter.warn).not.toHaveBeenCalled()
+  })
+
+  it('Story 7-9: trae 项目级保留 rules 与 instructions，且不生成 skills item', async () => {
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/rules')) {
+        return [
+          { name: 'team-rule.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      if (p.endsWith('/instructions')) {
+        return [
+          { name: 'AGENTS.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      if (p.endsWith('/skills')) {
+        return [
+          { name: 'writer', isFile: () => false, isDirectory: () => true },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['trae'], 'project'),
+      makeArgs({ global: false }),
+      mockReporter,
+      mockPathResolver,
+    )
+
+    expect(plan.items).toHaveLength(2)
+    expect(plan.items.map((item) => item.rule.sourceDir).sort()).toEqual(['instructions', 'rules'])
+    expect(plan.items.some((item) => item.rule.sourceDir === 'skills')).toBe(false)
+  })
+
+  it('Story 7-9: trae 命中且仓库存在 skills 目录时输出 info 提示，不记为 warn', async () => {
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/rules')) {
+        return [
+          { name: 'team-rule.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      if (p.endsWith('/instructions')) {
+        return [
+          { name: 'AGENTS.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      if (p.endsWith('/skills')) {
+        return [
+          { name: 'writer', isFile: () => false, isDirectory: () => true },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    await matchRules(
+      mockRepo,
+      makeEnv(['trae'], 'project'),
+      makeArgs({ global: false }),
+      mockReporter,
+      mockPathResolver,
+    )
+
+    expect(mockReporter.info).toHaveBeenCalledWith(expect.stringContaining('Trae Skills'))
+    expect(mockReporter.warn).not.toHaveBeenCalled()
+  })
+
+  it('Story 7-9: trae 命中且 skills 目录为空时仍输出 info 提示', async () => {
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/rules')) {
+        return [
+          { name: 'team-rule.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      if (p.endsWith('/instructions')) {
+        return [
+          { name: 'AGENTS.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      if (p.endsWith('/skills')) {
+        return [] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    await matchRules(
+      mockRepo,
+      makeEnv(['trae'], 'project'),
+      makeArgs({ global: false }),
+      mockReporter,
+      mockPathResolver,
+    )
+
+    expect(mockReporter.info).toHaveBeenCalledWith(expect.stringContaining('Trae Skills'))
+    expect(mockReporter.warn).not.toHaveBeenCalled()
+  })
+
+  it('Story 7-9: trae 命中且 skills 目录仅含占位文件时仍输出 info 提示', async () => {
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/rules')) {
+        return [
+          { name: 'team-rule.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      if (p.endsWith('/instructions')) {
+        return [
+          { name: 'AGENTS.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      if (p.endsWith('/skills')) {
+        return [
+          { name: '.gitkeep', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    await matchRules(
+      mockRepo,
+      makeEnv(['trae'], 'project'),
+      makeArgs({ global: false }),
+      mockReporter,
+      mockPathResolver,
+    )
+
+    expect(mockReporter.info).toHaveBeenCalledWith(expect.stringContaining('Trae Skills'))
     expect(mockReporter.warn).not.toHaveBeenCalled()
   })
 

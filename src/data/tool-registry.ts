@@ -87,4 +87,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       project: ['.kiro'],
     },
   },
+  {
+    id: 'trae',
+    name: 'Trae (ByteDance)',
+    detect: {
+      global: ['~/.trae'],
+      project: ['.trae'],
+    },
+  },
 ]

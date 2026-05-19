@@ -7,13 +7,14 @@ import {
   MCP_MERGE_HINTS,
   RULE_INDEX,
   TOOL_PRECONDITIONS,
+  TOOL_UNSUPPORTED_NOTICES,
   UNIVERSAL_RULES,
   loadRules,
 } from '../../src/data/install-rules.js'
 
-describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-8)', () => {
-  it('contains exactly 53 rules (Epic 7 cumulative matrix + antigravity 3 rules)', () => {
-    expect(BUILTIN_RULES).toHaveLength(53)
+describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-9)', () => {
+  it('contains exactly 55 rules (Epic 7 cumulative matrix + trae 2 rules)', () => {
+    expect(BUILTIN_RULES).toHaveLength(55)
   })
 
   it('every rule has required fields: tool, scope, sourceDir, type, targetDir', () => {
@@ -26,7 +27,7 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-8)', () => {
     }
   })
 
-  it('Story 7-8: covers 10 tools (antigravity added on top of kiro baseline)', () => {
+  it('Story 7-9: covers 11 tools (trae added on top of Story 7-8 baseline)', () => {
     const tools = new Set(BUILTIN_RULES.map((r) => r.tool))
     expect(tools).toEqual(
       new Set([
@@ -40,6 +41,7 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-8)', () => {
         'gemini',
         'antigravity',
         'kiro',
+        'trae',
       ]),
     )
   })
@@ -490,6 +492,38 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-8)', () => {
       fileFilter: ['AGENTS.md'],
     })
   })
+
+  it('Story 7-9: trae has 2 project rules (rules + AGENTS instructions)', () => {
+    const traeRules = BUILTIN_RULES.filter((r) => r.tool === 'trae')
+    expect(traeRules).toHaveLength(2)
+    expect(traeRules.every((r) => r.scope === 'project')).toBe(true)
+    expect(traeRules.map((r) => r.sourceDir).sort()).toEqual(['instructions', 'rules'])
+  })
+
+  it('Story 7-9: trae rule matrix installs rules into .trae/rules and AGENTS.md into project root', () => {
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'trae',
+      scope: 'project',
+      sourceDir: 'rules',
+      type: InstallType.Files,
+      targetDir: '.trae/rules/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'trae',
+      scope: 'project',
+      sourceDir: 'instructions',
+      type: InstallType.Files,
+      targetDir: './',
+      fileFilter: ['AGENTS.md'],
+    })
+  })
+
+  it('Story 7-9: trae does not define any skills rule', () => {
+    const traeSkillsRules = BUILTIN_RULES.filter(
+      (r) => r.tool === 'trae' && r.sourceDir === 'skills',
+    )
+    expect(traeSkillsRules).toHaveLength(0)
+  })
 })
 
 describe('data/install-rules — RULE_INDEX (AC: #1)', () => {
@@ -612,6 +646,13 @@ describe('data/install-rules — RULE_INDEX (AC: #1)', () => {
     expect(rules).toHaveLength(1)
   })
 
+  it('Story 7-9: lookup trae:project returns 2 rules', () => {
+    const rules = RULE_INDEX.get('trae:project')
+    expect(rules).toBeDefined()
+    expect(rules).toHaveLength(2)
+    expect(rules?.map((rule) => rule.sourceDir).sort()).toEqual(['instructions', 'rules'])
+  })
+
   it('lookup for non-existent key returns undefined', () => {
     expect(RULE_INDEX.get('nonexistent:global')).toBeUndefined()
   })
@@ -643,6 +684,14 @@ describe('data/install-rules — TOOL_PRECONDITIONS (Story 7-4)', () => {
     expect(TOOL_PRECONDITIONS.gemini).toBeDefined()
     expect(TOOL_PRECONDITIONS.gemini.affectedSourceDirs).toEqual(['skills'])
     expect(typeof TOOL_PRECONDITIONS.gemini.check).toBe('function')
+  })
+})
+
+describe('data/install-rules — TOOL_UNSUPPORTED_NOTICES (Story 7-9)', () => {
+  it('registers trae unsupported notice for skills only', () => {
+    expect(TOOL_UNSUPPORTED_NOTICES.trae).toBeDefined()
+    expect(TOOL_UNSUPPORTED_NOTICES.trae.sourceDirs).toEqual(['skills'])
+    expect(TOOL_UNSUPPORTED_NOTICES.trae.messageKey).toBe('unsupported.traeSkills')
   })
 })
 

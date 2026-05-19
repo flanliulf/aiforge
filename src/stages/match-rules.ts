@@ -22,7 +22,12 @@ import type { Reporter } from '../core/reporter.js'
 import type { PathResolver } from '../core/path-resolver.js'
 import { AiforgeError } from '../core/errors.js'
 import { EXIT_ARG_ERROR } from '../core/errors.js'
-import { RULE_INDEX, TOOL_PRECONDITIONS, UNIVERSAL_RULES } from '../data/install-rules.js'
+import {
+  RULE_INDEX,
+  TOOL_PRECONDITIONS,
+  TOOL_UNSUPPORTED_NOTICES,
+  UNIVERSAL_RULES,
+} from '../data/install-rules.js'
 import { DEFAULT_EXCLUDES } from '../data/excludes.js'
 import { msg } from '../core/messages.js'
 import { parseFilterPattern, matchesGlob, FilterCancelledSignal } from './filter-utils.js'
@@ -140,6 +145,19 @@ async function scanSourceFiles(repoDir: string, rule: InstallRule): Promise<stri
   }
 
   return sourceFiles
+}
+
+async function sourceDirExists(repoDir: string, sourceDir: string): Promise<boolean> {
+  try {
+    await readdir(join(repoDir, sourceDir), { withFileTypes: true })
+    return true
+  } catch (error: unknown) {
+    const code = (error as { code?: string }).code
+    if (code === 'ENOENT' || code === 'ENOTDIR') {
+      return false
+    }
+    throw error
+  }
 }
 
 // ── 主入口 ───────────────────────────────────────────────────────────────────
@@ -275,6 +293,23 @@ export async function matchRules(
 
     if (result.reason) {
       reporter.warn(result.reason)
+    }
+  }
+
+  for (const toolId of env.tools) {
+    const notice = TOOL_UNSUPPORTED_NOTICES[toolId]
+    if (!notice) continue
+
+    let shouldNotify = false
+    for (const sourceDir of notice.sourceDirs) {
+      if (await sourceDirExists(repo.repoDir, sourceDir)) {
+        shouldNotify = true
+        break
+      }
+    }
+
+    if (shouldNotify) {
+      reporter.info(msg(notice.messageKey))
     }
   }
 

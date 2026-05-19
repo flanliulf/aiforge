@@ -14,6 +14,7 @@ export interface Reporter {
   reportPlan(plan: MatchedPlan): void
   reportList(dirName: string, entries: string[]): void
   reportError(error: AiforgeError): void
+  info(message: string): void
   warn(message: string): void
 }
 
@@ -130,6 +131,20 @@ function formatTtyWarnMessage(message: string): string {
   }
 
   return chalk.yellow(line)
+}
+
+function formatTtyInfoMessage(message: string): string {
+  if (message.trim() === '') {
+    return '\n'
+  }
+
+  const line = `${message.trimStart().startsWith('ℹ') ? message : `ℹ ${message}`}\n`
+
+  if (/^\s+/.test(message)) {
+    return chalk.gray(line)
+  }
+
+  return chalk.cyan(line)
 }
 
 /** 安装结果状态图标映射（内联常量，与 core/messages.ts icons 保持一致） */
@@ -459,6 +474,14 @@ class TtyReporter implements Reporter {
     })
   }
 
+  info(message: string): void {
+    if (this.spinner && !this.spinnerWarnSeparated) {
+      process.stderr.write('\n')
+      this.spinnerWarnSeparated = true
+    }
+    process.stderr.write(formatTtyInfoMessage(message))
+  }
+
   warn(message: string): void {
     if (this.spinner && !this.spinnerWarnSeparated) {
       process.stderr.write('\n')
@@ -591,6 +614,10 @@ class PlainReporter implements Reporter {
     })
   }
 
+  info(message: string): void {
+    process.stderr.write(`INFO: ${message}\n`)
+  }
+
   warn(message: string): void {
     process.stderr.write(`⚠ ${message}\n`)
   }
@@ -602,6 +629,7 @@ class QuietReporter implements Reporter {
   startPhase(): void {}
   updatePhase(): void {}
   completePhase(): void {}
+  info(): void {}
   warn(): void {}
 
   reportList(dirName: string, entries: string[]): void {

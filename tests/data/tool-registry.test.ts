@@ -3,12 +3,12 @@ import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { TOOL_DEFINITIONS } from '../../src/data/tool-registry.js'
 
-describe('data/tool-registry — TOOL_DEFINITIONS (AC: #1, Story 7-8)', () => {
-  it('Story 7-8: contains exactly 10 tool definitions (antigravity added on top of Story 7-7 set)', () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(10)
+describe('data/tool-registry — TOOL_DEFINITIONS (AC: #1, Story 7-9)', () => {
+  it('Story 7-9: contains exactly 11 tool definitions (trae added on top of Story 7-8 set)', () => {
+    expect(TOOL_DEFINITIONS).toHaveLength(11)
   })
 
-  it('Story 7-8: covers copilot, claude, cursor, codex, opencode, windsurf, auggie, gemini, antigravity, kiro (no vscode)', () => {
+  it('Story 7-9: covers copilot, claude, cursor, codex, opencode, windsurf, auggie, gemini, antigravity, kiro, trae (no vscode)', () => {
     const ids = TOOL_DEFINITIONS.map((t) => t.id)
     expect(ids).toContain('copilot')
     expect(ids).toContain('claude')
@@ -20,6 +20,7 @@ describe('data/tool-registry — TOOL_DEFINITIONS (AC: #1, Story 7-8)', () => {
     expect(ids).toContain('gemini')
     expect(ids).toContain('antigravity')
     expect(ids).toContain('kiro')
+    expect(ids).toContain('trae')
     expect(ids).not.toContain('vscode')
   })
 
@@ -104,6 +105,13 @@ describe('data/tool-registry — TOOL_DEFINITIONS (AC: #1, Story 7-8)', () => {
     expect(antigravity.name).toBe('Antigravity')
     expect(antigravity.detect.global).toEqual(['~/.gemini/antigravity'])
     expect(antigravity.detect.project).toEqual(['.agents'])
+  })
+
+  it('Story 7-9: trae detects via ~/.trae (global) and .trae (project)', () => {
+    const trae = TOOL_DEFINITIONS.find((t) => t.id === 'trae')!
+    expect(trae.name).toBe('Trae (ByteDance)')
+    expect(trae.detect.global).toEqual(['~/.trae'])
+    expect(trae.detect.project).toEqual(['.trae'])
   })
 
   it('all tool ids are unique', () => {

@@ -131,6 +131,22 @@ describe('data/messages — setLanguage / msg (AC: #3)', () => {
     expect(m.msg('precondition.geminiVersion')).toContain('skip skills installation')
   })
 
+  it('Story 7-9: unsupported.traeSkills returns Chinese info message', async () => {
+    const m = await import('../../src/data/messages.js')
+    m.setLanguage('zh-CN')
+    expect(m.msg('unsupported.traeSkills')).toContain('Trae Skills')
+    expect(m.msg('unsupported.traeSkills')).toContain('UI')
+    expect(m.msg('unsupported.traeSkills')).toContain('无法安装')
+  })
+
+  it('Story 7-9: unsupported.traeSkills returns English info message', async () => {
+    const m = await import('../../src/data/messages.js')
+    m.setLanguage('en')
+    expect(m.msg('unsupported.traeSkills')).toContain('Trae Skills')
+    expect(m.msg('unsupported.traeSkills')).toContain('UI-driven')
+    expect(m.msg('unsupported.traeSkills')).toContain('cannot install')
+  })
+
   it('Story 7-6: semanticWarning.windsurfAgentsToWorkflows.prompt 返回中文提示', async () => {
     const m = await import('../../src/data/messages.js')
     m.setLanguage('zh-CN')
