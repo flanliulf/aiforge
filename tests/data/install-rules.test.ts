@@ -11,9 +11,9 @@ import {
   loadRules,
 } from '../../src/data/install-rules.js'
 
-describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-6)', () => {
-  it('contains exactly 50 rules (Epic 7 cumulative matrix + kiro 4 rules)', () => {
-    expect(BUILTIN_RULES).toHaveLength(50)
+describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-8)', () => {
+  it('contains exactly 53 rules (Epic 7 cumulative matrix + antigravity 3 rules)', () => {
+    expect(BUILTIN_RULES).toHaveLength(53)
   })
 
   it('every rule has required fields: tool, scope, sourceDir, type, targetDir', () => {
@@ -26,7 +26,7 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-6)', () => {
     }
   })
 
-  it('Story 7-7: covers 9 tools (kiro added on top of windsurf baseline)', () => {
+  it('Story 7-8: covers 10 tools (antigravity added on top of kiro baseline)', () => {
     const tools = new Set(BUILTIN_RULES.map((r) => r.tool))
     expect(tools).toEqual(
       new Set([
@@ -38,6 +38,7 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-6)', () => {
         'windsurf',
         'auggie',
         'gemini',
+        'antigravity',
         'kiro',
       ]),
     )
@@ -358,6 +359,52 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-6)', () => {
     })
   })
 
+  it('Story 7-8: antigravity has 3 rules (skills global/project, agents global)', () => {
+    const antigravityRules = BUILTIN_RULES.filter((r) => r.tool === 'antigravity')
+    expect(antigravityRules).toHaveLength(3)
+    expect(antigravityRules.filter((r) => r.scope === 'global')).toHaveLength(2)
+    expect(antigravityRules.filter((r) => r.scope === 'project')).toHaveLength(1)
+  })
+
+  it('Story 7-8: antigravity rule matrix uses isolated gemini subdirectory and project .agents target', () => {
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'antigravity',
+      scope: 'global',
+      sourceDir: 'skills',
+      type: InstallType.Directories,
+      targetDir: '~/.gemini/antigravity/skills/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'antigravity',
+      scope: 'global',
+      sourceDir: 'agents',
+      type: InstallType.Files,
+      targetDir: '~/.gemini/antigravity/agents/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'antigravity',
+      scope: 'project',
+      sourceDir: 'skills',
+      type: InstallType.Directories,
+      targetDir: '.agents/skills/',
+    })
+  })
+
+  it('Story 7-8: antigravity global skills target stays isolated from gemini global skills target', () => {
+    const antigravitySkillsRule = BUILTIN_RULES.find(
+      (r) => r.tool === 'antigravity' && r.scope === 'global' && r.sourceDir === 'skills',
+    )
+    const geminiSkillsRule = BUILTIN_RULES.find(
+      (r) => r.tool === 'gemini' && r.scope === 'global' && r.sourceDir === 'skills',
+    )
+
+    expect(antigravitySkillsRule).toBeDefined()
+    expect(geminiSkillsRule).toBeDefined()
+    expect(antigravitySkillsRule!.targetDir).toBe('~/.gemini/antigravity/skills/')
+    expect(geminiSkillsRule!.targetDir).toBe('~/.gemini/skills/')
+    expect(antigravitySkillsRule!.targetDir).not.toBe(geminiSkillsRule!.targetDir)
+  })
+
   it('Story 7-6: windsurf has 5 rules (skills/rules global+project, agents→workflows project)', () => {
     const windsurfRules = BUILTIN_RULES.filter((r) => r.tool === 'windsurf')
     expect(windsurfRules).toHaveLength(5)
@@ -551,6 +598,18 @@ describe('data/install-rules — RULE_INDEX (AC: #1)', () => {
     const rules = RULE_INDEX.get('kiro:project')
     expect(rules).toBeDefined()
     expect(rules).toHaveLength(2)
+  })
+
+  it('Story 7-8: lookup antigravity:global returns 2 rules', () => {
+    const rules = RULE_INDEX.get('antigravity:global')
+    expect(rules).toBeDefined()
+    expect(rules).toHaveLength(2)
+  })
+
+  it('Story 7-8: lookup antigravity:project returns 1 rule', () => {
+    const rules = RULE_INDEX.get('antigravity:project')
+    expect(rules).toBeDefined()
+    expect(rules).toHaveLength(1)
   })
 
   it('lookup for non-existent key returns undefined', () => {

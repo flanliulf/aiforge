@@ -72,6 +72,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    id: 'antigravity',
+    name: 'Antigravity',
+    detect: {
+      global: ['~/.gemini/antigravity'],
+      project: ['.agents'],
+    },
+  },
+  {
     id: 'kiro',
     name: 'Kiro (AWS)',
     detect: {

@@ -3,12 +3,12 @@ import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { TOOL_DEFINITIONS } from '../../src/data/tool-registry.js'
 
-describe('data/tool-registry — TOOL_DEFINITIONS (AC: #1, Story 7-6)', () => {
-  it('Story 7-7: contains exactly 9 tool definitions (kiro added on top of Story 7-6 set)', () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(9)
+describe('data/tool-registry — TOOL_DEFINITIONS (AC: #1, Story 7-8)', () => {
+  it('Story 7-8: contains exactly 10 tool definitions (antigravity added on top of Story 7-7 set)', () => {
+    expect(TOOL_DEFINITIONS).toHaveLength(10)
   })
 
-  it('Story 7-7: covers copilot, claude, cursor, codex, opencode, windsurf, auggie, gemini, kiro (no vscode)', () => {
+  it('Story 7-8: covers copilot, claude, cursor, codex, opencode, windsurf, auggie, gemini, antigravity, kiro (no vscode)', () => {
     const ids = TOOL_DEFINITIONS.map((t) => t.id)
     expect(ids).toContain('copilot')
     expect(ids).toContain('claude')
@@ -18,6 +18,7 @@ describe('data/tool-registry — TOOL_DEFINITIONS (AC: #1, Story 7-6)', () => {
     expect(ids).toContain('windsurf')
     expect(ids).toContain('auggie')
     expect(ids).toContain('gemini')
+    expect(ids).toContain('antigravity')
     expect(ids).toContain('kiro')
     expect(ids).not.toContain('vscode')
   })
@@ -98,6 +99,13 @@ describe('data/tool-registry — TOOL_DEFINITIONS (AC: #1, Story 7-6)', () => {
     expect(gemini.detect.project).toEqual(['.gemini'])
   })
 
+  it('Story 7-8: antigravity detects via ~/.gemini/antigravity (global) and .agents (project)', () => {
+    const antigravity = TOOL_DEFINITIONS.find((t) => t.id === 'antigravity')!
+    expect(antigravity.name).toBe('Antigravity')
+    expect(antigravity.detect.global).toEqual(['~/.gemini/antigravity'])
+    expect(antigravity.detect.project).toEqual(['.agents'])
+  })
+
   it('all tool ids are unique', () => {
     const ids = TOOL_DEFINITIONS.map((t) => t.id)
     expect(new Set(ids).size).toBe(ids.length)
@@ -110,7 +118,7 @@ describe('data/tool-registry — module boundary (AC: #5)', () => {
     const content = readFileSync(filePath, 'utf-8')
     const importLines = content
       .split('\n')
-      .filter((l) => l.match(/^\s*import\s/) && !l.match(/^\s*import\s+type\s/))
+      .filter((line: string) => line.match(/^\s*import\s/) && !line.match(/^\s*import\s+type\s/))
     for (const line of importLines) {
       expect(line).not.toMatch(/from\s+['"]\.\.\/(?:core|stages|services|commands)/)
     }

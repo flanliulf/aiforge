@@ -6,7 +6,7 @@ const Directories: InstallType = 'Directories' as InstallType
 const Flatten: InstallType = 'Flatten' as InstallType
 
 /**
- * v2.0 内置安装规则表 — 50 条规则覆盖 9 工具 × 全局/项目
+ * v2.0 内置安装规则表 — 53 条规则覆盖 10 工具 × 全局/项目
  *
  * v2.0 变更（Breaking Change）:
  *   - 删除: vscode:global:mcp-tools（VS Code 归并到 Copilot 语境）
@@ -327,6 +327,29 @@ export const BUILTIN_RULES: InstallRule[] = [
     type: Files,
     targetDir: './',
     fileFilter: ['AGENTS.md', 'GEMINI.md'],
+  },
+
+  // ── Antigravity: 全局 + 项目 (3 条) ──
+  {
+    tool: 'antigravity',
+    scope: 'global',
+    sourceDir: 'skills',
+    type: Directories,
+    targetDir: '~/.gemini/antigravity/skills/',
+  },
+  {
+    tool: 'antigravity',
+    scope: 'global',
+    sourceDir: 'agents',
+    type: Files,
+    targetDir: '~/.gemini/antigravity/agents/',
+  },
+  {
+    tool: 'antigravity',
+    scope: 'project',
+    sourceDir: 'skills',
+    type: Directories,
+    targetDir: '.agents/skills/',
   },
 
   // ── Windsurf: 全局 + 项目 (5 条，agents→workflows 语义提示) ──

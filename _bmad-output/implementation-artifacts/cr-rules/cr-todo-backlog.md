@@ -7,7 +7,7 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 36 |
+| 🔴 open | 37 |
 | 🟡 in-progress | 0 |
 | ✅ resolved | 12 |
 
@@ -136,6 +136,17 @@
 - **描述**: Story 7-6 的 AC#5 仍表述为“新增规则 +5 条，BUILTIN_RULES 总量 46 条”，与当前规则口径存在文案矛盾。评估结论为非阻塞文档一致性问题：建议将 AC 文案修正为“新增规则 +6 条（5 条 Windsurf + 1 条 Claude 项目根 CLAUDE.md），总量 46 条”，并在后续补充 `claude:project` 双规则并存场景的验证说明。
 - **涉及文件**: `_bmad-output/implementation-artifacts/stories/7-6-windsurf-integration.md`
 - **建议时机**: 下次触及 Story 7-6 文档或进行 Epic 7 文档一致性收敛时
+- **状态**: open
+- **解决记录**:
+
+### TODO-044: manifest 同 target 多工具归属模型缺失
+
+- **来源**: 7-8 CR round 1 (2026-05-19)
+- **优先级**: P2
+- **类别**: tech-debt
+- **描述**: Story 7-8 新增 antigravity project skills 规则后，`antigravity:project` 与 `universal:project` 会同时指向 `.agents/skills/`。当前安装计划可保留两条 plan item，但 manifest 仍按单 target 单 tool 归属处理：`src/stages/execute-install.ts` 逐 plan item 执行，`src/pipeline.ts` 从 target/source 反查单个 planInfo 生成 manifest entry，`src/services/manifest.ts` 的 `mergeManifest` 以 target 覆盖旧 entry。结果是同一轮安装不阻塞，但 manifest 无法同时表达 antigravity + universal 对同一 target 的双 owner。后续需单独设计：支持 `owners/tools[]`、定义安装计划去重优先级，或文档化当前“最后 target owner 生效”的既有语义。
+- **涉及文件**: `src/stages/execute-install.ts`, `src/pipeline.ts`, `src/services/manifest.ts`, `src/data/install-rules.ts`
+- **建议时机**: Story 7-10 Epic 7 收尾或 manifest schema/安装计划归属模型专项设计时，先明确同 target 多 owner 的兼容性与迁移策略
 - **状态**: open
 - **解决记录**:
 

@@ -134,6 +134,18 @@ vi.mock('../../src/data/install-rules.js', () => ({
       ],
     ],
     [
+      'antigravity:project',
+      [
+        {
+          tool: 'antigravity',
+          scope: 'project',
+          sourceDir: 'skills',
+          type: InstallType.Directories,
+          targetDir: '.agents/skills/',
+        },
+      ],
+    ],
+    [
       'windsurf:project',
       [
         {
@@ -1428,6 +1440,34 @@ describe('matchRules — LINK_PROJECT_REJECTED i18n', () => {
     for (const item of universalItems) {
       expect(item.mode).toBe('copy')
     }
+  })
+
+  it('Story 7-8 AC #3/Task 2.4: antigravity 项目级 skills 规则与 universal .agents/skills 规则同时保留', async () => {
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/skills')) {
+        return [
+          { name: 'skill-a', isFile: () => false, isDirectory: () => true },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    const plan = await matchRules(
+      mockRepo,
+      makeEnv(['antigravity'], 'project'),
+      makeArgs({ global: false, dirs: ['skills'] }),
+      mockReporter,
+      mockPathResolver,
+      true,
+    )
+
+    const agentsSkillsItems = plan.items.filter((item) =>
+      item.targetPath.includes('.agents/skills/'),
+    )
+    expect(agentsSkillsItems).toHaveLength(2)
+    expect(agentsSkillsItems.map((item) => item.rule.tool)).toEqual(['antigravity', 'universal'])
+    expect(agentsSkillsItems.every((item) => item.rule.sourceDir === 'skills')).toBe(true)
   })
 
   it('AC #4 --dirs 过滤同样应用于通用目录：skills 过滤时 agents 容类将被排除', async () => {
