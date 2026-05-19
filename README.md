@@ -7,6 +7,8 @@
 
 **English** | [中文](README.zh.md)
 
+> **v2.0**: Breaking change release. The `vscode` tool ID has been removed, support now covers 11 tools, and migration guidance is available in [docs/migration-v2.md](docs/migration-v2.md).
+
 ## What is aiforge?
 
 **aiforge** is a CLI tool (runs via `npx`) that reads AI coding configurations — Agents, Skills, Instructions, and MCP Tools — from any Git repository and installs them to the correct locations for each AI tool automatically.
@@ -27,7 +29,7 @@ Knowledge Repo (Git)            aiforge              Local AI Tools
 
 ## Features
 
-- **Multi-tool support** — Auto-detects and installs to GitHub Copilot, Claude Code, and Cursor
+- **11-tool support** — Auto-detects and installs to GitHub Copilot, Claude Code, Cursor, Codex CLI, OpenCode, Auggie, Gemini CLI, Windsurf, Kiro, Antigravity, and Trae
 - **Global + Project scope** — User-level global install (`-g`) or project-level install (default)
 - **Copy or Symlink** — Copy files by default; use `-l` for symlinks that auto-update with `git pull`
 - **Four resource types** — Agents, Skills, Instructions, and MCP Tools
@@ -189,45 +191,30 @@ npx aiforge update
 
 > **v2.0**: The `vscode` tool has been removed. VS Code MCP configuration is now managed via the `copilot` project rule. See [docs/migration-v2.md](docs/migration-v2.md).
 
-| Tool | Global | Project | Resource Types |
-|------|:------:|:-------:|----------------|
-| GitHub Copilot | ✅ | ✅ | Agents, Skills, Instructions, MCP Tools |
-| Claude Code | ✅ | ✅ | Agents, Skills, Instructions |
-| Cursor | ✅ | ✅ | Agents, Skills |
-| Universal (`.agents/`, `.agent/`) | — | ✅ | Agents, Skills |
+| Tool | Global | Project | Primary Resource Types | Notes |
+|------|:------:|:-------:|------------------------|-------|
+| GitHub Copilot | ✅ | ✅ | Agents, Skills, Instructions, MCP Tools | `.vscode/` project MCP files are managed through Copilot |
+| Claude Code | ✅ | ✅ | Agents, Skills, Instructions | Project instructions go to both `.claude/` and repo root |
+| Cursor | ✅ | ✅ | Agents, Skills | Skills use Flatten mode |
+| Codex CLI | ✅ | ✅ | Agents, Skills, MCP Tools | MCP templates require manual merge |
+| OpenCode | ✅ | ✅ | Agents, Skills, Instructions, MCP Tools | Uses XDG global path |
+| Auggie | ✅ | ✅ | Agents, Skills, Instructions | Project instructions install `AGENTS.md` at repo root |
+| Gemini CLI | ✅ | ✅ | Skills, Instructions | Skills require Gemini CLI `v0.26.0+` |
+| Windsurf | ✅ | ✅ | Skills, Rules, Agents | `agents/` map to `workflows/` with warning |
+| Kiro | ✅ | ✅ | Skills, Instructions | Instructions install into `steering/` |
+| Antigravity | ✅ | ✅ | Agents, Skills | Global files live under `~/.gemini/antigravity/` |
+| Trae | — | ✅ | Rules, Instructions | Skills are intentionally unsupported |
+| Universal (`.agents/`, `.agent/`) | — | ✅ | Agents, Skills | Extra parallel install path, separate from tool matrix |
 
 ### Detailed Install Rules
 
 <details>
-<summary>Click to expand the full 23-rule matrix (19 tool rules + 4 universal rules)</summary>
+<summary>Click to expand the docs links for the full v2.0 matrix</summary>
 
-| Tool | Scope | Source Dir | Install Type | Target Dir |
-|------|-------|-----------|:------------:|------------|
-| Copilot | global | `agents/` | Files | `~/.copilot/agents/` |
-| Copilot | global | `skills/` | Directories | `~/.copilot/skills/` |
-| Copilot | global | `instructions/` | Files | `~/.copilot/` |
-| Copilot | global | `mcp-tools/` | Files | `~/.copilot/` |
-| Copilot | project | `agents/` | Files | `.github/agents/` |
-| Copilot | project | `skills/` | Directories | `.github/skills/` |
-| Copilot | project | `instructions/` | Files | `.github/` |
-| Copilot | project | `mcp-tools/` | Files | `.github/` |
-| Copilot | project | `mcp-tools/` | Files | `.vscode/` |
-| Claude | global | `agents/` | Files | `~/.claude/agents/` |
-| Claude | global | `skills/` | Directories | `~/.claude/skills/` |
-| Claude | global | `instructions/` | Files | `~/.claude/` |
-| Claude | project | `agents/` | Files | `.claude/agents/` |
-| Claude | project | `skills/` | Directories | `.claude/skills/` |
-| Claude | project | `instructions/` | Files | `.claude/` |
-| Cursor | global | `agents/` | Files | `~/.cursor/rules/` |
-| Cursor | global | `skills/` | Flatten | `~/.cursor/rules/` |
-| Cursor | project | `skills/` | Flatten | `.cursor/rules/` |
-| Cursor | project | `agents/` | Files | `.cursor/rules/` |
-| Universal | project | `skills/` | Directories | `.agents/skills/` |
-| Universal | project | `agents/` | Files | `.agents/agents/` |
-| Universal | project | `skills/` | Directories | `.agent/skills/` |
-| Universal | project | `agents/` | Files | `.agent/agents/` |
-
-> **Note:** Universal rules run in parallel with tool-specific rules by default. Use `--no-universal` or set `universalDirs: false` in config to disable.
+- [docs/install-rules-matrix.md](docs/install-rules-matrix.md) — Full 55-rule tool matrix + 4 universal rules
+- [docs/install-rules-matrix.zh.md](docs/install-rules-matrix.zh.md) — 中文版完整矩阵
+- [docs/migration-v2.md](docs/migration-v2.md) — Upgrade guide
+- [docs/migration-v2.zh.md](docs/migration-v2.zh.md) — 中文升级指南
 
 </details>
 

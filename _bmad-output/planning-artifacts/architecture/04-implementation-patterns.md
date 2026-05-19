@@ -309,6 +309,29 @@ grep -rn "console\.log\|硬编码中文" src/ --include="*.ts"
 
 > 来源：Story 2-4 CR — `hasLocalRepo()` 和 `dirExists()` 各出现一次同样问题，3 轮 CR 才彻底收敛。
 
+**信息性提示路径的存在性检查豁免必须窄化隔离：**
+
+仅当文件系统检查只用于 unsupported/stale/迁移类用户提示，且 Story/AC 明确要求提示失败不得阻断主流程时，才允许使用专用非阻断 helper 将 `EACCES`/`EIO` 等异常降级为“跳过提示”。该 helper 必须命名清楚并仅在信息性提示路径使用，禁止复用到工具识别、安全校验、安装决策或数据完整性路径；主决策路径仍必须遵守 ENOENT/ENOTDIR 白名单降级规则。
+
+```typescript
+✅ // 只用于信息性 stale notice，失败时跳过提示，不影响工具检测结果
+async function pathExistsForOptionalNotice(path: string): Promise<boolean> {
+   try {
+      await access(path)
+      return true
+   } catch {
+      return false
+   }
+}
+
+❌ // 将非阻断 helper 用于工具识别/安全/安装决策
+const toolExists = await pathExistsForOptionalNotice(toolMarkerPath)
+```
+
+必须补测试证明提示检查遇到 `EACCES`/I/O 异常时主流程继续执行，同时不改变通用严格 helper 的行为。
+
+> 来源：Story 7-10 CR R1→R3 — `.iflow/` stale-tool 提示复用严格 `pathExists()` 导致信息性检查可能阻断安装，修复为专用非阻断 helper。
+
 **CR 修复引入的新代码必须贯彻同等规则标准：**
 
 修复 A 函数的问题时若新增了 B 辅助函数，B 必须遵循与 A 相同的规则。修复者提交前应自查：新增的每个函数/分支是否与项目规则一致。
@@ -583,6 +606,29 @@ reporter.completePhase()
 > 来源：Install UX 收敛（2026-04-24）。原 Story 4.5 设计为「全部 skipped 也触发零结果诊断」，UX 实测时该分支误导用户（用户已主动选 skip，再触发 warn 显得系统不理解用户意图）；改为「全部 skipped 走成功路径，仅真·零结果触发 warn」后语义自洽。
 
 **输出字符串集中管理：** 所有用户可见字符串统一通过 `src/core/messages.ts` 的 `msg()` 函数获取（Story 5-5a 将 `data/messages.ts` 迁移至 `core/messages.ts`，`data/messages.ts` 现为向后兼容 re-export 垫片）。
+
+**unsupported/stale/迁移类信息性提示必须按契约触发且覆盖所有入口：**
+
+为 `TOOL_UNSUPPORTED_NOTICES`、停服工具提示、迁移提示等新增用户可见 notice 时，触发条件必须直接对应 Story/AC 契约（如目录存在、配置文件存在、工具命中或历史路径存在），不得用“可安装项扫描结果”等下游副产品代替。若契约适用于 `aiforge install`，必须同时覆盖自动检测路径和手动 `--tools` 路径；提示应通过 `reporter.info()` 或 `reporter.warn()` 输出，不得改变检测结果、安装计划或错误语义。
+
+```typescript
+✅ // 契约是“目录存在即提示”，直接检查目录存在性
+if (await sourceDirExists(repoDir, 'skills')) {
+   reporter.info(msg('matchRules.traeUnsupportedSkills'))
+}
+
+✅ // 契约适用于 install，手动工具分支返回前也执行同一 notice helper
+if (args.tools?.length) {
+   const tools = validateToolIds(args.tools)
+   await emitStaleToolNoticeIfNeeded(reporter, pathResolver)
+   return { tools, scope }
+}
+
+❌ // 用扫描出的可安装项数量代替“目录存在”契约，空目录/占位文件会漏提示
+if (scanSourceFiles('skills').length > 0) reporter.info(...)
+```
+
+> 来源：Story 7-9 CR — Trae `skills/` 空目录未触发 unsupported notice；Story 7-10 CR — 手动 `--tools` 分支绕过 `.iflow/` stale-tool notice。
 
 **CLI help 文案不做国际化：** Commander `.description()` / `.option()` 描述统一使用英文硬编码，不通过 `msg()` 动态获取——Commander 在模块加载时求值 description，此时 `currentLanguage` 始终为默认值，动态获取无效。
 

@@ -11,7 +11,8 @@
 | CR-PROCESS-01 | 规则数量验收口径必须绑定已批准基线与本 Story 明确新增范围 | 7-3, 7-5 | 8/12 | global-doc | 已同步全局文档 |
 | CR-PROCESS-02 | 交互式确认中断必须统一转换为管道取消信号 | 7-6 | 8/12 | global-doc | 已同步全局文档 |
 | CR-TEST-01 | 新增工具安装规则必须用端到端测试锁定真实落盘路径 | 7-3 | 7/12 | rules-summary | 已写入规则总结 |
-| CR-API-01 | 能力边界提示必须按契约触发条件检查 | 7-9 | 7/12 | rules-summary | 已写入规则总结 |
+| CR-API-01 | 能力边界提示必须按契约触发条件检查 | 7-9, 7-10 | 9/12 | global-doc | 已同步全局文档 |
+| CR-API-02 | 信息性提示的存在性检查必须与决策路径隔离并保持非阻断 | 7-10 | 8/12 | global-doc | 已同步全局文档 |
 
 ---
 
@@ -236,12 +237,13 @@
   - Round 1 发现 2 个 `patch` 项：Trae unsupported notice 误用安装项扫描结果作为触发条件、`Reporter.info()` 新增后部分既有测试 mock 未补齐。
   - Round 1 evaluation 确认 Finding #1 为 AC #3 边界合规缺口并要求修复；Finding #2 降级为 P2 非阻塞 CR TODO。
   - 修复后 Round 2 reviewer/evaluator 均确认通过；本次仅将已修复且可复用的能力边界提示规则写入规则总结，不升格全局文档。
+  - Story 7-10 复现同类 notice 契约缺口后，本规则升格为 global-doc，并同步到 Rule Document Registry 三文档。
 
 #### 升格判定摘要
 
 | 候选规则 | 硬性门槛 | 总分 | 建议去向 | 用户确认结果 |
 |----------|----------|------|----------|--------------|
-| 能力边界提示必须按契约触发条件检查 | 通过 | 7/12 | rules-summary | 按默认保守决策 record-only |
+| 能力边界提示必须按契约触发条件检查 | 通过 | 9/12 | global-doc | Story 7-10 复现后按默认决策升格 |
 | Reporter 接口新增必需方法时同步补齐既有测试 mock | 通过 | 6/12 | todo-tracker | 交给 05 TODO Tracker |
 
 ### 提炼规则
@@ -264,26 +266,94 @@
 
   | 维度 | 分数 | 理由 |
   |------|------|------|
-  | 复现频次 | 1 | 单 Story 中由 reviewer、evaluator、fixer、复审连续确认，且 Story 7-10 已规划类似 `reporter.info()` 通知场景。 |
-  | 影响范围 | 1 | 影响数据驱动能力边界提示、match 阶段用户反馈与 AC 验收语义。 |
+  | 复现频次 | 2 | Story 7-9 的 Trae unsupported notice 与 Story 7-10 的 iFlow stale notice 均出现“提示触发条件未覆盖 AC 契约”的同类问题。 |
+  | 影响范围 | 2 | 影响 match 阶段能力边界提示、detect 阶段 stale-tool 提示、手动/自动工具入口与用户反馈契约。 |
   | 风险等级 | 1 | 可能导致用户无法获知能力边界，误以为 unsupported 资源被静默忽略。 |
   | 根因稳定性 | 1 | 根因是将“可安装项扫描结果”误作“提示触发契约”，未来新增类似 notice 时容易复现。 |
   | 可执行性 | 2 | 可明确检查：提示触发条件必须直接验证契约要求，并覆盖空目录、占位文件等边界测试。 |
-  | 文档缺口 | 1 | 全局文档未覆盖 unsupported notice 的触发语义，但该模式目前仍局限于 match 阶段通知。 |
+  | 文档缺口 | 2 | 全局文档未覆盖 unsupported/stale notice 的触发契约与手动/自动入口一致性。 |
 
-- **总分**: 7/12
-- **建议去向**: rules-summary
+- **总分**: 9/12
+- **建议去向**: global-doc
 - **适用范围**: `TOOL_UNSUPPORTED_NOTICES`、停服/不支持能力提示、数据驱动 info 级用户通知，以及类似“无安装规则但需要解释”的 match 阶段场景。
 - **规避指南**:
   - 禁止用安装项扫描结果替代能力边界提示的契约触发条件。
   - 禁止让提示行为依赖目录内容形态，而 Story/AC 明确要求按目录存在性触发。
+  - 禁止只在自动检测路径输出 stale/unsupported notice，而遗漏手动 `--tools` 等同样满足契约的入口。
 - **最佳实践**:
   - 为每类 unsupported/stale notice 明确触发契约，例如目录存在、配置文件存在或工具命中。
   - 对目录存在性触发的 notice，应直接检查 `sourceDir` 是否存在且为目录，并覆盖空目录和仅占位文件场景。
   - 保持提示为 `reporter.info()` 等非失败通道，避免把能力边界说明误呈现为安装失败。
 - **全局文档建议**:
-  - 不建议本轮升格全局文档。该规则当前主要约束 `TOOL_UNSUPPORTED_NOTICES` 的局部实现模式，总分 7/12，按默认保守决策仅写入规则总结；若后续 Story 7-10 或更多工具通知复现同类问题，再评估升格到 Rule Document Registry 三文档。
+  - 已升格并同步到 Rule Document Registry 三文档：`project-context.md`、`04-implementation-patterns.md`、`03-core-decisions.md`。
 - **本次落地**:
   - `src/stages/match-rules.ts` 已改为通过 `sourceDirExists()` 按 `skills/` 目录存在性触发 Trae unsupported notice。
   - `tests/stages/match-rules.test.ts` 已新增空 `skills/` 目录和仅 `.gitkeep` 占位文件场景测试。
-- **同步状态**: 已写入规则总结
+- **同步状态**: 已同步全局文档
+
+### Story 7-10 / 2026-05-19
+
+- **Story**: 7-10
+- **分析来源**:
+  - `7-10-code-review-summary-20260519-round-1.md`
+  - `7-10-code-review-evaluation-20260519-round-1.md`
+  - `7-10-code-review-summary-20260519-round-2.md`
+  - `7-10-code-review-evaluation-20260519-round-2.md`
+  - `7-10-code-review-summary-20260519-round-3.md`
+  - `7-10-code-review-evaluation-20260519-round-3.md`
+- **结论概览**:
+  - Round 1 发现 2 个 `patch` 项：手动 `--tools` 分支绕过 `.iflow/` stale-tool 提示、信息性 `.iflow/` 检查可能因权限/I/O 错误阻断安装。
+  - Round 2 发现 1 个 `patch` 项：dry-run 集成测试 Reporter mock 缺少 `info()`，在项目级 `.iflow/` 存在时导致全量 `npm test` 失败。
+  - Round 3 reviewer 与 evaluator 均确认通过：decision_needed 0、patch 0、defer 0；Round 1/2 的 3 个 P1 均已关闭，无新增 CR TODO。
+  - 本次将 `CR-API-01` 从 rules-summary 升格为 global-doc，并新增 `CR-API-02` 作为信息性提示非阻断豁免规则。
+
+#### 升格判定摘要
+
+| 候选规则 | 硬性门槛 | 总分 | 建议去向 | 用户确认结果 |
+|----------|----------|------|----------|--------------|
+| 能力边界提示必须按契约触发条件检查 | 通过 | 9/12 | global-doc | 按本次用户指令采用默认决策并落地 |
+| 信息性提示的存在性检查必须与决策路径隔离并保持非阻断 | 通过 | 8/12 | global-doc | 按本次用户指令采用默认决策并落地 |
+| Reporter 接口新增必需方法时同步补齐既有测试 mock | 通过 | 7/12 | todo-tracker | 已存在 TODO-045；交给 05 更新证据 |
+
+### 提炼规则
+
+#### CR-API-02：信息性提示的存在性检查必须与决策路径隔离并保持非阻断
+
+- **来源问题**: `.iflow/` stale-tool 提示是 AC #6 / Task 5.3 定义的信息性提示，不应阻断安装流程。初始实现复用严格 `pathExists()`，当 `~/.iflow` 或项目 `.iflow` 检查遇到 `EACCES`、`EIO` 等非 ENOENT/ENOTDIR 错误时会抛错并中断 `detectTools()`。
+- **CR 证据**:
+  - `7-10-code-review-summary-20260519-round-1.md`: Finding #2 指出 `.iflow/` 信息性检查可能因权限/I/O 错误阻断安装流程。
+  - `7-10-code-review-evaluation-20260519-round-1.md`: 确认该发现有效，并要求保持通用 `pathExists()` 严格语义不变，仅为 `.iflow/` stale-tool 提示引入专用非阻断降级。
+  - `7-10-code-review-evaluation-20260519-round-1.md`: 修复记录显示已新增专用非阻断 helper，`EACCES`/I/O 异常时静默跳过提示而不阻断安装。
+  - `7-10-code-review-summary-20260519-round-3.md`: 复审确认该 P1 持续关闭，且 `.iflow/` stale-tool 提示仍为信息性输出，不新增安装目标。
+- **硬性门槛**:
+  - 有证据: 是
+  - 可规则化: 是
+  - 非纯特例: 是
+  - 不重复: 是
+  - 状态明确: 是
+- **量化评分**:
+
+  | 维度 | 分数 | 理由 |
+  |------|------|------|
+  | 复现频次 | 1 | 单 Story 中由 reviewer、evaluator、fixer、复审连续确认，且属于可复用的 info notice 异常边界。 |
+  | 影响范围 | 1 | 影响 detect 阶段、手动/自动工具入口和用户提示链路。 |
+  | 风险等级 | 1 | 信息提示失败会误阻断安装流程，违反非阻断 AC。 |
+  | 根因稳定性 | 1 | 根因是可选提示复用主决策路径的严格存在性检查 helper，未来新增 notice 时容易复现。 |
+  | 可执行性 | 2 | 可明确检查：专用 helper、与主检测隔离、异常降级测试、不得改变通用 `pathExists()`。 |
+  | 文档缺口 | 2 | 既有全局 fs 存在性规则要求非 ENOENT/ENOTDIR 透传，需要补充信息性提示路径的窄豁免，避免规则冲突。 |
+
+- **总分**: 8/12
+- **建议去向**: global-doc
+- **适用范围**: unsupported/stale notice、停服提示、迁移提示等只影响用户说明、不参与工具识别/安装/安全边界决策的可选信息性检查。
+- **规避指南**:
+  - 禁止让信息性提示的文件系统探测失败阻断安装主流程。
+  - 禁止将信息性提示的非阻断存在性 helper 复用到工具识别、安全校验、安装决策或数据完整性路径。
+- **最佳实践**:
+  - 主决策路径继续使用严格存在性检查：`ENOENT`/`ENOTDIR` 降级，其他错误透传。
+  - 信息性提示若明确要求非阻断，应使用命名清晰的专用 helper，并用测试覆盖 `EACCES`/I/O 异常时主流程继续执行。
+  - 在修复记录中说明该 helper 的适用边界，避免后续被误推广。
+- **全局文档建议**:
+  - 升格并同步到 Rule Document Registry 三文档：`project-context.md`、`04-implementation-patterns.md`、`03-core-decisions.md`。
+- **本次落地**:
+  - `src/stages/detect-tools.ts` 已新增 `.iflow/` stale-tool 专用非阻断检查；`tests/stages/detect-tools.test.ts` 已覆盖 `EACCES` 不阻断检测结果。
+- **同步状态**: 已同步全局文档

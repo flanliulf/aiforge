@@ -2,122 +2,149 @@
 
 ## Overview
 
-aiforge v2.0 introduces one **Breaking Change**: the `vscode` tool ID has been removed and its functionality has been merged into the GitHub Copilot context.
+aiforge v2.0 is the first release that expands the built-in tool matrix from 3 primary tools to 11 tool integrations. It also introduces one explicit breaking change: the `vscode` tool ID is removed and folded into the GitHub Copilot context.
 
-**Your existing `~/.vscode/` files are safe — aiforge v2.0 will NOT overwrite or delete them.**
+Your existing `~/.vscode/` files remain untouched.
 
----
-
-## What Changed
-
-### Version Differences
+## Version Differences
 
 | Area | v1.x | v2.0 |
 |------|------|------|
-| Supported tools | copilot, claude, cursor, **vscode** | copilot, claude, cursor |
-| `vscode` tool ID | ✅ Available | ❌ Removed |
-| VS Code MCP config | `vscode:global → ~/.vscode/` | `copilot:project → .vscode/` |
-| Claude instructions | Not installed | ✅ `~/.claude/` + `.claude/` |
-| Cursor global agents | Not installed | ✅ `~/.cursor/rules/` |
-| BUILTIN_RULES count | 16 | 19 |
+| Supported tools | 4 (`copilot`, `claude`, `cursor`, `vscode`) | 11 (`copilot`, `claude`, `cursor`, `codex`, `opencode`, `auggie`, `gemini`, `windsurf`, `kiro`, `antigravity`, `trae`) |
+| Built-in tool rules | 16 | 55 |
+| Universal rules | 4 | 4 |
+| MCP behavior | VS Code global rule, limited MCP coverage | Copilot project MCP + Codex/OpenCode downgrade merge strategy |
+| Instructions coverage | Partial | Claude, Gemini, Kiro, Auggie, Trae all have explicit instruction behavior |
+| Preconditions | None | Gemini skills require `v0.26.0+` |
+| Semantic warnings | None | Windsurf agents -> workflows warning |
+| Unsupported notices | None | Trae skills unsupported notice |
 
-### Old vs New Rule Mapping
+## New Tool Summary
 
-| Old Rule (v1.x) | New Rule (v2.0) | Notes |
-|-----------------|-----------------|-------|
-| `vscode:global:mcp-tools → ~/.vscode/` | **Removed** | Global VS Code MCP path is deprecated |
-| *(none)* | `copilot:project:mcp-tools → .vscode/` | Project-level `.vscode/` via Copilot (filename follows source in `mcp-tools/`) |
-| *(none)* | `claude:global:instructions → ~/.claude/` | New in v2.0 |
-| *(none)* | `claude:project:instructions → .claude/` | New in v2.0 |
-| *(none)* | `cursor:global:agents → ~/.cursor/rules/` | New in v2.0 |
+| Tool | What v2.0 Adds | Quick Usage Note |
+|------|----------------|------------------|
+| Codex CLI | Skills, agents, MCP downgrade templates | `--tools codex` |
+| OpenCode | XDG global path, skills, agents, MCP templates | `--tools opencode` |
+| Auggie | Skills, agents, root `AGENTS.md` | `--tools auggie` |
+| Gemini CLI | Skills + `AGENTS.md` / `GEMINI.md` | Upgrade Gemini CLI before installing skills |
+| Windsurf | Skills, rules, workflows mapping | Review the workflows warning before confirming |
+| Kiro | Skills + steering instructions | Instructions go into `steering/` |
+| Antigravity | Nested Gemini namespace integration | Global install stays under `~/.gemini/antigravity/` |
+| Trae | Rules + root `AGENTS.md` only | Skills stay UI-managed and are not installed |
 
----
+## Breaking Change: `vscode` -> `copilot`
 
-## How to Upgrade
+### Old and New Mapping
 
-### 1. Upgrade aiforge
+| v1.x | v2.0 | Notes |
+|------|------|-------|
+| `--tools vscode` | `--tools copilot` | Replace in scripts and CI |
+| `vscode:global:mcp-tools -> ~/.vscode/` | Removed | Home-level VS Code MCP path is no longer managed |
+| None | `copilot:project:mcp-tools -> .vscode/` | Project-level MCP files are now written through Copilot |
 
-```bash
-npm install -g aiforge@2.0.0
-# or
-npx aiforge@2.0.0 --help
-```
+### Recommended Upgrade Steps
 
-### 2. Install the GitHub Copilot Extension and Create the `~/.copilot/` Marker
-
-If you previously used aiforge with VS Code and want to continue managing MCP configurations:
-
-- **VS Code**: Install the [GitHub Copilot](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) extension
-- **Then create the aiforge marker directory**: `mkdir -p ~/.copilot/`
-  - This is an aiforge convention path; the extension itself does **not** automatically create this directory.
-  - See the "Note on `~/.copilot/`" section below for full context.
-- After both are in place, `aiforge install` will detect Copilot (via `~/.copilot/` marker) and apply the `.vscode/` MCP rule (copying files from `mcp-tools/`).
-
-### 3. Re-run aiforge install
+1. Install or link aiforge v2.0.
+2. If you use VS Code MCP files, install the GitHub Copilot extension.
+3. Create the aiforge Copilot marker directory:
 
 ```bash
-aiforge install
+mkdir -p ~/.copilot/
 ```
 
-aiforge will now detect the Copilot context via `~/.copilot/` marker or project `.github/` and apply the updated rules.
+4. Re-run installation with the new tool ID:
 
----
-
-## What Happens to My Existing `~/.vscode/` Files?
-
-**Nothing.** aiforge v2.0 will not touch your existing `~/.vscode/` directory. Your configuration files are preserved.
-
-If aiforge detects `~/.vscode/` but no Copilot context (`~/.copilot/` marker or project `.github/`), it will display a warning:
-
-```
-⚠️ Detected ~/.vscode/ without ~/.copilot/. Since v2.0, VS Code has been merged
-   into the GitHub Copilot context.
-   ① VS Code MCP is now handled by the Copilot project-level rule (target: .vscode/<filename>)
-   ② Install the GitHub Copilot extension
-   ③ Create ~/.copilot/ as an aiforge marker (see note below), then re-run aiforge install
-   ④ Existing ~/.vscode/ files will not be overwritten or deleted
+```bash
+npx aiforge --tools copilot
 ```
 
-> **Note on `~/.copilot/`**: This path is an aiforge convention marker — it is **not** the actual GitHub Copilot extension installation directory. GitHub Copilot itself writes to `~/.vscode/extensions/github.copilot-*/` and your IDE config directories. To tell aiforge you are using Copilot, create the marker manually:
-> ```bash
-> mkdir -p ~/.copilot/
-> ```
-> After that, `aiforge install` will detect Copilot and apply the relevant rules.
+5. Verify that project-level MCP files land in `.vscode/`.
 
-This warning is informational only. The migration note itself does not block installation; however, if no supported AI tool is detected (e.g. neither Copilot, Claude Code, nor Cursor), aiforge will still fail with `NO_TOOLS` until you install one of the supported tools.
+### Upgrade Commands
 
----
+```bash
+# local source workflow
+npm install
+npm run build
+
+# preview before writing
+npx aiforge --dry-run
+
+# targeted migration for VS Code users
+npx aiforge --tools copilot --dry-run
+npx aiforge --tools copilot
+```
+
+### Rollback Commands
+
+```bash
+# run the previous major locally if you still need v1 behavior for comparison
+npx aiforge@1 --help
+
+# clean and rebuild this repo if a local test run changed build output
+rm -rf dist
+npm run build
+```
+
+## Tool-Specific Migration Notes
+
+### Gemini CLI
+
+- `skills/` installation is skipped unless Gemini CLI is `v0.26.0+`.
+- Upgrade command:
+
+```bash
+npm install -g @google/gemini-cli@latest
+```
+
+### Windsurf
+
+- v2.0 maps generic `agents/` into Windsurf `workflows/`.
+- This is a semantic bridge, not a 1:1 identity. Review generated workflows before relying on them in production.
+
+### Trae
+
+- v2.0 intentionally does not install `skills/` for Trae.
+- Keep configuring Trae skills in the product UI; aiforge only handles `rules/` and root-level `AGENTS.md`.
+
+### Codex CLI and OpenCode MCP Strategy
+
+- aiforge copies MCP template files for these tools.
+- You still need to merge them manually into the real config files:
+  - Codex: `~/.codex/config.toml` under `[mcp]`
+  - OpenCode: `~/.config/opencode/opencode.json` under `"mcp"`
+
+### iFlow Retirement
+
+- If aiforge detects a leftover `.iflow/` directory, v2.0 prints an informational stale-tool notice.
+- iFlow CLI was shut down on `2026-04-17`; aiforge will not install anything into `.iflow/`.
 
 ## FAQ
 
-**Q: I used `--tools vscode` in my scripts. What should I use now?**
+**Q: I still have `~/.vscode/` from v1.x. Will v2.0 remove it?**
 
-A: Replace `--tools vscode` with `--tools copilot`. GitHub Copilot now handles VS Code MCP configuration.
+A: No. v2.0 only emits a migration notice. It does not delete or overwrite your home-level `~/.vscode/` files.
 
-```bash
-# Before (v1.x)
-aiforge install --tools vscode
+**Q: What replaces `--tools vscode`?**
 
-# After (v2.0)
-aiforge install --tools copilot
-```
+A: Use `--tools copilot`.
 
----
+**Q: Why does Gemini skip my skills install?**
 
-**Q: Will my `.vscode/` MCP config files be overwritten if I run `aiforge install` with Copilot?**
+A: Your Gemini CLI version is below `v0.26.0`, or the `gemini` binary is missing from `PATH`.
 
-A: Only if the file exists and was previously managed by aiforge (tracked in the manifest). If it's a user-written file, aiforge will prompt before overwriting; choose "skip" in the prompt to preserve the file. `--force` skips the confirmation prompt and will overwrite managed/conflicting files without asking — do not use `--force` if you want to keep hand-written files in `.vscode/`.
+**Q: Why does Windsurf ask about workflows?**
 
-> **Note**: The filename written to `.vscode/` matches the source filename in the `mcp-tools/` directory of your knowledge repo (e.g. if the source file is `mcp.json`, the target is `.vscode/mcp.json`).
+A: aiforge maps `agents/` into `.windsurf/workflows/` and warns because Windsurf workflows are not identical to generic agents.
 
----
+**Q: Why are Trae skills missing after install?**
 
-**Q: I don't use GitHub Copilot. Do I lose VS Code MCP support entirely?**
+A: That is expected. Trae skills are not file-installable in v2.0.
 
-A: Yes, for the global `~/.vscode/` path. However, if you install GitHub Copilot and run `aiforge install`, the MCP config will be written to `.vscode/` in your project directory (filename follows the source file in `mcp-tools/`) — which VS Code also reads. The project-level config path (`.vscode/`) is the same; only the detection mechanism changed.
+**Q: Why do Codex or OpenCode MCP settings still need manual work?**
 
----
+A: Their production config formats require merging into existing tool-owned config files, so aiforge intentionally uses a downgrade template-copy strategy.
 
-**Q: What if I still want to use the old `vscode` rule manually?**
+**Q: Can I validate the migration without writing files?**
 
-A: The `vscode` tool ID no longer exists in v2.0. For now, use `--tools copilot` to get `.vscode/` project-level MCP support. If you need per-project rule overrides beyond what the built-in rules provide, [please file an issue](https://github.com/anthropics/claude-code/issues).
+A: Yes. Run `npx aiforge --dry-run` or `npx aiforge --tools <tool> --dry-run` first.

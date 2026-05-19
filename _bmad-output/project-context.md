@@ -4,7 +4,7 @@ user_name: 'chunxiao'
 date: '2026-03-12'
 sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 46
+rule_count: 48
 optimized_for_llm: true
 ---
 
@@ -138,6 +138,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - **catch 块必须区分错误类型：** 禁止使用 `catch {}` 或 `catch { /* ignore */ }`。如需对特定错误降级，必须使用 `catch (error) { if (error instanceof AiforgeError && error.code === 'SPECIFIC_CODE') { ... } else { throw error } }` 模式。默认行为是 `throw`（透传），降级是例外且必须在注释中说明理由
 - **catch 降级必须逐码白名单：** 禁止创建辅助函数（如 `isConfigError()`）将多个错误码归类后批量降级。每个被降级的错误码必须逐个 `error.code === 'XXX'` 匹配，并在注释中单独说明降级理由。如需对新错误码降级，逐码新增 `||` 条件并附带独立注释。（来源：Story 2-3 CR — `isConfigError()` 将 `CONFIG_NOT_FOUND`/`CONFIG_CORRUPT`/`CONFIG_READ_FAILED` 统一降级，掩盖了配置损坏的真实根因）
 - **fs 存在性检查必须使用 ENOENT/ENOTDIR 白名单降级：** 使用 `fs.access()` / `fs.stat()` 判断文件/目录是否存在时，禁止 `catch { return false }` 无差别降级。仅对 `error.code === 'ENOENT'`（不存在）和 `error.code === 'ENOTDIR'`（路径组件非目录）降级为 `false`，其他错误（`EACCES` 权限拒绝、`EIO` I/O 错误等）必须向上抛出。否则权限问题会被误判为"不存在"，导致后续逻辑走错分支。（来源：Story 2-4 CR — `hasLocalRepo()` 和 `dirExists()` 各出现一次同样问题，共 3 轮 CR 才彻底收敛）
+- **信息性提示路径的存在性检查豁免必须窄化隔离：** 仅当文件系统检查只用于 unsupported/stale/迁移类用户提示，且 Story/AC 明确要求提示失败不得阻断主流程时，才允许使用专用非阻断 helper 将 `EACCES`/`EIO` 等异常降级为“跳过提示”。该 helper 必须命名清楚并仅在信息性提示路径使用，禁止复用到工具识别、安全校验、安装决策或数据完整性路径；主决策路径仍必须遵守 ENOENT/ENOTDIR 白名单降级规则。必须补测试证明提示检查异常时主流程继续执行。（来源：Story 7-10 CR R1→R3 — `.iflow/` stale-tool 提示复用严格 `pathExists()` 导致信息性检查可能阻断安装，修复为专用非阻断 helper）
 - **CR 修复引入的新函数/新代码必须贯彻同等规则标准：** 修复 A 函数的问题时若新增了 B 辅助函数，B 必须遵循与 A 相同的规则。修复者提交前应自查：新增的每个函数/分支是否与项目规则一致。（来源：Story 2-4 CR — 修复 `hasLocalRepo()` 的 catch 问题时新增 `dirExists()`，但 `dirExists()` 重复了同样的 `catch {}` 错误，被下一轮 CR 发现）
 - **CR 修复必须审查同一函数中所有并行分支：** 修复某个函数的特定分支时，必须审查同一函数中所有并行分支是否存在同类问题，并在修复记录中逐分支列出审查结论（"该分支是否需要同等修复？"→ 是/否 + 理由）。禁止只修复被 CR 指出的具体分支而不审查并行分支——这是导致"修复引入对称性回归"的主要原因。（来源：Story 4-1 CR — Round 3 修复 symlink 逃逸仅在 `targetStat === null` 分支添加 realpath 校验，遗漏 `isSymbolicLink()` 和 `isDirectory()` 分支，导致 P0 安全问题延续到 Round 4 才关闭）
 - **新增错误处理分支必须全功能对标同函数内已有并行分支：** 在 catch 块或同一函数中新增错误处理分支（如 `if (isAuthFailure) { throw new AiforgeError(...) }`）时，**禁止只实现核心字段（message/why/code）而忽略辅助功能字段**。必须找到同函数中已有的同类分支（如 `CLONE_FAILED`），逐字段对比，确保新分支在行为上与已有分支完全对等（如 cleanupWarning 透传、额外上下文追加等）。否则同函数内两个并行分支行为不一致，会造成特定场景下用户收不到应有的修复提示。（来源：Story 5-4 CR Round 2 — 新增 `AUTH_FAILED` 分支时未复制 `CLONE_FAILED` 分支的 cleanupWarning 透传逻辑，导致"认证失败 + 清理也失败"时用户看不到手动删除残留目录的提示）
@@ -160,6 +161,7 @@ index.ts → pipeline.ts → stages/* → services/*
 ### Output Rules
 
 - **ALL user-visible output MUST go through Reporter interface** — never `console.log` directly
+- **unsupported/stale/迁移类信息性提示必须按契约触发且覆盖所有入口：** 为 `TOOL_UNSUPPORTED_NOTICES`、停服工具提示、迁移提示等新增用户可见 notice 时，触发条件必须直接对应 Story/AC 契约（如目录存在、配置文件存在、工具命中或历史路径存在），不得用“可安装项扫描结果”等下游副产品代替。若契约适用于 `aiforge install`，必须同时覆盖自动检测路径和手动 `--tools` 路径；提示应通过 `reporter.info()` 或 `reporter.warn()` 输出，不得改变检测结果、安装计划或错误语义。（来源：Story 7-9 CR — Trae `skills/` 空目录未触发 unsupported notice；Story 7-10 CR — 手动 `--tools` 分支绕过 `.iflow/` stale-tool notice）
 - **Exceptions (formally allowed):**
   - `aiforge init` 交互式命令：使用 `console.log` + `@inquirer/prompts` 直接输出（init 不走管道，不适用 Reporter）
   - Reporter 创建前的语言回退提示：允许 `process.stderr.write()`（此时 Reporter 尚未实例化）
@@ -277,7 +279,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - Update when technology stack or patterns change
 - Remove rules that become obvious over time
 
-Last Updated: 2026-04-24
+Last Updated: 2026-05-19
 
 ---
 

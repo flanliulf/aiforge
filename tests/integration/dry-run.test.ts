@@ -50,6 +50,7 @@ function createMockReporter(): Reporter & {
       planArgs.push(p)
     }),
     reportError: vi.fn(),
+    info: vi.fn(),
     warn: vi.fn(),
   }
 }

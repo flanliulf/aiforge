@@ -6,9 +6,10 @@ All notable changes to aiforge are documented in this file.
 
 ### ⚠️ BREAKING CHANGES
 
-- **`vscode` tool ID removed**: The `vscode` tool has been merged into the GitHub Copilot context. VS Code MCP configuration is now managed via the `copilot` project-level rule targeting `.vscode/`. If you relied on `--tools vscode`, switch to `--tools copilot`.
-  - **Migration**: See [docs/migration-v2.md](docs/migration-v2.md) / [docs/migration-v2.zh.md](docs/migration-v2.zh.md)
-  - **Existing files under `~/.vscode/` (user home) are NOT modified** (NFR-C7 compliance). Note: project-level `.vscode/` will receive `mcp-tools` writes via the new `copilot:project:mcp-tools` rule when GitHub Copilot is detected.
+- **`vscode` tool ID removed**: VS Code has been merged into the GitHub Copilot context. Project-level VS Code MCP configuration is now written by `copilot:project:mcp-tools -> .vscode/`. Replace `--tools vscode` with `--tools copilot`.
+- **Tool matrix expanded from 4 to 11 tools**: v2.0 adds Codex CLI, OpenCode, Auggie, Gemini CLI, Windsurf, Kiro, Antigravity, and Trae.
+- **Migration guide**: See [docs/migration-v2.md](docs/migration-v2.md) / [docs/migration-v2.zh.md](docs/migration-v2.zh.md).
+- **Existing files under `~/.vscode/` are not modified** (NFR-C7). Home-level VS Code MCP is no longer managed.
 
 ### Added
 
@@ -17,13 +18,29 @@ All notable changes to aiforge are documented in this file.
   - `claude:global:instructions → ~/.claude/` — global-scope instruction files
   - `claude:project:instructions → .claude/` — project-scope instruction files
 - **Cursor global agents rule** (`cursor:global:agents → ~/.cursor/rules/`): Symmetric with existing cursor project agents rule.
+- **New tool integrations**:
+  - Codex CLI
+  - OpenCode
+  - Auggie (Augment Code)
+  - Gemini CLI
+  - Windsurf
+  - Kiro (AWS)
+  - Antigravity
+  - Trae (ByteDance)
+- **MCP downgrade strategy**: Codex and OpenCode now copy MCP template files and emit manual merge guidance instead of mutating tool-owned config files directly.
+- **`fileFilter` coverage expansion**: Instructions rules now use file filters to target `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` where required.
+- **`TOOL_PRECONDITIONS`**: Gemini CLI skills installation is gated by a version check (`v0.26.0+`).
+- **`semanticWarning` support**: Windsurf emits an explicit warning when generic `agents/` are mapped to `.windsurf/workflows/`.
+- **iFlow stale-tool notice**: Detecting leftover `.iflow/` prints an informational message that iFlow CLI was retired on 2026-04-17 and is no longer supported.
+- **Coexisting instruction distribution**: `CLAUDE.md` and `AGENTS.md` can now coexist across tool-specific target paths, including Claude dual-path distribution and root-level instruction installs where defined.
 - **Migration warning**: When `~/.vscode/` is detected without `~/.copilot/`, a `⚠️` warning is emitted explaining the v2.0 VS Code merge. Install flow is not blocked.
 
 ### Changed
 
-- `BUILTIN_RULES` count: 16 → 19 (4 new rules, 1 deleted)
-- `TOOL_DEFINITIONS` count: 4 → 3 (vscode removed)
-- Suggestion messages updated to reference 3 tools (GitHub Copilot, Claude Code, Cursor)
+- `BUILTIN_RULES` count: 16 → 55
+- `TOOL_DEFINITIONS` count: 4 → 11 (`vscode` removed, 8 new tools added)
+- Install matrix documentation expanded to the full 11-tool rule set.
+- Migration documentation now includes version-diff tables, upgrade and rollback commands, and tool-specific FAQ.
 
 ### Removed
 

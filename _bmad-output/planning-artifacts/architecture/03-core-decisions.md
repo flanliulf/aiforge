@@ -126,6 +126,7 @@ interface Reporter {
   reportResult(results: InstallResult): void;
   reportPlan(plan: MatchedPlan): void;
   reportError(error: AiforgeError): void;
+  info(message: string): void;
   warn(message: string): void;
 }
 ```
@@ -146,6 +147,7 @@ interface Reporter {
 | `updatePhase()` | stderr | 同上 |
 | `completePhase()` | stderr | 同上 |
 | `reportError()` | stderr | 错误信息写 stderr 是 CLI 标准约定 |
+| `info()` | stderr | 非失败信息提示（unsupported/stale/迁移说明等），诊断性质 |
 | `warn()` | stderr | 非致命警告（断链、mainFile 缺失等），诊断性质 |
 
 这确保 `npx aiforge --dry-run 2>/dev/null` 只输出纯安装计划，可被 `grep`/`awk`/`jq` 解析。
@@ -233,6 +235,16 @@ interface PathResolver {
 - 检测函数 `detectLegacyVscodeOnly(detected, pathResolver)` 封装在 `detect-tools.ts`，不作为独立管道阶段
 - 检测结果为非阻塞警告（`reporter.warn`），不影响安装继续执行
 - NFR-C7 约束：aiforge 不读写 `~/.vscode/` 等旧工具目录，仅检测路径是否存在
+
+**unsupported/stale/迁移类 notice 触发契约与非阻断边界：**
+
+- notice 触发条件必须直接对应 Story/AC 契约（目录存在、配置文件存在、工具命中或历史路径存在等），不得用“可安装项扫描结果”等下游副产品代替。
+- 若契约适用于 `aiforge install`，必须同时覆盖自动检测路径和手动 `--tools` 路径；手动分支提前返回前也必须执行同一 notice helper。
+- notice 通过 `reporter.info()` 或 `reporter.warn()` 输出，不得改变检测结果、安装计划或错误语义。
+- 仅当 notice 是纯信息性且明确要求非阻断时，允许使用专用存在性 helper 将 `EACCES`/`EIO` 等异常降级为“跳过提示”；该 helper 禁止复用到工具识别、安全校验、安装决策或数据完整性路径，主决策路径仍遵守 ENOENT/ENOTDIR 白名单降级。
+- 对目录存在性触发的 notice，必须覆盖空目录、仅占位文件、手动/自动入口和存在性检查异常等边界测试。
+
+> 来源：Story 7-9 CR — Trae `skills/` 空目录未触发 unsupported notice；Story 7-10 CR — 手动 `--tools` 分支绕过 `.iflow/` stale-tool notice，且信息性 `.iflow/` 检查曾可能因权限/I/O 错误阻断安装。
 
 **reserved-name 强制保护设计决策（Story 7-1）：**
 

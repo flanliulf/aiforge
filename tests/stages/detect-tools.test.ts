@@ -475,8 +475,13 @@ describe('detectTools', () => {
   // AC #3 — 手动指定模式：跳过自动检测
   // ──────────────────────────────────────────────────────────────
 
-  it('AC #3 手动指定工具时跳过自动检测，直接返回指定工具', async () => {
-    // access 不应被调用
+  it('AC #3 手动指定工具时跳过工具自动检测，但仍允许执行 .iflow 信息检查', async () => {
+    const calledPaths: string[] = []
+    vi.mocked(access).mockImplementation(async (p) => {
+      calledPaths.push(String(p))
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
     const env = await detectTools(
       mockRepo,
       makeArgs({ tools: ['copilot', 'claude'] }),
@@ -485,7 +490,28 @@ describe('detectTools', () => {
     )
 
     expect(env.tools).toEqual(['copilot', 'claude'])
-    expect(access).not.toHaveBeenCalled()
+    expect(access).toHaveBeenCalledTimes(2)
+    expect(calledPaths.every((p) => p.endsWith('/.iflow'))).toBe(true)
+    expect(calledPaths.some((p) => p.includes('.copilot'))).toBe(false)
+    expect(calledPaths.some((p) => p.includes('.claude'))).toBe(false)
+  })
+
+  it('Story 7-10 AC#6: 手动指定工具时检测到 .iflow/ 残留目录仍输出 iflowStale 信息提示', async () => {
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.iflow') return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(
+      mockRepo,
+      makeArgs({ tools: ['copilot'] }),
+      mockReporter,
+      mockPathResolver,
+    )
+
+    expect(env.tools).toEqual(['copilot'])
+    expect(mockReporter.info).toHaveBeenCalledWith(expect.stringContaining('.iflow/'))
+    expect(mockReporter.info).toHaveBeenCalledWith(expect.stringContaining('2026-04-17'))
   })
 
   // ──────────────────────────────────────────────────────────────
@@ -827,5 +853,48 @@ describe('detectTools', () => {
     expect(String(enWarnCall![0])).toContain('Install the GitHub Copilot extension')
     // 清理
     setLanguage('zh-CN')
+  })
+
+  it('Story 7-10 AC#6: 检测到 home 级 .iflow/ 残留目录时输出 iflowStale 信息提示', async () => {
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.copilot') return
+      if (String(p) === '/home/user/.iflow') return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(mockReporter.info).toHaveBeenCalledWith(expect.stringContaining('.iflow/'))
+    expect(mockReporter.info).toHaveBeenCalledWith(expect.stringContaining('2026-04-17'))
+  })
+
+  it('Story 7-10 AC#6: 检测到项目级 .iflow/ 残留目录时输出 iflowStale 信息提示', async () => {
+    const cwd = process.cwd()
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.copilot') return
+      if (String(p) === `${cwd}/.iflow`) return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(mockReporter.info).toHaveBeenCalledWith(expect.stringContaining('.iflow/'))
+    expect(mockReporter.info).toHaveBeenCalledTimes(1)
+  })
+
+  it('Story 7-10 AC#6: .iflow/ 检查遇到 EACCES 时不阻断安装流程', async () => {
+    const cwd = process.cwd()
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.copilot') return
+      if (String(p) === '/home/user/.iflow' || String(p) === `${cwd}/.iflow`) {
+        throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })
+      }
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('copilot')
+    expect(mockReporter.info).not.toHaveBeenCalledWith(expect.stringContaining('.iflow/'))
   })
 })

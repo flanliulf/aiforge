@@ -2,121 +2,149 @@
 
 ## 概述
 
-aiforge v2.0 引入了一项**破坏性变更**：`vscode` 工具 ID 已被移除，其功能已合并到 GitHub Copilot 语境中。
+aiforge v2.0 是首个将内置工具矩阵从 3 个主工具扩展到 11 个工具集成的版本。同时它引入了一项明确的破坏性变更：`vscode` 工具 ID 被移除，并归并到 GitHub Copilot 语境。
 
-**您现有的 `~/.vscode/` 文件完全安全 — aiforge v2.0 不会覆盖或删除它们。**
+您现有的 `~/.vscode/` 文件不会被触碰。
 
----
+## 版本差异对照
 
-## 变更内容
-
-### 版本差异对照表
-
-| 区域 | v1.x | v2.0 |
+| 项目 | v1.x | v2.0 |
 |------|------|------|
-| 支持的工具 | copilot、claude、cursor、**vscode** | copilot、claude、cursor |
-| `vscode` 工具 ID | ✅ 可用 | ❌ 已移除 |
-| VS Code MCP 配置 | `vscode:global → ~/.vscode/` | `copilot:project → .vscode/` |
-| Claude 指令文件 | 未安装 | ✅ `~/.claude/` + `.claude/` |
-| Cursor 全局 agents | 未安装 | ✅ `~/.cursor/rules/` |
-| BUILTIN_RULES 数量 | 16 | 19 |
+| 支持的工具 | 4 个：`copilot`、`claude`、`cursor`、`vscode` | 11 个：`copilot`、`claude`、`cursor`、`codex`、`opencode`、`auggie`、`gemini`、`windsurf`、`kiro`、`antigravity`、`trae` |
+| 内置工具规则 | 16 | 55 |
+| 通用目录规则 | 4 | 4 |
+| MCP 行为 | 依赖 VS Code 全局规则，覆盖面有限 | Copilot 项目 MCP + Codex/OpenCode 手动合并降级策略 |
+| Instructions 覆盖 | 部分支持 | Claude、Gemini、Kiro、Auggie、Trae 都有明确行为 |
+| Preconditions | 无 | Gemini skills 需要 `v0.26.0+` |
+| Semantic warnings | 无 | Windsurf agents -> workflows 提示 |
+| Unsupported notices | 无 | Trae skills 不支持提示 |
 
-### 旧规则 → 新规则映射表
+## 新工具清单
 
-| 旧规则（v1.x） | 新规则（v2.0） | 说明 |
-|----------------|----------------|------|
-| `vscode:global:mcp-tools → ~/.vscode/` | **已移除** | 全局 VS Code MCP 路径已废弃 |
-| *（无）* | `copilot:project:mcp-tools → .vscode/` | 通过 Copilot 管理项目级 `.vscode/`（文件名沿用 `mcp-tools/` 源目录的文件名） |
-| *（无）* | `claude:global:instructions → ~/.claude/` | v2.0 新增 |
-| *（无）* | `claude:project:instructions → .claude/` | v2.0 新增 |
-| *（无）* | `cursor:global:agents → ~/.cursor/rules/` | v2.0 新增 |
+| 工具 | v2.0 新增能力 | 快速使用说明 |
+|------|---------------|--------------|
+| Codex CLI | Skills、agents、MCP 模板降级 | `--tools codex` |
+| OpenCode | XDG 全局路径、skills、agents、MCP 模板 | `--tools opencode` |
+| Auggie | Skills、agents、根目录 `AGENTS.md` | `--tools auggie` |
+| Gemini CLI | Skills 与 `AGENTS.md` / `GEMINI.md` | 安装 skills 前先升级 Gemini CLI |
+| Windsurf | Skills、rules、workflows 映射 | 关注 workflows 语义提示 |
+| Kiro | Skills 与 steering instructions | instructions 写入 `steering/` |
+| Antigravity | Gemini 子命名空间集成 | 全局安装落在 `~/.gemini/antigravity/` |
+| Trae | 仅 rules 与根目录 `AGENTS.md` | skills 仍由 UI 管理，不走文件安装 |
 
----
+## 破坏性变更：`vscode` -> `copilot`
 
-## 升级步骤
+### 旧行为与新行为映射
 
-### 1. 升级 aiforge
+| v1.x | v2.0 | 说明 |
+|------|------|------|
+| `--tools vscode` | `--tools copilot` | 请同步替换脚本与 CI 配置 |
+| `vscode:global:mcp-tools -> ~/.vscode/` | 移除 | 不再管理 home 级 VS Code MCP 路径 |
+| 无 | `copilot:project:mcp-tools -> .vscode/` | 项目级 MCP 文件改由 Copilot 规则落地 |
 
-```bash
-npm install -g aiforge@2.0.0
-# 或
-npx aiforge@2.0.0 --help
-```
+### 推荐升级步骤
 
-### 2. 安装 GitHub Copilot 扩展并创建 `~/.copilot/` 标识目录
-
-如果您之前使用 aiforge 配合 VS Code 管理 MCP 配置，需要继续使用该功能：
-
-- **VS Code**：安装 [GitHub Copilot](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) 扩展
-- **然后创建 aiforge 标识目录**：`mkdir -p ~/.copilot/`
-  - 这是 aiforge 的约定路径；扩展本身**不会**自动创建此目录。
-  - 详情请参见下方「关于 `~/.copilot/`」说明。
-- 两者都就绪后，`aiforge install` 将检测到 Copilot（通过 `~/.copilot/` 标识目录）并应用 `.vscode/` MCP 规则（将 `mcp-tools/` 中的文件复制到项目 `.vscode/` 目录）。
-
-### 3. 重新执行 aiforge install
+1. 安装或构建 aiforge v2.0。
+2. 如需继续使用 VS Code MCP 文件，安装 GitHub Copilot 扩展。
+3. 创建 aiforge 约定的 Copilot 标记目录：
 
 ```bash
-aiforge install
+mkdir -p ~/.copilot/
 ```
 
-aiforge 现在会通过 `~/.copilot/` 标识目录或项目 `.github/` 检测 Copilot 语境并应用更新后的规则。
-
----
-
-## 我现有的 `~/.vscode/` 文件会怎样？
-
-**什么都不会发生。** aiforge v2.0 不会修改您的 `~/.vscode/` 目录。您的配置文件将被完整保留。
-
-如果 aiforge 检测到 `~/.vscode/` 但未检测到 Copilot 语境（`~/.copilot/` 标识目录或项目 `.github/`），将显示以下警告：
-
-```
-⚠️ 检测到 ~/.vscode/ 但未检测到 ~/.copilot/。从 v2.0 起 VS Code 已归并到 GitHub Copilot 语境。
-  ① VS Code MCP 现由 Copilot 项目级规则承接（目标路径 .vscode/<文件名>）
-  ② 安装 GitHub Copilot 扩展
-  ③ 创建 ~/.copilot/ 作为 aiforge 标识目录（见下方说明），再重新执行 aiforge install
-  ④ 现有 ~/.vscode/ 文件不会被覆盖或删除
-```
-
-> **关于 `~/.copilot/`**：该路径是 aiforge 自定义的约定标识目录 — **并非** GitHub Copilot 扩展的实际安装位置。GitHub Copilot 本身将文件写入 `~/.vscode/extensions/github.copilot-*/` 及 IDE 配置目录。要让 aiforge 识别您正在使用 Copilot，请手动创建该标识目录：
-> ```bash
-> mkdir -p ~/.copilot/
-> ```
-> 创建后，`aiforge install` 即可检测到 Copilot 并应用相应规则。
-
-此警告仅为提示信息。迁移提示本身不会阻断安装流程；但如果未检测到任何受支持的 AI 工具（即 Copilot、Claude Code、Cursor 均未安装），aiforge 仍会因 `NO_TOOLS` 错误退出，直至您安装其中一个工具。
-
----
-
-## 常见问题（FAQ）
-
-**Q：我的脚本中使用了 `--tools vscode`，应该改成什么？**
-
-A：将 `--tools vscode` 替换为 `--tools copilot`。GitHub Copilot 现在负责管理 VS Code MCP 配置。
+4. 使用新的工具 ID 重新执行安装：
 
 ```bash
-# 之前（v1.x）
-aiforge install --tools vscode
-
-# 之后（v2.0）
-aiforge install --tools copilot
+npx aiforge --tools copilot
 ```
 
----
+5. 验证项目级 MCP 文件是否写入 `.vscode/`。
 
-**Q：使用 Copilot 执行 `aiforge install` 时，我 `.vscode/` 目录下的 MCP 配置文件会被覆盖吗？**
+### 升级命令
 
-A：仅当该文件存在且之前由 aiforge 管理（记录在清单中）时才会覆盖。如果是用户手动创建的文件，aiforge 会在覆盖前提示确认；在提示中选择"跳过"可保留该文件。`--force` 是跳过确认提示（而非跳过文件写入）；如需保留手动编写的 `.vscode/` 配置文件，请勿使用 `--force`。
+```bash
+# 本地源码工作流
+npm install
+npm run build
 
-> **注意**：写入 `.vscode/` 的文件名与知识库 `mcp-tools/` 源目录中的文件名一致（例如源文件为 `mcp.json`，则目标为 `.vscode/mcp.json`）。
+# 正式写入前先预览
+npx aiforge --dry-run
 
----
+# 面向 VS Code 旧用户的定向迁移
+npx aiforge --tools copilot --dry-run
+npx aiforge --tools copilot
+```
 
-**Q：我不使用 GitHub Copilot，是否完全失去 VS Code MCP 支持？**
+### 回滚命令
 
-A：对于全局 `~/.vscode/` 路径，是的。但如果您安装 GitHub Copilot 并执行 `aiforge install`，MCP 配置将写入项目目录下的 `.vscode/`（文件名沿用 `mcp-tools/` 源目录的文件名）— VS Code 同样读取该路径。项目级配置路径（`.vscode/`）保持不变，只是检测机制有所改变。
+```bash
+# 如需对照旧版本行为，可临时查看上一个大版本
+npx aiforge@1 --help
 
----
+# 如果本地测试改动了构建产物，可清理后重建
+rm -rf dist
+npm run build
+```
 
-**Q：我还想使用旧的 `vscode` 规则，该怎么办？**
+## 工具级迁移提示
 
-A：v2.0 中 `vscode` 工具 ID 已不再存在。目前请使用 `--tools copilot` 获取 `.vscode/` 项目级 MCP 支持。如果您需要内置规则以外的自定义能力，欢迎[提交 Issue](https://github.com/anthropics/claude-code/issues) 说明需求。
+### Gemini CLI
+
+- `skills/` 安装会在 Gemini CLI 低于 `v0.26.0` 时被跳过。
+- 升级命令：
+
+```bash
+npm install -g @google/gemini-cli@latest
+```
+
+### Windsurf
+
+- v2.0 会把通用 `agents/` 映射到 Windsurf 的 `workflows/`。
+- 这是语义桥接，不是完全等价。用于生产前请检查生成结果。
+
+### Trae
+
+- v2.0 明确不安装 Trae 的 `skills/`。
+- 仍需在产品 UI 中配置 Trae skills；aiforge 只处理 `rules/` 和根级 `AGENTS.md`。
+
+### Codex CLI 与 OpenCode 的 MCP 策略
+
+- aiforge 只复制 MCP 模板文件。
+- 您仍需手动合并到真实配置：
+  - Codex：`~/.codex/config.toml` 的 `[mcp]`
+  - OpenCode：`~/.config/opencode/opencode.json` 的 `"mcp"` 字段
+
+### iFlow 停服提示
+
+- 当 aiforge 检测到残留 `.iflow/` 目录时，v2.0 会输出 stale-tool 信息提示。
+- iFlow CLI 已于 `2026-04-17` 停服；aiforge 不会向 `.iflow/` 安装任何内容。
+
+## 常见问题
+
+**Q：我还保留着 v1.x 的 `~/.vscode/`，v2.0 会删掉吗？**
+
+A：不会。v2.0 只会输出迁移提示，不会删除或覆盖 home 级 `~/.vscode/` 文件。
+
+**Q：`--tools vscode` 现在该替换成什么？**
+
+A：改为 `--tools copilot`。
+
+**Q：为什么 Gemini 跳过了我的 skills 安装？**
+
+A：通常是 Gemini CLI 版本低于 `v0.26.0`，或者系统 `PATH` 中没有 `gemini` 命令。
+
+**Q：为什么 Windsurf 会提示 workflows？**
+
+A：因为 aiforge 会把 `agents/` 映射到 `.windsurf/workflows/`，并明确提醒 workflow 与通用 agent 并不完全相同。
+
+**Q：为什么安装后看不到 Trae skills？**
+
+A：这是预期行为。v2.0 不支持通过文件系统安装 Trae skills。
+
+**Q：为什么 Codex 或 OpenCode 的 MCP 还需要手动处理？**
+
+A：因为它们的正式配置文件需要与工具自管配置合并，aiforge 故意采用“复制模板 + 手动合并”的降级策略。
+
+**Q：有没有不写文件的迁移验证方式？**
+
+A：有。先执行 `npx aiforge --dry-run`，或者执行 `npx aiforge --tools <tool> --dry-run`。

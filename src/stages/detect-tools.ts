@@ -101,6 +101,34 @@ async function detectLegacyVscodeOnly(pathResolver: PathResolver): Promise<boole
   return vscodeHomeExists && !copilotExists
 }
 
+async function pathExistsNonBlocking(p: string): Promise<boolean> {
+  try {
+    return await pathExists(p)
+  } catch {
+    return false
+  }
+}
+
+async function detectIflowResidue(pathResolver: PathResolver): Promise<boolean> {
+  const home = pathResolver.home()
+  const cwd = process.cwd()
+  const [homeIflowExists, projectIflowExists] = await Promise.all([
+    pathExistsNonBlocking(join(home, '.iflow')),
+    pathExistsNonBlocking(join(cwd, '.iflow')),
+  ])
+
+  return homeIflowExists || projectIflowExists
+}
+
+async function emitIflowStaleNoticeIfNeeded(
+  reporter: Reporter,
+  pathResolver: PathResolver,
+): Promise<void> {
+  if (await detectIflowResidue(pathResolver)) {
+    reporter.info(msg('detectTools.iflowStale'))
+  }
+}
+
 // ── 诊断输出 ────────────────────────────────────────────────────
 
 /**
@@ -180,6 +208,7 @@ export async function detectTools(
       return def.id
     })
 
+    await emitIflowStaleNoticeIfNeeded(reporter, pathResolver)
     reporter.completePhase()
     return { tools, scope }
   }
@@ -198,6 +227,8 @@ export async function detectTools(
   if (!detectedTools.includes('copilot') && (await detectLegacyVscodeOnly(pathResolver))) {
     reporter.warn(msg('detectTools.vscodeMergedNote'))
   }
+
+  await emitIflowStaleNoticeIfNeeded(reporter, pathResolver)
 
   // ── 无工具处理 ──────────────────────────────────────────────
   if (detectedTools.length === 0) {

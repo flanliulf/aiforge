@@ -273,6 +273,7 @@ interface MessageSet {
     fixInstallTools: string
     fixSupportedTools: string
     vscodeMergedNote: string
+    iflowStale: string
   }
   authenticate: {
     argConflict: string
@@ -580,6 +581,8 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
         '  ② 安装 GitHub Copilot 扩展\n' +
         '  ③ 创建 ~/.copilot/ 作为 aiforge 标识目录后重新执行 aiforge install\n' +
         '  ④ 现有 ~/.vscode/ 文件不会被覆盖或删除',
+      iflowStale:
+        'ℹ️  检测到 .iflow/ 残留目录。iFlow CLI 已于 2026-04-17 停服，aiforge 不再支持。可安全删除该目录',
     },
     authenticate: {
       argConflict: '--ssh 和 --token 不能同时使用',
@@ -895,6 +898,8 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
         '  ② Install the GitHub Copilot extension\n' +
         '  ③ Create ~/.copilot/ as an aiforge marker, then re-run aiforge install\n' +
         '  ④ Existing ~/.vscode/ files will not be overwritten or deleted',
+      iflowStale:
+        'ℹ️  Detected a leftover .iflow/ directory. iFlow CLI was shut down on 2026-04-17, and aiforge no longer supports it. You can safely delete this directory',
     },
     authenticate: {
       argConflict: '--ssh and --token cannot be used together',

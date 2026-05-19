@@ -7,6 +7,8 @@
 
 [English](README.md) | **中文**
 
+> **v2.0**：这是一个破坏性变更版本。`vscode` 工具 ID 已移除，当前支持 11 个工具，迁移说明见 [docs/migration-v2.zh.md](docs/migration-v2.zh.md)。
+
 ## 简介
 
 **aiforge** 是一个通过 `npx` 运行的命令行工具，能够从任意 Git 仓库中读取 AI 编码辅助配置（Agents、Skills、Instructions、MCP Tools），并按照各 AI 工具的目录约定，自动安装到用户全局目录或项目目录。
@@ -27,7 +29,7 @@
 
 ## 特性
 
-- **多工具支持** — 自动检测并安装到 GitHub Copilot、Claude Code、Cursor
+- **11 工具支持** — 自动检测并安装到 GitHub Copilot、Claude Code、Cursor、Codex CLI、OpenCode、Auggie、Gemini CLI、Windsurf、Kiro、Antigravity、Trae
 - **全局 + 项目** — 支持用户级全局安装（`-g`）和项目级安装（默认）
 - **复制 / 符号链接** — 默认复制文件；`-l` 使用符号链接，`git pull` 即可自动更新
 - **四类资源** — Agents、Skills、Instructions、MCP Tools 全覆盖
@@ -189,45 +191,30 @@ npx aiforge update
 
 > **v2.0**：`vscode` 工具已移除，VS Code MCP 配置现由 `copilot` 项目规则管理。详见 [docs/migration-v2.zh.md](docs/migration-v2.zh.md)。
 
-| 工具 | 全局安装 | 项目安装 | 支持的资源类型 |
-|------|:------:|:------:|-------------|
-| GitHub Copilot | ✅ | ✅ | Agents, Skills, Instructions, MCP Tools |
-| Claude Code | ✅ | ✅ | Agents, Skills, Instructions |
-| Cursor | ✅ | ✅ | Agents, Skills |
-| 通用目录 (`.agents/`, `.agent/`) | — | ✅ | Agents, Skills |
+| 工具 | 全局安装 | 项目安装 | 主要资源类型 | 备注 |
+|------|:--------:|:--------:|--------------|------|
+| GitHub Copilot | ✅ | ✅ | Agents、Skills、Instructions、MCP Tools | `.vscode/` 项目 MCP 文件由 Copilot 管理 |
+| Claude Code | ✅ | ✅ | Agents、Skills、Instructions | 项目 instructions 会同时写入 `.claude/` 与仓库根 |
+| Cursor | ✅ | ✅ | Agents、Skills | skills 使用 Flatten 模式 |
+| Codex CLI | ✅ | ✅ | Agents、Skills、MCP Tools | MCP 模板需要手动合并 |
+| OpenCode | ✅ | ✅ | Agents、Skills、Instructions、MCP Tools | 使用 XDG 全局路径 |
+| Auggie | ✅ | ✅ | Agents、Skills、Instructions | 项目 instructions 把 `AGENTS.md` 写到仓库根 |
+| Gemini CLI | ✅ | ✅ | Skills、Instructions | skills 需要 Gemini CLI `v0.26.0+` |
+| Windsurf | ✅ | ✅ | Skills、Rules、Agents | `agents/` 会映射到 `workflows/` 并提示 |
+| Kiro | ✅ | ✅ | Skills、Instructions | instructions 写入 `steering/` |
+| Antigravity | ✅ | ✅ | Agents、Skills | 全局路径位于 `~/.gemini/antigravity/` |
+| Trae | — | ✅ | Rules、Instructions | 明确不支持 skills |
+| 通用目录 (`.agents/`, `.agent/`) | — | ✅ | Agents、Skills | 与工具矩阵并行执行的附加路径 |
 
 ### 完整安装规则矩阵
 
 <details>
-<summary>点击展开 23 条规则详情（19 条工具规则 + 4 条通用目录规则）</summary>
+<summary>点击展开 v2.0 完整矩阵文档链接</summary>
 
-| 工具 | 范围 | 源目录 | 安装类型 | 目标目录 |
-|------|------|-------|:------:|---------|
-| Copilot | 全局 | `agents/` | Files | `~/.copilot/agents/` |
-| Copilot | 全局 | `skills/` | Directories | `~/.copilot/skills/` |
-| Copilot | 全局 | `instructions/` | Files | `~/.copilot/` |
-| Copilot | 全局 | `mcp-tools/` | Files | `~/.copilot/` |
-| Copilot | 项目 | `agents/` | Files | `.github/agents/` |
-| Copilot | 项目 | `skills/` | Directories | `.github/skills/` |
-| Copilot | 项目 | `instructions/` | Files | `.github/` |
-| Copilot | 项目 | `mcp-tools/` | Files | `.github/` |
-| Copilot | 项目 | `mcp-tools/` | Files | `.vscode/` |
-| Claude | 全局 | `agents/` | Files | `~/.claude/agents/` |
-| Claude | 全局 | `skills/` | Directories | `~/.claude/skills/` |
-| Claude | 全局 | `instructions/` | Files | `~/.claude/` |
-| Claude | 项目 | `agents/` | Files | `.claude/agents/` |
-| Claude | 项目 | `skills/` | Directories | `.claude/skills/` |
-| Claude | 项目 | `instructions/` | Files | `.claude/` |
-| Cursor | 全局 | `agents/` | Files | `~/.cursor/rules/` |
-| Cursor | 全局 | `skills/` | Flatten | `~/.cursor/rules/` |
-| Cursor | 项目 | `skills/` | Flatten | `.cursor/rules/` |
-| Cursor | 项目 | `agents/` | Files | `.cursor/rules/` |
-| 通用 | 项目 | `skills/` | Directories | `.agents/skills/` |
-| 通用 | 项目 | `agents/` | Files | `.agents/agents/` |
-| 通用 | 项目 | `skills/` | Directories | `.agent/skills/` |
-| 通用 | 项目 | `agents/` | Files | `.agent/agents/` |
-
-> **注意：** 通用目录规则默认与工具规则并行执行。使用 `--no-universal` 或在配置中设置 `universalDirs: false` 可禁用。
+- [docs/install-rules-matrix.md](docs/install-rules-matrix.md) — 英文完整 55 条工具规则 + 4 条通用规则
+- [docs/install-rules-matrix.zh.md](docs/install-rules-matrix.zh.md) — 中文完整矩阵
+- [docs/migration-v2.md](docs/migration-v2.md) — 英文升级指南
+- [docs/migration-v2.zh.md](docs/migration-v2.zh.md) — 中文升级指南
 
 </details>
 
