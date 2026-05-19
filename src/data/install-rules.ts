@@ -6,7 +6,7 @@ const Directories: InstallType = 'Directories' as InstallType
 const Flatten: InstallType = 'Flatten' as InstallType
 
 /**
- * v2.0 内置安装规则表 — 40 条规则覆盖 7 工具 × 全局/项目
+ * v2.0 内置安装规则表 — 46 条规则覆盖 8 工具 × 全局/项目
  *
  * v2.0 变更（Breaking Change）:
  *   - 删除: vscode:global:mcp-tools（VS Code 归并到 Copilot 语境）
@@ -123,6 +123,15 @@ export const BUILTIN_RULES: InstallRule[] = [
     sourceDir: 'instructions',
     type: Files,
     targetDir: '.claude/',
+    fileFilter: ['CLAUDE.md'],
+  },
+  // Epic 7 规则矩阵补齐：Claude 项目级还需支持仓库根 CLAUDE.md
+  {
+    tool: 'claude',
+    scope: 'project',
+    sourceDir: 'instructions',
+    type: Files,
+    targetDir: './',
     fileFilter: ['CLAUDE.md'],
   },
 
@@ -318,6 +327,44 @@ export const BUILTIN_RULES: InstallRule[] = [
     type: Files,
     targetDir: './',
     fileFilter: ['AGENTS.md', 'GEMINI.md'],
+  },
+
+  // ── Windsurf: 全局 + 项目 (5 条，agents→workflows 语义提示) ──
+  {
+    tool: 'windsurf',
+    scope: 'global',
+    sourceDir: 'skills',
+    type: Directories,
+    targetDir: '~/.codeium/windsurf/skills/',
+  },
+  {
+    tool: 'windsurf',
+    scope: 'global',
+    sourceDir: 'rules',
+    type: Files,
+    targetDir: '~/.codeium/windsurf/rules/',
+  },
+  {
+    tool: 'windsurf',
+    scope: 'project',
+    sourceDir: 'skills',
+    type: Directories,
+    targetDir: '.windsurf/skills/',
+  },
+  {
+    tool: 'windsurf',
+    scope: 'project',
+    sourceDir: 'rules',
+    type: Files,
+    targetDir: '.windsurf/rules/',
+  },
+  {
+    tool: 'windsurf',
+    scope: 'project',
+    sourceDir: 'agents',
+    type: Files,
+    targetDir: '.windsurf/workflows/',
+    semanticWarning: 'windsurfAgentsToWorkflows',
   },
 ]
 

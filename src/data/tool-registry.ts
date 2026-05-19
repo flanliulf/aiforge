@@ -48,6 +48,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    id: 'windsurf',
+    name: 'Windsurf',
+    detect: {
+      global: ['~/.codeium/windsurf'],
+      project: ['.windsurf'],
+    },
+  },
+  {
     id: 'auggie',
     name: 'Auggie (Augment Code)',
     detect: {

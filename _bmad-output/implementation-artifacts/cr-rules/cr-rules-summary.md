@@ -9,6 +9,7 @@
 | 规则编号 | 标题 | 来源 Story | 总分 | 建议去向 | 同步状态 |
 |----------|------|------------|------|----------|----------|
 | CR-PROCESS-01 | 规则数量验收口径必须绑定已批准基线与本 Story 明确新增范围 | 7-3, 7-5 | 8/12 | global-doc | 已同步全局文档 |
+| CR-PROCESS-02 | 交互式确认中断必须统一转换为管道取消信号 | 7-6 | 8/12 | global-doc | 已同步全局文档 |
 | CR-TEST-01 | 新增工具安装规则必须用端到端测试锁定真实落盘路径 | 7-3 | 7/12 | rules-summary | 已写入规则总结 |
 
 ---
@@ -141,3 +142,66 @@
 - **本次落地**:
   - 已新增 Auggie project 端到端安装测试并通过完整质量门禁。
 - **同步状态**: 已写入规则总结
+
+### Story 7-6 / 2026-05-19
+
+- **Story**: 7-6
+- **分析来源**:
+  - `7-6-code-review-summary-20260519-round-1.md`
+  - `7-6-code-review-evaluation-20260519-round-1.md`
+  - `7-6-code-review-summary-20260519-round-2.md`
+  - `7-6-code-review-evaluation-20260519-round-2.md`
+- **结论概览**:
+  - Round 1 共 4 条发现：`decision_needed=1`（AC#5 口径矛盾）、`patch=2`（confirm 中断未捕获、动态 i18n 键无防护）、`defer=1`（stdout/stdin TTY 历史约定）。
+  - Round 1 evaluation 确认仅 1 项阻塞修复：`confirm()` 中断异常需统一处理；其余 3 项降级为 CR TODO。
+  - 修复后 Round 2 reviewer/evaluator 均通过，阻塞项关闭；本次提炼 1 条可复用且可执行的全局规则。
+
+#### 升格判定摘要
+
+| 候选规则 | 硬性门槛 | 总分 | 建议去向 | 用户确认结果 |
+|----------|----------|------|----------|--------------|
+| 交互式确认中断必须统一转换为管道取消信号 | 通过 | 8/12 | global-doc | apply-confirmed 自动落地 |
+| 动态 i18n 键访问必须具备键存在性防护或类型收窄 | 通过 | 7/12 | todo-tracker | 本次仅分析，不在 04 中写入 TODO |
+| stdout/stdin TTY 判定语义统一 | 通过 | 6/12 | todo-tracker | 本次仅分析，不在 04 中写入 TODO |
+
+### 提炼规则
+
+#### CR-PROCESS-02：交互式确认中断必须统一转换为管道取消信号
+
+- **来源问题**: 在 TTY 交互确认中按 Ctrl+C 会抛出 `ExitPromptError`。若 stage 未捕获并转换，异常会绕过既有取消语义，导致 phase 无法按统一取消链路收敛，并可能留下未闭合的交互状态。
+- **CR 证据**:
+  - `7-6-code-review-summary-20260519-round-1.md`: Finding #2 指出 `applySemanticWarnings` 未捕获 `confirm()` 中断异常，建议转换为统一取消信号。
+  - `7-6-code-review-evaluation-20260519-round-1.md`: 明确确认为需修复项（P2），并要求与既有取消机制保持一致。
+  - `7-6-code-review-evaluation-20260519-round-1.md`: 修复记录显示已将 `ExitPromptError` 转换为 `FilterCancelledSignal`。
+  - `7-6-code-review-summary-20260519-round-2.md`: 复审确认该修复持续有效，无新增阻塞。
+- **硬性门槛**:
+  - 有证据: 是
+  - 可规则化: 是
+  - 非纯特例: 是
+  - 不重复: 是
+  - 状态明确: 是
+- **量化评分**:
+
+  | 维度 | 分数 | 理由 |
+  |------|------|------|
+  | 复现频次 | 1 | 单 Story 多轮（审查→评估→修复→复审）持续出现并验证。 |
+  | 影响范围 | 1 | 涉及 stage 交互、pipeline 取消分支与 reporter phase 生命周期。 |
+  | 风险等级 | 1 | 会导致用户中断路径异常退出或状态不一致，影响 CLI 可靠性。 |
+  | 根因稳定性 | 1 | 根因是交互式 prompt 异常语义未纳入统一取消协议，具有复发性。 |
+  | 可执行性 | 2 | 可明确检查：捕获 `ExitPromptError` 并转换为项目取消信号，且有回归点。 |
+  | 文档缺口 | 2 | 现有全局规则覆盖 catch 原则，但未明确交互中断的协议化转换要求。 |
+
+- **总分**: 8/12
+- **建议去向**: global-doc
+- **适用范围**: 所有使用 `@inquirer/prompts` 等交互式确认/选择的 stage 或辅助函数。
+- **规避指南**:
+  - 禁止将交互中断异常直接向上裸抛并依赖外层兜底。
+  - 禁止在交互分支中引入与现有取消信号并行的“私有取消语义”。
+- **最佳实践**:
+  - 在交互调用点捕获 `ExitPromptError`，统一转换为 `FilterCancelledSignal`（或项目统一取消信号）。
+  - 让 pipeline 仅识别统一取消信号，保证取消路径行为一致、可测试、可观测。
+- **全局文档建议**:
+  - 升格并同步到 Rule Document Registry 三文档：`project-context.md`、`04-implementation-patterns.md`、`03-core-decisions.md`。
+- **本次落地**:
+  - `src/stages/semantic-warnings.ts` 已在 `confirm()` 调用处捕获 `ExitPromptError` 并转抛 `FilterCancelledSignal`。
+- **同步状态**: 已同步全局文档

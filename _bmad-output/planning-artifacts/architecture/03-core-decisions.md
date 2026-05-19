@@ -162,6 +162,19 @@ interface Reporter {
 
 在 catch 块或同一函数中新增错误处理分支时，**禁止只实现核心字段（message/why/code）而忽略辅助功能字段**。必须找到同函数中已有的同类分支，逐字段对比，确保新分支行为与已有分支完全对等（如 cleanupWarning 透传、额外上下文追加等）。（来源：Story 5-4 CR Round 2 — 新增 `AUTH_FAILED` 分支时未复制 `CLONE_FAILED` 分支的 cleanupWarning 透传逻辑）
 
+**交互式提示中断统一决策（Prompt Cancellation Unification）：**
+
+当阶段逻辑使用 `@inquirer/prompts`（如 `confirm()`）处理用户交互时，Ctrl+C 触发的 `ExitPromptError` 必须在交互调用点被捕获，并转换为项目统一取消信号（当前为 `FilterCancelledSignal`）。
+
+该决策的目标是维持 D4a/D4b 的单一错误与输出语义：
+- pipeline 仅识别统一取消信号，不处理多种“局部取消异常”
+- 取消行为与 reporter 生命周期保持一致，不引入并行分支
+- 取消路径具备可测试性（可通过固定信号断言）
+
+反模式：将 `ExitPromptError` 原样上抛，依赖外层兜底识别。该做法会让交互中断语义散落在多处，增加后续 stage 扩展的不一致风险。
+
+> 来源：Story 7-6 CR R1→R2 — `applySemanticWarnings` 首轮因未捕获中断被判定为需修复；修复为统一转换后通过复审。
+
 **三种脱敏函数适用场景不可混用：**
 
 `sanitizeToken()` 适用于独立 token 字符串；`sanitizeUrl()` 适用于纯 URL 字符串（带 `^` 锚点正则）；`sanitizeMessage()` 适用于任意字符串（如 git 错误消息）中嵌入 token-bearing URL 的场景（全局替换正则，无锚点）。将底层异常的 `error.message` 写入 `AiforgeError.why` 时，**必须使用 `sanitizeMessage()` 而非 `sanitizeUrl()`**。（来源：Story 5-4 CR Round 1 — `CLONE_FAILED`/`PULL_FAILED` 的 `why` 直接透传 `error.message` 导致 token 泄露；修复时新增 `sanitizeMessage()` 处理此场景）

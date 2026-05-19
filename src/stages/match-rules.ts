@@ -26,6 +26,7 @@ import { RULE_INDEX, TOOL_PRECONDITIONS, UNIVERSAL_RULES } from '../data/install
 import { DEFAULT_EXCLUDES } from '../data/excludes.js'
 import { msg } from '../core/messages.js'
 import { parseFilterPattern, matchesGlob, FilterCancelledSignal } from './filter-utils.js'
+import { applySemanticWarnings } from './semantic-warnings.js'
 
 // ── 安装模式推导 ─────────────────────────────────────────────────────────────
 
@@ -399,6 +400,8 @@ export async function matchRules(
     }
   }
 
+  const filteredItems = await applySemanticWarnings(items, reporter)
+
   reporter.completePhase()
-  return { items }
+  return { items: filteredItems }
 }

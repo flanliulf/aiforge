@@ -7,7 +7,7 @@
 
 | 状态 | 数量 |
 |------|------|
-| 🔴 open | 33 |
+| 🔴 open | 36 |
 | 🟡 in-progress | 0 |
 | ✅ resolved | 12 |
 
@@ -125,6 +125,17 @@
 - **描述**: Story 7-5 CR 已裁定 `BUILTIN_RULES` 的有效验收口径为 `33 条当前基线 + 7 条 OpenCode 新增规则 = 40 条`，而非 Story/Epic/PLAN 中残留的 41 条。当前残留位置包括：`_bmad-output/implementation-artifacts/stories/7-5-opencode-xdg-integration.md:34` 的 AC #5、同文件 `:65` 的 Task 5.1、`_bmad-output/planning-artifacts/epics/epic-7.md:353`、`_bmad-output/implementation-artifacts/code-reviews/7-5-code-review/PLAN.md:12`。这些不影响代码验收，但会导致后续 finalizer 或文档审计重复误判。
 - **涉及文件**: `_bmad-output/implementation-artifacts/stories/7-5-opencode-xdg-integration.md`, `_bmad-output/planning-artifacts/epics/epic-7.md`, `_bmad-output/implementation-artifacts/code-reviews/7-5-code-review/PLAN.md`
 - **建议时机**: 下次进行 Epic 7 文档收敛、Story 7-5 文档归档或发布前规格一致性整理时统一修正为 40，并保留“41 为累计计数误差”的说明。
+- **状态**: open
+- **解决记录**:
+
+### TODO-041: AC#5 文案矛盾（+5 条 vs 总量 46）
+
+- **来源**: 7-6 CR round 1-2 (2026-05-19 ~ 2026-05-19)
+- **优先级**: P2
+- **类别**: other
+- **描述**: Story 7-6 的 AC#5 仍表述为“新增规则 +5 条，BUILTIN_RULES 总量 46 条”，与当前规则口径存在文案矛盾。评估结论为非阻塞文档一致性问题：建议将 AC 文案修正为“新增规则 +6 条（5 条 Windsurf + 1 条 Claude 项目根 CLAUDE.md），总量 46 条”，并在后续补充 `claude:project` 双规则并存场景的验证说明。
+- **涉及文件**: `_bmad-output/implementation-artifacts/stories/7-6-windsurf-integration.md`
+- **建议时机**: 下次触及 Story 7-6 文档或进行 Epic 7 文档一致性收敛时
 - **状态**: open
 - **解决记录**:
 
@@ -367,6 +378,28 @@
 - **描述**: `src/data/install-rules.ts:75` 注释 `// v2.0: 承接原 vscode 项目级 MCP 配置语义（.vscode/mcp.json）` 字面使用 `.vscode/mcp.json` 描述历史路径语义，与实际规则 `type: Files, targetDir: '.vscode/'`（文件名沿用 `mcp-tools/` 源目录）存在字面差异。该注释是开发者内部历史溯源说明，不影响运行时行为，但可能在后续维护中引发"目标固定为 mcp.json"的误解。建议改为：`// v2.0: 承接原 vscode 项目级 MCP 配置语义（目标目录 .vscode/，文件名沿用 mcp-tools/ 源目录）`。
 - **涉及文件**: `src/data/install-rules.ts`
 - **建议时机**: 下次触及 `install-rules.ts` 时或常规代码清理
+- **状态**: open
+- **解决记录**:
+
+### TODO-042: `msg()` 动态键缺失时的兜底防护
+
+- **来源**: 7-6 CR round 1-2 (2026-05-19 ~ 2026-05-19)
+- **优先级**: P3
+- **类别**: tech-debt
+- **描述**: `semanticWarning.${warningKey}.prompt` / `semanticWarning.${warningKey}.skipped` 通过动态键读取文案，当前虽无触发路径，但未来新增 `semanticWarning` 键且漏配 i18n 时可能出现空字符串提示，导致交互信息缺失。评估结论为非阻塞的前瞻性健壮性改进。
+- **涉及文件**: `src/stages/semantic-warnings.ts`
+- **建议时机**: 下次触及语义警告流程或新增 `semanticWarning` 枚举值时
+- **状态**: open
+- **解决记录**:
+
+### TODO-043: stdout/stdin TTY 判定约定统一治理
+
+- **来源**: 7-6 CR round 1-2 (2026-05-19 ~ 2026-05-19)
+- **优先级**: P3
+- **类别**: tech-debt
+- **描述**: 语义警告路径当前以 `process.stdout.isTTY` 决定是否进入交互，历史上与 `stdin` 的交互能力判定并非统一策略。在极端 IO 重定向组合下可能出现边界不一致。该问题为项目级历史约定，非本 Story 新引入，评估为 defer/非阻塞。
+- **涉及文件**: `src/stages/semantic-warnings.ts`
+- **建议时机**: 后续进行项目级 TTY 判定策略统一时（独立治理 Story）
 - **状态**: open
 - **解决记录**:
 

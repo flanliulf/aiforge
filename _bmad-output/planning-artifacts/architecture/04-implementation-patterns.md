@@ -1494,6 +1494,40 @@ Story 开发及 CR 修复的质量门禁验证必须使用 `npm run lint:src`（
 
 > 来源：Story 7-1 CR R8 Finding #4 — R7 修复记录只记录局部测试（24 tests），未记录全量 npm test/lint/build，被 Auditor 列为 P3 阻塞项需另轮修复。
 
+**[CR-007] 交互式确认中断必须统一转换为管道取消信号：**
+
+在 stage 或辅助函数中使用 `@inquirer/prompts`（如 `confirm()`）时，必须在调用点捕获 `ExitPromptError`，并转换为项目统一取消信号（当前为 `FilterCancelledSignal`）。
+
+禁止：
+- 直接将 `ExitPromptError` 裸抛给 pipeline 上层
+- 在局部 stage 中自定义“第二套取消语义”而不接入统一取消协议
+
+```typescript
+✅ // 统一取消协议：交互中断 -> FilterCancelledSignal
+try {
+   const shouldContinue = await confirm({ message, default: false })
+   if (shouldContinue) {
+      filteredItems.push(item)
+   }
+} catch (error) {
+   if (error instanceof ExitPromptError) {
+      throw new FilterCancelledSignal()
+   }
+   throw error
+}
+
+❌ // 裸抛交互中断，取消路径不统一
+const shouldContinue = await confirm({ message, default: false })
+// Ctrl+C 时抛 ExitPromptError，外层无法按统一取消信号处理
+```
+
+验证要点：
+1. TTY 下 Ctrl+C 触发后，异常类型应为统一取消信号（非 `ExitPromptError`）
+2. pipeline 取消分支可稳定识别该信号并走统一退出路径
+3. 与交互相关的 stage 不引入并行取消协议
+
+> 来源：Story 7-6 CR R1→R2 — `applySemanticWarnings` 初始实现未捕获 `confirm()` 中断；修复为捕获 `ExitPromptError` 并转抛 `FilterCancelledSignal`，复审确认通过。
+
 ### Enforcement Guidelines
 
 **所有 AI Agent 必须遵守：**

@@ -4,7 +4,7 @@ user_name: 'chunxiao'
 date: '2026-03-12'
 sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 45
+rule_count: 46
 optimized_for_llm: true
 ---
 
@@ -237,6 +237,7 @@ index.ts → pipeline.ts → stages/* → services/*
 - **[CR-004] 回归保护测试断言必须精确到关键词，禁止使用宽泛正则：** 注释为"防止文案回归"或"AC #X 保护"的测试断言，必须精确到 AC 要求的关键短语（如 `toContain('GitHub Copilot 扩展')`），而非宽泛正则（`/Copilot/i`）。自查方法：心算"如果把 AC 要求的文案删掉，断言还会通过吗？"若答案是"会"，则断言不够强，必须加精确关键词。（来源：Story 7-1 CR R5→R6 — vscodeMergedNote 回归保护用 `.toMatch(/Copilot/i)`，删除 ② 项"安装扩展"后文案仍含 "Copilot 项目级规则"，断言仍通过，R6 才将断言改为 `.toContain('GitHub Copilot 扩展')`）
 - **[CR-005] CR 超过 4 轮未通过时，Evaluator 必须主动诊断根因并给出突围路径：** 当 CR 达到第 5 轮仍未通过，Evaluator 不得仅逐条确认"本轮发现有效/无效"，必须：① 分析"为何同类问题反复出现"（根因，而非症状）；② 给出 Fixer 的具体行动指引（如"执行全局 grep + 一次性闭合所有触点"）；③ 对本轮发现进行严重性重新评估（避免审查疲劳导致非阻塞项被过度放大）。**沉默型确认只会延长循环**；根因诊断 + 突围路径是破局的关键。（来源：Story 7-1 CR R8 评估 — 第 8 轮明确诊断"多触点字面量未全局扫描"为根因，给出全局 grep + 一次性闭合的突围路径，R9 完整执行后一轮通过）
 - **[CR-006] 每轮修复执行记录必须包含质量门禁三件套的执行结果：** 每轮修复完成后必须运行 `npm run lint:src && npm run build && npm test`，并将结果写入该轮评估文件的「修复执行记录」章节，格式：lint ✅/❌、build ✅ XX KB / ❌、test ✅ NNN/NNN passed / ❌。禁止省略或复用上轮结果——即使修改内容看似与测试无关也必须重新执行。缺少记录会导致下轮 Auditor 将"缺质量门禁记录"列为阻塞项，制造额外 CR 轮次。（来源：Story 7-1 CR R8 Finding #4 — R7 修复记录只记载局部测试（24 测试），未记录全量 npm test/lint/build，被 Auditor 列为阻塞项；Story 7-1 CR R8→R9 修复后补录 853/853 全量通过才闭合）
+- **[CR-007] 交互式确认中断必须统一转换为管道取消信号：** 在 stage 或辅助函数中使用 `@inquirer/prompts`（如 `confirm()`）时，必须显式捕获 `ExitPromptError` 并转换为项目统一取消信号（当前为 `FilterCancelledSignal`）。禁止将交互中断异常裸抛给上层；pipeline 取消语义必须保持单一入口，确保取消路径行为一致、可回归验证。（来源：Story 7-6 CR R1→R2 — `applySemanticWarnings` 未捕获中断导致取消路径不统一；修复为捕获 `ExitPromptError` 后转抛 `FilterCancelledSignal`，复审通过）
 
 ### Install Rules Data Architecture
 

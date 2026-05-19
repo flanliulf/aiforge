@@ -99,6 +99,8 @@ export interface InstallRule {
   fileFilter?: string[]
   /** flatten 模式下的主文件名（默认 'index.md'），仅 type=Flatten 时有效 */
   mainFile?: string
+  /** 语义差异提示键；存在时需在安装前提示用户确认 */
+  semanticWarning?: string
 }
 
 // Data structure: AI tool definition for detection

@@ -3,18 +3,19 @@ import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { TOOL_DEFINITIONS } from '../../src/data/tool-registry.js'
 
-describe('data/tool-registry — TOOL_DEFINITIONS (AC: #1, Story 7-5)', () => {
-  it('Story 7-5: contains exactly 7 tool definitions (opencode added on top of v2.0 set)', () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(7)
+describe('data/tool-registry — TOOL_DEFINITIONS (AC: #1, Story 7-6)', () => {
+  it('Story 7-6: contains exactly 8 tool definitions (windsurf added on top of v2.0 set)', () => {
+    expect(TOOL_DEFINITIONS).toHaveLength(8)
   })
 
-  it('Story 7-5: covers copilot, claude, cursor, codex, opencode, auggie, gemini (no vscode)', () => {
+  it('Story 7-6: covers copilot, claude, cursor, codex, opencode, windsurf, auggie, gemini (no vscode)', () => {
     const ids = TOOL_DEFINITIONS.map((t) => t.id)
     expect(ids).toContain('copilot')
     expect(ids).toContain('claude')
     expect(ids).toContain('cursor')
     expect(ids).toContain('codex')
     expect(ids).toContain('opencode')
+    expect(ids).toContain('windsurf')
     expect(ids).toContain('auggie')
     expect(ids).toContain('gemini')
     expect(ids).not.toContain('vscode')
@@ -73,6 +74,13 @@ describe('data/tool-registry — TOOL_DEFINITIONS (AC: #1, Story 7-5)', () => {
     expect(opencode.name).toBe('OpenCode')
     expect(opencode.detect.global).toEqual(['~/.config/opencode'])
     expect(opencode.detect.project).toEqual(['.opencode'])
+  })
+
+  it('Story 7-6: windsurf detects via ~/.codeium/windsurf and .windsurf', () => {
+    const windsurf = TOOL_DEFINITIONS.find((t) => t.id === 'windsurf')!
+    expect(windsurf.name).toBe('Windsurf')
+    expect(windsurf.detect.global).toEqual(['~/.codeium/windsurf'])
+    expect(windsurf.detect.project).toEqual(['.windsurf'])
   })
 
   it('Story 7-3: auggie detects via .augment (global and project)', () => {

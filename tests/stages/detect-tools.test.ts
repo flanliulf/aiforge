@@ -53,6 +53,14 @@ vi.mock('../../src/data/tool-registry.js', () => ({
       },
     },
     {
+      id: 'windsurf',
+      name: 'Windsurf',
+      detect: {
+        global: ['~/.codeium/windsurf'],
+        project: ['.windsurf'],
+      },
+    },
+    {
       id: 'auggie',
       name: 'Auggie (Augment Code)',
       detect: {
@@ -189,6 +197,7 @@ describe('detectTools', () => {
       '/home/user/.cursor',
       '/home/user/.codex',
       '/home/user/.config/opencode',
+      '/home/user/.codeium/windsurf',
       '/home/user/.augment',
       '/home/user/.gemini',
     ])
@@ -204,6 +213,7 @@ describe('detectTools', () => {
     expect(env.tools).toContain('cursor')
     expect(env.tools).toContain('codex')
     expect(env.tools).toContain('opencode')
+    expect(env.tools).toContain('windsurf')
     expect(env.tools).toContain('auggie')
     expect(env.tools).toContain('gemini')
   })
@@ -252,6 +262,29 @@ describe('detectTools', () => {
     const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
 
     expect(env.tools).toContain('opencode')
+  })
+
+  it('Story 7-6 AC #1 全局侧命中 ~/.codeium/windsurf 时返回包含 windsurf 的工具列表', async () => {
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.codeium/windsurf') return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('windsurf')
+  })
+
+  it('Story 7-6 AC #1 项目侧命中 .windsurf 时返回包含 windsurf 的工具列表', async () => {
+    const cwd = process.cwd()
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === `${cwd}/.windsurf`) return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('windsurf')
   })
 
   it('Story 7-5 AC #1 仅存在旧路径 ~/.opencode 时不会检测到 opencode', async () => {

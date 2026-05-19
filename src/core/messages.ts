@@ -296,6 +296,12 @@ interface MessageSet {
     selectPrompt: string
     cancelled: string
   }
+  semanticWarning: {
+    windsurfAgentsToWorkflows: {
+      prompt: string
+      skipped: string
+    }
+  }
 }
 
 // ── 双语消息集 ──────────────────────────────────────────────────
@@ -592,6 +598,13 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       fixAvailable: '可用子目录: {dirs}',
       selectPrompt: '没有匹配结果，请选择一个子目录或取消：',
       cancelled: '已取消',
+    },
+    semanticWarning: {
+      windsurfAgentsToWorkflows: {
+        prompt:
+          '⚠️  agents 将安装到 .windsurf/workflows/。Windsurf Workflow 是工作流概念，与通用 Agent 不同。是否继续？',
+        skipped: '已跳过 windsurf agents → workflows 安装（非 TTY 自动跳过）',
+      },
     },
   },
   en: {
@@ -897,6 +910,14 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
       fixAvailable: 'Available subdirectories: {dirs}',
       selectPrompt: 'No matches found. Select a subdirectory or cancel:',
       cancelled: 'Cancelled',
+    },
+    semanticWarning: {
+      windsurfAgentsToWorkflows: {
+        prompt:
+          '⚠️  agents will be installed to .windsurf/workflows/. Windsurf Workflow represents workflows, not general-purpose agents. Continue?',
+        skipped:
+          'Skipped windsurf agents → workflows installation automatically because non-TTY mode cannot confirm the semantic mapping',
+      },
     },
   },
 }

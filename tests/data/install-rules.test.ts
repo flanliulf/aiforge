@@ -11,9 +11,9 @@ import {
   loadRules,
 } from '../../src/data/install-rules.js'
 
-describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-5)', () => {
-  it('contains exactly 40 rules (current 33-rule baseline + 7 OpenCode rules)', () => {
-    expect(BUILTIN_RULES).toHaveLength(40)
+describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-6)', () => {
+  it('contains exactly 46 rules (Epic 7 cumulative matrix + windsurf 5 rules)', () => {
+    expect(BUILTIN_RULES).toHaveLength(46)
   })
 
   it('every rule has required fields: tool, scope, sourceDir, type, targetDir', () => {
@@ -26,10 +26,10 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-5)', () => {
     }
   })
 
-  it('Story 7-5: covers 7 tools (opencode added on top of v2.0 set)', () => {
+  it('Story 7-6: covers 8 tools (windsurf added on top of v2.0 set)', () => {
     const tools = new Set(BUILTIN_RULES.map((r) => r.tool))
     expect(tools).toEqual(
-      new Set(['copilot', 'claude', 'cursor', 'codex', 'opencode', 'auggie', 'gemini']),
+      new Set(['copilot', 'claude', 'cursor', 'codex', 'opencode', 'windsurf', 'auggie', 'gemini']),
     )
   })
 
@@ -59,11 +59,11 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-5)', () => {
     expect(rule!.type).toBe(InstallType.Files)
   })
 
-  it('v2.0: claude has 6 rules (3 global + 3 project, including new instructions rules)', () => {
+  it('v2.0: claude has 7 rules (3 global + 4 project, including project root CLAUDE.md)', () => {
     const claudeRules = BUILTIN_RULES.filter((r) => r.tool === 'claude')
-    expect(claudeRules).toHaveLength(6)
+    expect(claudeRules).toHaveLength(7)
     expect(claudeRules.filter((r) => r.scope === 'global')).toHaveLength(3)
-    expect(claudeRules.filter((r) => r.scope === 'project')).toHaveLength(3)
+    expect(claudeRules.filter((r) => r.scope === 'project')).toHaveLength(4)
   })
 
   it('v2.0: claude has global instructions rule targeting ~/.claude/', () => {
@@ -82,6 +82,16 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-5)', () => {
     )
     expect(rule).toBeDefined()
     expect(rule!.targetDir).toBe('.claude/')
+    expect(rule!.type).toBe(InstallType.Files)
+    expect(rule!.fileFilter).toEqual(['CLAUDE.md'])
+  })
+
+  it('Epic 7 matrix: claude has project root instructions rule targeting ./', () => {
+    const rule = BUILTIN_RULES.find(
+      (r) => r.tool === 'claude' && r.scope === 'project' && r.targetDir === './',
+    )
+    expect(rule).toBeDefined()
+    expect(rule!.sourceDir).toBe('instructions')
     expect(rule!.type).toBe(InstallType.Files)
     expect(rule!.fileFilter).toEqual(['CLAUDE.md'])
   })
@@ -337,6 +347,52 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-5)', () => {
       fileFilter: ['AGENTS.md', 'GEMINI.md'],
     })
   })
+
+  it('Story 7-6: windsurf has 5 rules (skills/rules global+project, agents→workflows project)', () => {
+    const windsurfRules = BUILTIN_RULES.filter((r) => r.tool === 'windsurf')
+    expect(windsurfRules).toHaveLength(5)
+    expect(windsurfRules.filter((r) => r.scope === 'global')).toHaveLength(2)
+    expect(windsurfRules.filter((r) => r.scope === 'project')).toHaveLength(3)
+  })
+
+  it('Story 7-6: windsurf rule matrix uses expected targets and semantic warning', () => {
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'windsurf',
+      scope: 'global',
+      sourceDir: 'skills',
+      type: InstallType.Directories,
+      targetDir: '~/.codeium/windsurf/skills/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'windsurf',
+      scope: 'global',
+      sourceDir: 'rules',
+      type: InstallType.Files,
+      targetDir: '~/.codeium/windsurf/rules/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'windsurf',
+      scope: 'project',
+      sourceDir: 'skills',
+      type: InstallType.Directories,
+      targetDir: '.windsurf/skills/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'windsurf',
+      scope: 'project',
+      sourceDir: 'rules',
+      type: InstallType.Files,
+      targetDir: '.windsurf/rules/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'windsurf',
+      scope: 'project',
+      sourceDir: 'agents',
+      type: InstallType.Files,
+      targetDir: '.windsurf/workflows/',
+      semanticWarning: 'windsurfAgentsToWorkflows',
+    })
+  })
 })
 
 describe('data/install-rules — RULE_INDEX (AC: #1)', () => {
@@ -367,6 +423,12 @@ describe('data/install-rules — RULE_INDEX (AC: #1)', () => {
     const rules = RULE_INDEX.get('claude:global')
     expect(rules).toBeDefined()
     expect(rules).toHaveLength(3)
+  })
+
+  it('Epic 7 matrix: lookup claude:project returns 4 rules', () => {
+    const rules = RULE_INDEX.get('claude:project')
+    expect(rules).toBeDefined()
+    expect(rules).toHaveLength(4)
   })
 
   it('Story 7-2: lookup codex:global returns 3 rules', () => {
@@ -415,6 +477,18 @@ describe('data/install-rules — RULE_INDEX (AC: #1)', () => {
     const rules = RULE_INDEX.get('gemini:project')
     expect(rules).toBeDefined()
     expect(rules).toHaveLength(2)
+  })
+
+  it('Story 7-6: lookup windsurf:global returns 2 rules', () => {
+    const rules = RULE_INDEX.get('windsurf:global')
+    expect(rules).toBeDefined()
+    expect(rules).toHaveLength(2)
+  })
+
+  it('Story 7-6: lookup windsurf:project returns 3 rules', () => {
+    const rules = RULE_INDEX.get('windsurf:project')
+    expect(rules).toBeDefined()
+    expect(rules).toHaveLength(3)
   })
 
   it('lookup for non-existent key returns undefined', () => {

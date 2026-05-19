@@ -13,9 +13,10 @@ const { mockGeminiPreconditionCheck } = vi.hoisted(() => ({
 vi.mock('node:fs/promises', () => ({
   readdir: vi.fn(),
 }))
-// Story 6-2: mock @inquirer/prompts 中的 select 函数（用于 TTY 零匹配交互测试）
+// Story 6-2 / 7-6: mock @inquirer/prompts 中的 select / confirm 函数
 vi.mock('@inquirer/prompts', () => ({
   select: vi.fn(),
+  confirm: vi.fn(),
 }))
 vi.mock('../../src/data/install-rules.js', () => ({
   RULE_INDEX: new Map([
@@ -132,6 +133,33 @@ vi.mock('../../src/data/install-rules.js', () => ({
         },
       ],
     ],
+    [
+      'windsurf:project',
+      [
+        {
+          tool: 'windsurf',
+          scope: 'project',
+          sourceDir: 'skills',
+          type: InstallType.Directories,
+          targetDir: '.windsurf/skills/',
+        },
+        {
+          tool: 'windsurf',
+          scope: 'project',
+          sourceDir: 'rules',
+          type: InstallType.Files,
+          targetDir: '.windsurf/rules/',
+        },
+        {
+          tool: 'windsurf',
+          scope: 'project',
+          sourceDir: 'agents',
+          type: InstallType.Files,
+          targetDir: '.windsurf/workflows/',
+          semanticWarning: 'windsurfAgentsToWorkflows',
+        },
+      ],
+    ],
   ]),
   TOOL_PRECONDITIONS: {
     gemini: {
@@ -175,7 +203,7 @@ import { matchRules } from '../../src/stages/match-rules.js'
 import { readdir } from 'node:fs/promises'
 import { AiforgeError } from '../../src/core/errors.js'
 import { FilterCancelledSignal } from '../../src/stages/filter-utils.js'
-import { select } from '@inquirer/prompts'
+import { confirm, select } from '@inquirer/prompts'
 
 // ── Fixtures ───────────────────────────────────────────────────
 
@@ -234,6 +262,7 @@ describe('matchRules', () => {
     vi.resetAllMocks()
     mockPathResolver.home.mockReturnValue('/home/user')
     mockGeminiPreconditionCheck.mockResolvedValue({ ok: true })
+    vi.mocked(confirm).mockResolvedValue(true)
   })
 
   // ──────────────────────────────────────────────────────────────
@@ -761,6 +790,122 @@ describe('matchRules', () => {
     expect(plan.items).toHaveLength(2)
     expect(plan.items.map((item) => item.rule.sourceDir)).toEqual(['skills', 'instructions'])
     expect(mockReporter.warn).not.toHaveBeenCalled()
+  })
+
+  it('Story 7-6 semantic warning: TTY confirm=false 时跳过 windsurf agents item', async () => {
+    const originalStdoutTTY = process.stdout.isTTY
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+    vi.mocked(confirm).mockResolvedValue(false)
+
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/skills')) {
+        return [
+          { name: 'skill-a', isFile: () => false, isDirectory: () => true },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      if (p.endsWith('/rules')) {
+        return [
+          { name: 'rule.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      if (p.endsWith('/agents')) {
+        return [
+          { name: 'agent.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    try {
+      const plan = await matchRules(
+        mockRepo,
+        makeEnv(['windsurf'], 'project'),
+        makeArgs({ global: false }),
+        mockReporter,
+        mockPathResolver,
+      )
+
+      expect(confirm).toHaveBeenCalledTimes(1)
+      expect(plan.items.map((item) => item.rule.sourceDir)).toEqual(['skills', 'rules'])
+      expect(plan.items.find((item) => item.rule.sourceDir === 'agents')).toBeUndefined()
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: originalStdoutTTY,
+        configurable: true,
+      })
+    }
+  })
+
+  it('Story 7-6 semantic warning: TTY confirm=true 时保留 windsurf agents item', async () => {
+    const originalStdoutTTY = process.stdout.isTTY
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+    vi.mocked(confirm).mockResolvedValue(true)
+
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/agents')) {
+        return [
+          { name: 'agent.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    try {
+      const plan = await matchRules(
+        mockRepo,
+        makeEnv(['windsurf'], 'project'),
+        makeArgs({ global: false, dirs: ['agents'] }),
+        mockReporter,
+        mockPathResolver,
+      )
+
+      expect(confirm).toHaveBeenCalledTimes(1)
+      expect(plan.items).toHaveLength(1)
+      expect(plan.items[0]!.rule.targetDir).toBe('.windsurf/workflows/')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: originalStdoutTTY,
+        configurable: true,
+      })
+    }
+  })
+
+  it('Story 7-6 semantic warning: 非 TTY 自动跳过 windsurf agents 并 warn', async () => {
+    const originalStdoutTTY = process.stdout.isTTY
+    Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true })
+
+    vi.mocked(readdir).mockImplementation(async (dirPath) => {
+      const p = String(dirPath)
+      if (p.endsWith('/agents')) {
+        return [
+          { name: 'agent.md', isFile: () => true, isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof readdir>>
+      }
+      return []
+    })
+
+    try {
+      const plan = await matchRules(
+        mockRepo,
+        makeEnv(['windsurf'], 'project'),
+        makeArgs({ global: false, dirs: ['agents'] }),
+        mockReporter,
+        mockPathResolver,
+      )
+
+      expect(confirm).not.toHaveBeenCalled()
+      expect(plan.items).toHaveLength(0)
+      expect(mockReporter.warn).toHaveBeenCalledWith(
+        '已跳过 windsurf agents → workflows 安装（非 TTY 自动跳过）',
+      )
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: originalStdoutTTY,
+        configurable: true,
+      })
+    }
   })
 
   // ──────────────────────────────────────────────────────────────

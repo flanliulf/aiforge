@@ -130,6 +130,22 @@ describe('data/messages — setLanguage / msg (AC: #3)', () => {
     expect(m.msg('precondition.geminiVersion')).toContain('v0.26.0')
     expect(m.msg('precondition.geminiVersion')).toContain('skip skills installation')
   })
+
+  it('Story 7-6: semanticWarning.windsurfAgentsToWorkflows.prompt 返回中文提示', async () => {
+    const m = await import('../../src/data/messages.js')
+    m.setLanguage('zh-CN')
+    expect(m.msg('semanticWarning.windsurfAgentsToWorkflows.prompt')).toContain(
+      '.windsurf/workflows/',
+    )
+    expect(m.msg('semanticWarning.windsurfAgentsToWorkflows.prompt')).toContain('是否继续')
+  })
+
+  it('Story 7-6: semanticWarning.windsurfAgentsToWorkflows.skipped 返回英文跳过原因', async () => {
+    const m = await import('../../src/data/messages.js')
+    m.setLanguage('en')
+    expect(m.msg('semanticWarning.windsurfAgentsToWorkflows.skipped')).toContain('Skipped')
+    expect(m.msg('semanticWarning.windsurfAgentsToWorkflows.skipped')).toContain('non-TTY')
+  })
 })
 
 describe('data/messages — English message content (AC: #3, Task 1.3-1.5)', () => {
