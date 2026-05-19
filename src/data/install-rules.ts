@@ -6,7 +6,7 @@ const Directories: InstallType = 'Directories' as InstallType
 const Flatten: InstallType = 'Flatten' as InstallType
 
 /**
- * v2.0 内置安装规则表 — 46 条规则覆盖 8 工具 × 全局/项目
+ * v2.0 内置安装规则表 — 50 条规则覆盖 9 工具 × 全局/项目
  *
  * v2.0 变更（Breaking Change）:
  *   - 删除: vscode:global:mcp-tools（VS Code 归并到 Copilot 语境）
@@ -365,6 +365,38 @@ export const BUILTIN_RULES: InstallRule[] = [
     type: Files,
     targetDir: '.windsurf/workflows/',
     semanticWarning: 'windsurfAgentsToWorkflows',
+  },
+
+  // ── Kiro (AWS): 全局 + 项目 (4 条，instructions→steering 子目录) ──
+  {
+    tool: 'kiro',
+    scope: 'global',
+    sourceDir: 'skills',
+    type: Directories,
+    targetDir: '~/.kiro/skills/',
+  },
+  {
+    tool: 'kiro',
+    scope: 'global',
+    sourceDir: 'instructions',
+    type: Files,
+    targetDir: '~/.kiro/steering/',
+    fileFilter: ['AGENTS.md'],
+  },
+  {
+    tool: 'kiro',
+    scope: 'project',
+    sourceDir: 'skills',
+    type: Directories,
+    targetDir: '.kiro/skills/',
+  },
+  {
+    tool: 'kiro',
+    scope: 'project',
+    sourceDir: 'instructions',
+    type: Files,
+    targetDir: '.kiro/steering/',
+    fileFilter: ['AGENTS.md'],
   },
 ]
 

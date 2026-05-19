@@ -1,6 +1,6 @@
 # Story 7.7: Kiro (AWS) 接入
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -33,23 +33,23 @@ So that 我的 AI 编码辅助配置保持最新同步。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 注册 kiro 工具定义 (AC: #1)
-  - [ ] 1.1 在 `src/data/tool-registry.ts` 追加：`{ id: 'kiro', name: 'Kiro (AWS)', detect: { global: ['~/.kiro'], project: ['.kiro'] } }`
-- [ ] Task 2: 添加 kiro 安装规则 (AC: #2, #3, #4)
-  - [ ] 2.1 在 `src/data/install-rules.ts` 追加：
+- [x] Task 1: 注册 kiro 工具定义 (AC: #1)
+  - [x] 1.1 在 `src/data/tool-registry.ts` 追加：`{ id: 'kiro', name: 'Kiro (AWS)', detect: { global: ['~/.kiro'], project: ['.kiro'] } }`
+- [x] Task 2: 添加 kiro 安装规则 (AC: #2, #3, #4)
+  - [x] 2.1 在 `src/data/install-rules.ts` 追加：
     - `{ tool: 'kiro', scope: 'global', sourceDir: 'skills', type: Directories, targetDir: '~/.kiro/skills/' }`
     - `{ tool: 'kiro', scope: 'global', sourceDir: 'instructions', type: Files, targetDir: '~/.kiro/steering/', fileFilter: ['AGENTS.md'] }`
     - `{ tool: 'kiro', scope: 'project', sourceDir: 'skills', type: Directories, targetDir: '.kiro/skills/' }`
     - `{ tool: 'kiro', scope: 'project', sourceDir: 'instructions', type: Files, targetDir: '.kiro/steering/', fileFilter: ['AGENTS.md'] }`
-  - [ ] 2.2 共 4 条；与 epic AC #5 一致
-  - [ ] 2.3 **steering 子目录说明**：Kiro 的 instructions 概念存储在 `steering/` 子目录（区别于其他工具的工具根目录），由 targetDir 显式声明，无需新增类型
-- [ ] Task 3: 编写单元测试 (AC: #1-5)
-  - [ ] 3.1 扩展 `tests/data/install-rules.test.ts`：`BUILTIN_RULES.length === 50`，包含 4 条 kiro 规则；instructions 规则 fileFilter 为 `['AGENTS.md']`
-  - [ ] 3.2 扩展 `tests/stages/detect-tools.test.ts`：mock `~/.kiro/` → 检测命中
-- [ ] Task 4: 质量门禁 (AC: #5)
-  - [ ] 4.1 `npm test` — 全绿
-  - [ ] 4.2 `npm run lint:src` — 退出码 0
-  - [ ] 4.3 `npm run build` — 构建通过
+  - [x] 2.2 共 4 条；与 epic AC #5 一致
+  - [x] 2.3 **steering 子目录说明**：Kiro 的 instructions 概念存储在 `steering/` 子目录（区别于其他工具的工具根目录），由 targetDir 显式声明，无需新增类型
+- [x] Task 3: 编写单元测试 (AC: #1-5)
+  - [x] 3.1 扩展 `tests/data/install-rules.test.ts`：`BUILTIN_RULES.length === 50`，包含 4 条 kiro 规则；instructions 规则 fileFilter 为 `['AGENTS.md']`
+  - [x] 3.2 扩展 `tests/stages/detect-tools.test.ts`：mock `~/.kiro/` → 检测命中
+- [x] Task 4: 质量门禁 (AC: #5)
+  - [x] 4.1 `npm test` — 全绿
+  - [x] 4.2 `npm run lint:src` — 退出码 0
+  - [x] 4.3 `npm run build` — 构建通过
 
 ## Dev Notes
 
@@ -84,10 +84,30 @@ Kiro 的 instructions 不放在工具根目录，而是放在 `steering/` 子目
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+GPT-5.4
 
 ### Debug Log References
 
 ### Completion Notes List
 
+- 已注册 `kiro` 工具定义：`detect.global = ['~/.kiro']`，`detect.project = ['.kiro']`。
+- 已新增 4 条 Kiro 安装规则：skills 安装到 `.kiro/skills/` / `~/.kiro/skills/`，instructions 安装到 `.kiro/steering/` / `~/.kiro/steering/`，并对 instructions 使用 `fileFilter: ['AGENTS.md']`。
+- 已扩展 `tests/data/install-rules.test.ts` 与 `tests/stages/detect-tools.test.ts`，覆盖 Kiro 规则矩阵、规则总量 50，以及 `~/.kiro` / `.kiro` 检测命中。
+- 聚焦验证通过：`npm test -- tests/data/install-rules.test.ts tests/stages/detect-tools.test.ts`，共 97 个测试通过。
+- 已修复既有测试 `tests/data/tool-registry.test.ts` 的旧基线断言：工具总数从 8 更新为 9，并补充 `kiro` 覆盖断言，使工具注册表测试与 Story 7-7 的注册事实一致。
+- 完整质量门禁通过：`npm test` 全绿（34 个测试文件、924 个测试），`npm run lint:src` 通过，`npm run build` 通过。
+- 本次实现保持零引擎代码改动，仅修改 data 层与相关测试文件；Story 7-7 已推进到 `review`。
+
 ### File List
+
+- src/data/tool-registry.ts
+- src/data/install-rules.ts
+- tests/data/install-rules.test.ts
+- tests/data/tool-registry.test.ts
+- tests/stages/detect-tools.test.ts
+- _bmad-output/implementation-artifacts/stories/7-7-kiro-aws-integration.md
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+
+### Change Log
+
+- 2026-05-19: 修复 `tests/data/tool-registry.test.ts` 的旧工具数量断言并补充 Kiro 覆盖；完整质量门禁通过，Story 状态更新为 review。

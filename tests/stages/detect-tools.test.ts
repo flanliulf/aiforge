@@ -76,6 +76,14 @@ vi.mock('../../src/data/tool-registry.js', () => ({
         project: ['.gemini'],
       },
     },
+    {
+      id: 'kiro',
+      name: 'Kiro (AWS)',
+      detect: {
+        global: ['~/.kiro'],
+        project: ['.kiro'],
+      },
+    },
   ],
 }))
 
@@ -200,6 +208,7 @@ describe('detectTools', () => {
       '/home/user/.codeium/windsurf',
       '/home/user/.augment',
       '/home/user/.gemini',
+      '/home/user/.kiro',
     ])
     vi.mocked(access).mockImplementation(async (p) => {
       if (hitPaths.has(String(p))) return
@@ -216,6 +225,7 @@ describe('detectTools', () => {
     expect(env.tools).toContain('windsurf')
     expect(env.tools).toContain('auggie')
     expect(env.tools).toContain('gemini')
+    expect(env.tools).toContain('kiro')
   })
 
   it('Story 7-2 AC #1 全局侧命中 codex 时返回包含 codex 的工具列表', async () => {
@@ -344,6 +354,29 @@ describe('detectTools', () => {
     const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
 
     expect(env.tools).toContain('gemini')
+  })
+
+  it('Story 7-7 AC #1 全局侧命中 ~/.kiro 时返回包含 kiro 的工具列表', async () => {
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === '/home/user/.kiro') return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('kiro')
+  })
+
+  it('Story 7-7 AC #1 项目侧命中 .kiro 时返回包含 kiro 的工具列表', async () => {
+    const cwd = process.cwd()
+    vi.mocked(access).mockImplementation(async (p) => {
+      if (String(p) === `${cwd}/.kiro`) return
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const env = await detectTools(mockRepo, makeArgs(), mockReporter, mockPathResolver)
+
+    expect(env.tools).toContain('kiro')
   })
 
   // ──────────────────────────────────────────────────────────────

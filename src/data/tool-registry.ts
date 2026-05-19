@@ -71,4 +71,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       project: ['.gemini'],
     },
   },
+  {
+    id: 'kiro',
+    name: 'Kiro (AWS)',
+    detect: {
+      global: ['~/.kiro'],
+      project: ['.kiro'],
+    },
+  },
 ]

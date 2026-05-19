@@ -4,11 +4,11 @@ import { resolve } from 'path'
 import { TOOL_DEFINITIONS } from '../../src/data/tool-registry.js'
 
 describe('data/tool-registry — TOOL_DEFINITIONS (AC: #1, Story 7-6)', () => {
-  it('Story 7-6: contains exactly 8 tool definitions (windsurf added on top of v2.0 set)', () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(8)
+  it('Story 7-7: contains exactly 9 tool definitions (kiro added on top of Story 7-6 set)', () => {
+    expect(TOOL_DEFINITIONS).toHaveLength(9)
   })
 
-  it('Story 7-6: covers copilot, claude, cursor, codex, opencode, windsurf, auggie, gemini (no vscode)', () => {
+  it('Story 7-7: covers copilot, claude, cursor, codex, opencode, windsurf, auggie, gemini, kiro (no vscode)', () => {
     const ids = TOOL_DEFINITIONS.map((t) => t.id)
     expect(ids).toContain('copilot')
     expect(ids).toContain('claude')
@@ -18,6 +18,7 @@ describe('data/tool-registry — TOOL_DEFINITIONS (AC: #1, Story 7-6)', () => {
     expect(ids).toContain('windsurf')
     expect(ids).toContain('auggie')
     expect(ids).toContain('gemini')
+    expect(ids).toContain('kiro')
     expect(ids).not.toContain('vscode')
   })
 

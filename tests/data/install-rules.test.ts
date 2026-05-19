@@ -12,8 +12,8 @@ import {
 } from '../../src/data/install-rules.js'
 
 describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-6)', () => {
-  it('contains exactly 46 rules (Epic 7 cumulative matrix + windsurf 5 rules)', () => {
-    expect(BUILTIN_RULES).toHaveLength(46)
+  it('contains exactly 50 rules (Epic 7 cumulative matrix + kiro 4 rules)', () => {
+    expect(BUILTIN_RULES).toHaveLength(50)
   })
 
   it('every rule has required fields: tool, scope, sourceDir, type, targetDir', () => {
@@ -26,10 +26,20 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-6)', () => {
     }
   })
 
-  it('Story 7-6: covers 8 tools (windsurf added on top of v2.0 set)', () => {
+  it('Story 7-7: covers 9 tools (kiro added on top of windsurf baseline)', () => {
     const tools = new Set(BUILTIN_RULES.map((r) => r.tool))
     expect(tools).toEqual(
-      new Set(['copilot', 'claude', 'cursor', 'codex', 'opencode', 'windsurf', 'auggie', 'gemini']),
+      new Set([
+        'copilot',
+        'claude',
+        'cursor',
+        'codex',
+        'opencode',
+        'windsurf',
+        'auggie',
+        'gemini',
+        'kiro',
+      ]),
     )
   })
 
@@ -393,6 +403,46 @@ describe('data/install-rules — BUILTIN_RULES (AC: #1, Story 7-6)', () => {
       semanticWarning: 'windsurfAgentsToWorkflows',
     })
   })
+
+  it('Story 7-7: kiro has 4 rules (skills/instructions global+project)', () => {
+    const kiroRules = BUILTIN_RULES.filter((r) => r.tool === 'kiro')
+    expect(kiroRules).toHaveLength(4)
+    expect(kiroRules.filter((r) => r.scope === 'global')).toHaveLength(2)
+    expect(kiroRules.filter((r) => r.scope === 'project')).toHaveLength(2)
+  })
+
+  it('Story 7-7: kiro rule matrix uses expected targets and AGENTS filter', () => {
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'kiro',
+      scope: 'global',
+      sourceDir: 'skills',
+      type: InstallType.Directories,
+      targetDir: '~/.kiro/skills/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'kiro',
+      scope: 'global',
+      sourceDir: 'instructions',
+      type: InstallType.Files,
+      targetDir: '~/.kiro/steering/',
+      fileFilter: ['AGENTS.md'],
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'kiro',
+      scope: 'project',
+      sourceDir: 'skills',
+      type: InstallType.Directories,
+      targetDir: '.kiro/skills/',
+    })
+    expect(BUILTIN_RULES).toContainEqual({
+      tool: 'kiro',
+      scope: 'project',
+      sourceDir: 'instructions',
+      type: InstallType.Files,
+      targetDir: '.kiro/steering/',
+      fileFilter: ['AGENTS.md'],
+    })
+  })
 })
 
 describe('data/install-rules — RULE_INDEX (AC: #1)', () => {
@@ -489,6 +539,18 @@ describe('data/install-rules — RULE_INDEX (AC: #1)', () => {
     const rules = RULE_INDEX.get('windsurf:project')
     expect(rules).toBeDefined()
     expect(rules).toHaveLength(3)
+  })
+
+  it('Story 7-7: lookup kiro:global returns 2 rules', () => {
+    const rules = RULE_INDEX.get('kiro:global')
+    expect(rules).toBeDefined()
+    expect(rules).toHaveLength(2)
+  })
+
+  it('Story 7-7: lookup kiro:project returns 2 rules', () => {
+    const rules = RULE_INDEX.get('kiro:project')
+    expect(rules).toBeDefined()
+    expect(rules).toHaveLength(2)
   })
 
   it('lookup for non-existent key returns undefined', () => {
