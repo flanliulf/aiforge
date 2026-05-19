@@ -52,3 +52,10 @@
 - git commit sub agent 发现无关未跟踪文件 `bmad-create-story-update.md`，因此没有提交。
 - 默认决策：忽略该无关未跟踪文件，不纳入提交；重新执行 git commit，仅 add Story 7-7 相关文件。
 
+## 提交完成
+
+- 第二次 git commit sub agent 已完成本地提交，未推送。
+- 已生成提交：`e92bcad feat(kiro): 完成 Story 7-7 Kiro AWS 集成与 CR 收尾`。
+- 已生成提交：`96932d9 docs(kiro): 补充 Story 7-7 CR 文档与进度记录`。
+- 由于本条笔记是在提交完成后补写，还需要单独提交本次进度记录收尾更新。
+
