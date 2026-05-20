@@ -13,6 +13,7 @@
 | CR-TEST-01 | 新增工具安装规则必须用端到端测试锁定真实落盘路径 | 7-3 | 7/12 | rules-summary | 已写入规则总结 |
 | CR-API-01 | 能力边界提示必须按契约触发条件检查 | 7-9, 7-10 | 9/12 | global-doc | 已同步全局文档 |
 | CR-API-02 | 信息性提示的存在性检查必须与决策路径隔离并保持非阻断 | 7-10 | 8/12 | global-doc | 已同步全局文档 |
+| CR-API-03 | 安装结果摘要状态必须由结构化结果项承载 | 7-2 | 7/12 | rules-summary | 已写入规则总结 |
 
 ---
 
@@ -357,3 +358,66 @@
 - **本次落地**:
   - `src/stages/detect-tools.ts` 已新增 `.iflow/` stale-tool 专用非阻断检查；`tests/stages/detect-tools.test.ts` 已覆盖 `EACCES` 不阻断检测结果。
 - **同步状态**: 已同步全局文档
+
+### Story 7-2 / 2026-05-20
+
+- **Story**: 7-2
+- **分析来源**:
+  - `7-2-code-review-summary-20260518-round-1.md`
+  - `7-2-code-review-evaluation-20260518-round-1.md`
+  - `7-2-code-review-summary-20260518-round-2.md`
+  - `7-2-code-review-evaluation-20260518-round-2.md`
+- **结论概览**:
+  - Round 1 发现 2 个阻塞项：`decision_needed=1`（Codex instructions 与规则总量口径冲突）、`patch=1`（mcp-tools 安装结果摘要缺少“需手动合并”状态）。
+  - Round 1 evaluation 确认两项均有效；修复后 Round 2 reviewer 与 evaluator 均确认通过，Fix Items = 0，CR TODO = 0。
+  - 规则总量口径冲突已被既有 `CR-PROCESS-01` 覆盖；本次仅按用户确认的 record-only 模式沉淀“结果摘要状态必须进入结构化结果项”这一细化规则，不升格全局文档。
+
+#### 升格判定摘要
+
+| 候选规则 | 硬性门槛 | 总分 | 建议去向 | 用户确认结果 |
+|----------|----------|------|----------|--------------|
+| 安装结果摘要状态必须由结构化结果项承载 | 通过 | 7/12 | rules-summary | 按用户确认执行 record-only |
+
+### 提炼规则
+
+#### CR-API-03：安装结果摘要状态必须由结构化结果项承载
+
+- **来源问题**: Story AC #4 要求安装结果摘要中将 Codex `mcp-tools` 标注为“需手动合并”，而初始实现只额外输出 `Reporter.warn()` 合并提示，结果项本身仍按普通 `new` 状态展示。用户会同时看到 warning 和普通完成摘要，TTY / Plain / Quiet 输出及自动化消费方都无法从结果项语义判断后续仍需人工合并。
+- **CR 证据**:
+  - `7-2-code-review-summary-20260518-round-1.md`: Finding #2 指出 warning 不等同于安装结果摘要状态，mcp-tools 仍可能显示为普通完成。
+  - `7-2-code-review-evaluation-20260518-round-1.md`: 确认该发现有效，并建议保留 `InstallResult.items[].status` 三态，同时增加结果项级附加元数据或可追溯展示标记。
+  - `7-2-code-review-evaluation-20260518-round-1.md`: 修复记录显示已新增 `manualAction: 'mcp-merge-required'`，并让 TTY / Plain / Quiet 输出消费该字段。
+  - `7-2-code-review-evaluation-20260518-round-2.md`: 复核确认结果项级 `manualAction`、Reporter 输出和测试断言均已覆盖“需手动合并”语义。
+- **硬性门槛**:
+  - 有证据: 是
+  - 可规则化: 是
+  - 非纯特例: 是
+  - 不重复: 是
+  - 状态明确: 是
+- **量化评分**:
+
+  | 维度 | 分数 | 理由 |
+  |------|------|------|
+  | 复现频次 | 1 | 单 Story 中由 reviewer、evaluator、fixer、复审连续确认并闭环，具有同类输出契约复现迹象。 |
+  | 影响范围 | 1 | 影响 `InstallResult.items[]`、Reporter 三种实现和脚本化输出消费语义。 |
+  | 风险等级 | 1 | 可能误导用户认为安装已完全完成，或让自动化消费方把需人工合并项当作普通完成项。 |
+  | 根因稳定性 | 1 | 根因是将旁路提示误当作结构化摘要状态，未来新增手动操作类安装结果时容易复现。 |
+  | 可执行性 | 2 | 可检查：结果项必须携带可渲染元数据，TTY / Plain / Quiet 均有断言覆盖。 |
+  | 文档缺口 | 1 | 全局文档已有“共享字段禁止语义扩展”和 `InstallResult.status` 三态规则，但未细化“warning 不能替代摘要状态”的输出契约。 |
+
+- **总分**: 7/12
+- **建议去向**: rules-summary
+- **适用范围**: 安装结果摘要、Reporter 输出、需要用户后续手动操作的安装项、以及任何 AC 明确要求“摘要状态/结果项状态”的 CLI 输出场景。
+- **规避指南**:
+  - 禁止用 `Reporter.warn()`、`info()` 或其他旁路提示替代 AC 要求的结果摘要状态。
+  - 禁止为了表达新语义而扩展 `InstallResult.items[].status` 三态；新语义应使用独立字段或可追溯元数据承载。
+  - 禁止只覆盖 TTY 输出而遗漏 Plain / Quiet 等脚本化或静默模式。
+- **最佳实践**:
+  - 当安装项需要表达“需手动合并”“需后续操作”等附加状态时，在结果项上新增明确元数据（如 `manualAction`），再由 Reporter 统一渲染。
+  - 保持基础状态字段语义稳定，使用附加字段表达非文件级成功/跳过状态。
+  - 同步补充 TTY / Plain / Quiet 测试，断言用户可见文案、机器可读标记和摘要计数都能体现该附加状态。
+- **全局文档建议**:
+  - 不建议升格全局文档。该规则是既有 `InstallResult.status` 三态规则、跨层共享字段禁止语义扩展规则和 Reporter 输出契约在手动合并场景下的细化，当前先作为 CR 规则总结记录。
+- **本次落地**:
+  - Story 7-2 已通过 `manualAction: 'mcp-merge-required'` 在结果项层承载手动合并语义；Reporter TTY / Plain / Quiet 输出及相关测试已闭环。
+- **同步状态**: 已写入规则总结
