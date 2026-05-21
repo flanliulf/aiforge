@@ -17,3 +17,6 @@ node_modules/
 
 # BMad framework internals
 _bmad/
+
+# Archived reference drafts
+docs/references/

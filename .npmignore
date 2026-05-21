@@ -1,6 +1,5 @@
-# 中文 README 和文档目录不入 npm 包
-README.zh.md
-docs/
+# npm package uses package.json "files" to include public docs only.
+docs/references/
 
 # 开发和构建配置
 _bmad-output/
@@ -16,5 +15,13 @@ tsconfig.json
 .prettierignore
 .agent
 .agents
+.augment
+.codex
+.cursor
 .gemini
+.iflow
+.kiro
+.opencode
+.trae
+.windsurf
 AGENTS.md

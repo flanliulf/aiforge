@@ -16,7 +16,7 @@ describe('project toolchain configuration', () => {
   })
 
   it('package.json has bin entry for aiforge', () => {
-    expect(pkg.bin?.aiforge).toBe('./dist/index.js')
+    expect(pkg.bin?.aiforge).toBe('dist/index.js')
   })
 
   it('package.json has required scripts', () => {
