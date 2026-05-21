@@ -2,6 +2,31 @@
 
 All notable changes to aiforge are documented in this file.
 
+## [2.0.4] - 2026-05-21
+
+### Changed
+
+- Updated npm publishing guidance to verify the published CLI from a clean temporary directory, avoiding npm/npx local package resolution conflicts inside this repository.
+
+## [2.0.3] - 2026-05-21
+
+### Changed
+
+- Updated README release metadata to the next npm-publishable patch version.
+- Documented the release rule that any npm-bound code or documentation change must bump `package.json` and `package-lock.json` before publishing.
+
+## [2.0.2] - 2026-05-21
+
+### Fixed
+
+- Fixed garbled Chinese text in the npm package page README preview by pointing the Chinese README link to a jsDelivr URL that serves Markdown with an explicit UTF-8 charset.
+
+## [2.0.1] - 2026-05-20
+
+### Fixed
+
+- Fixed the Chinese README link on the npm package page by pointing it to the published `README.zh.md` asset on unpkg.
+
 ## [2.0.0] - 2026-05-11
 
 ### ⚠️ BREAKING CHANGES
@@ -13,6 +38,7 @@ All notable changes to aiforge are documented in this file.
 
 ### Added
 
+- **npm distribution**: The package is published as `@fancyliu/aiforge`; the installed CLI command remains `aiforge`.
 - **Copilot project MCP rule** (`copilot:project:mcp-tools → .vscode/`): Inherits the VS Code project-level MCP configuration semantics. Activates when aiforge detects the Copilot context (via `~/.copilot/` marker or project `.github/`).
 - **Claude instructions dual-path rules**:
   - `claude:global:instructions → ~/.claude/` — global-scope instruction files

@@ -8,7 +8,7 @@ aiforge uses a **three-part error format**:
 ❌ What went wrong            ← 发生了什么
    Why it happened            ← 为什么
    How to fix:                ← 怎么修
-     → npx aiforge --ssh      ← 可复制的修复命令
+     → npx @fancyliu/aiforge --ssh      ← 可复制的修复命令
 ```
 
 Read each part carefully — the "How to fix" section usually contains the exact command to resolve the issue.
@@ -23,9 +23,9 @@ Read each part carefully — the "How to fix" section usually contains the exact
 ```
 ❌ Cannot access repository
    Git server returned 401 (authentication failed)
-   → npx aiforge --ssh
-   → npx aiforge --token <your-access-token>
-   → npx aiforge init
+   → npx @fancyliu/aiforge --ssh
+   → npx @fancyliu/aiforge --token <your-access-token>
+   → npx @fancyliu/aiforge init
 ```
 
 **Solutions:**
@@ -42,21 +42,21 @@ Read each part carefully — the "How to fix" section usually contains the exact
 2. **Try a different auth method:**
    ```bash
    # Force SSH
-   npx aiforge --ssh
+   npx @fancyliu/aiforge --ssh
 
    # Use explicit token
-   npx aiforge --token <your-access-token>
+   npx @fancyliu/aiforge --token <your-access-token>
    ```
 
 3. **Re-run init to reconfigure:**
    ```bash
-   npx aiforge init
+   npx @fancyliu/aiforge init
    ```
 
 4. **For CI/CD, use environment variable:**
    ```bash
    export GIT_TOKEN=<your-access-token>
-   npx aiforge
+   npx @fancyliu/aiforge
    ```
 
 ---
@@ -89,7 +89,7 @@ Read each part carefully — the "How to fix" section usually contains the exact
 4. **Clear cached clone and retry:**
    ```bash
    rm -rf ~/.aiforge/repos/<repo-name>
-   npx aiforge
+   npx @fancyliu/aiforge
    ```
 
 ---
@@ -109,7 +109,7 @@ Read each part carefully — the "How to fix" section usually contains the exact
 rm /path/to/target
 
 # Retry installation
-npx aiforge
+npx @fancyliu/aiforge
 ```
 
 ---
@@ -150,7 +150,7 @@ npx aiforge
 
 2. **Manually specify tools:**
    ```bash
-   npx aiforge -t copilot claude
+   npx @fancyliu/aiforge -t copilot claude
    ```
 
 3. **For project-level detection**, make sure you're in a project directory that has tool config directories (e.g., `.github/`, `.claude/`).
@@ -173,10 +173,10 @@ npx aiforge
 2. **Use a simple directory name** (no path separators):
    ```bash
    # Correct
-   npx aiforge --list skills
+   npx @fancyliu/aiforge --list skills
 
    # Wrong
-   npx aiforge --list skills/code-review
+   npx @fancyliu/aiforge --list skills/code-review
    ```
 
 ---
@@ -192,7 +192,7 @@ npx aiforge
 
 **Solution:** Provide a simple top-level directory name:
 ```bash
-npx aiforge --list skills
+npx @fancyliu/aiforge --list skills
 ```
 
 ---
@@ -210,12 +210,12 @@ npx aiforge --list skills
 
 1. **Browse available subdirectories first:**
    ```bash
-   npx aiforge --list skills
+   npx @fancyliu/aiforge --list skills
    ```
 
 2. **Check your glob pattern** — supported wildcards: `*` (any string), `?` (single char):
    ```bash
-   npx aiforge --filter "skills/code*"
+   npx @fancyliu/aiforge --filter "skills/code*"
    ```
 
 ---
@@ -239,7 +239,7 @@ npx aiforge --list skills
 
 ```bash
 export GIT_TOKEN=<your-access-token>
-npx aiforge --quiet
+npx @fancyliu/aiforge --quiet
 ```
 
 Key flags for CI/CD:
@@ -257,14 +257,14 @@ Key flags for CI/CD:
 }
 ```
 
-Or re-run `npx aiforge init` and select your preferred language.
+Or re-run `npx @fancyliu/aiforge init` and select your preferred language.
 
 ### Q: What's the difference between symlink and copy mode? | 符号链接和复制模式有什么区别？
 
 | Aspect | Copy Mode | Symlink Mode (`-l`) |
 |--------|-----------|---------------------|
 | File independence | Files are independent copies | Links point to cloned repo |
-| Updates | Re-run `npx aiforge` | `git pull` or `npx aiforge update` |
+| Updates | Re-run `npx @fancyliu/aiforge` | `git pull` or re-run `npx @fancyliu/aiforge -g -l` |
 | Scope | Global + Project | **Global only** |
 | Disk usage | Duplicated files | Single source, multiple links |
 | Best for | Project-level configs | Long-term global setup |

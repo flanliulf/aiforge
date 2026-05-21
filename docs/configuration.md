@@ -4,7 +4,7 @@
 
 Location: `~/.aiforge/config.json`
 
-Created by `npx aiforge init`. Permissions: `0o600` (user-only read/write).
+Created by `npx @fancyliu/aiforge init`. Permissions: `0o600` (user-only read/write).
 
 ```jsonc
 {
@@ -59,7 +59,7 @@ Higher layers override lower layers. For example, `--ssh` always wins regardless
 ```bash
 # CI/CD example
 export GIT_TOKEN=<your-access-token>
-npx aiforge --quiet
+npx @fancyliu/aiforge --quiet
 ```
 
 ## CLI Options Reference | CLI 选项参考
@@ -67,7 +67,7 @@ npx aiforge --quiet
 ### Main Command | 主命令
 
 ```bash
-npx aiforge [repo-url] [options]
+npx @fancyliu/aiforge [repo-url] [options]
 ```
 
 | Option | Type | Default | Description |
@@ -125,7 +125,7 @@ aiforge supports bilingual output:
 | `zh-CN` | 中文（默认） |
 | `en` | English |
 
-Set via `npx aiforge init` or manually in `config.json`:
+Set via `npx @fancyliu/aiforge init` or manually in `config.json`:
 
 ```jsonc
 {

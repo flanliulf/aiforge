@@ -100,10 +100,10 @@ After adding the tool and rules:
 npm test
 
 # Verify detection works
-npx aiforge list
+npx @fancyliu/aiforge --list skills
 
 # Preview installation without writing
-npx aiforge -t newtool --dry-run
+npx @fancyliu/aiforge -t newtool --dry-run
 ```
 
 ## Type Definitions Reference

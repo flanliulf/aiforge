@@ -7,7 +7,7 @@
 
 [English](README.md) | **中文**
 
-> **v2.0**：这是一个破坏性变更版本。`vscode` 工具 ID 已移除，当前支持 11 个工具，迁移说明见 [docs/migration-v2.zh.md](docs/migration-v2.zh.md)。
+> **当前 npm 发布版本：v2.0.4**。`v2.0` 是当前稳定主版本线；`vscode` 工具 ID 已归并到 Copilot，当前支持 11 个工具，迁移说明见 [docs/migration-v2.zh.md](docs/migration-v2.zh.md)。
 
 ## 简介
 
@@ -41,6 +41,16 @@
 - **通用目录** — 默认并行安装到 `.agents/` 和 `.agent/` 目录，与具体工具无关（可通过 `--no-universal` 禁用）
 - **中英双语** — 支持 `zh-CN` 和 `en` 输出语言
 
+## v2.0 更新摘要
+
+最近的 Epic 7 提交完成了 v2.0 工具矩阵与发布收尾：
+
+- 工具支持从 4 个扩展到 11 个：新增 Codex CLI、OpenCode、Auggie、Gemini CLI、Windsurf、Kiro、Antigravity、Trae，同时 `vscode` 工具 ID 归并到 Copilot。
+- 内置安装规则扩展为 55 条工具规则 + 4 条通用目录规则，并同步中英矩阵和迁移文档。
+- Codex CLI 与 OpenCode 的 MCP 处理采用更稳妥的降级策略：复制模板并输出手动合并提示，不直接改写工具自有配置。
+- 新增 Gemini CLI 版本前置检查、Windsurf `agents/` 到 `workflows/` 语义提示、Trae skills 不支持提示、iFlow 遗留目录提醒。
+- 回归测试覆盖 11 工具矩阵、检测、dry-run、规则匹配和工具特定规则。
+
 ## 快速开始
 
 ### 前置要求
@@ -51,7 +61,7 @@
 ### 首次配置
 
 ```bash
-npx aiforge init
+npx @fancyliu/aiforge init
 ```
 
 交互式引导你完成默认仓库和认证方式的配置，信息保存到 `~/.aiforge/config.json`。
@@ -60,19 +70,20 @@ npx aiforge init
 
 ```bash
 # 符号链接模式：持久化仓库 + 自动更新
-npx aiforge -g -l
+npx @fancyliu/aiforge -g -l
 ```
 
 ### 安装到当前项目
 
 ```bash
 cd your-project
-npx aiforge
+npx @fancyliu/aiforge
 ```
 
 ## 本地开发运行
 
-> **注意：** 本项目尚未发布到 npm，且包名 `aiforge` 已被 npm 上一个无关项目占用。下文所有 `npx aiforge` 命令**不会**运行本项目代码。请使用以下本地方式运行。
+npm 包名为 `@fancyliu/aiforge`。安装后的 CLI 命令仍然是 `aiforge`；如果需要在本仓库中开发或调试源码，
+请使用以下本地运行方式。
 
 ### 源码运行（推荐用于开发）
 
@@ -123,88 +134,88 @@ npm unlink -g aiforge
 ### 主命令：安装
 
 ```bash
-npx aiforge [repo-url] [options]
+npx @fancyliu/aiforge [repo-url] [options]
 ```
 
-| 参数/选项 | 说明 |
-|----------|------|
-| `repo-url` | Git 仓库 URL（可省略，使用默认仓库） |
-| `-g, --global` | 安装到用户全局目录 |
-| `-l, --link` | 使用符号链接模式 |
+| 参数/选项                | 说明                                       |
+| ------------------------ | ------------------------------------------ |
+| `repo-url`               | Git 仓库 URL（可省略，使用默认仓库）       |
+| `-g, --global`           | 安装到用户全局目录                         |
+| `-l, --link`             | 使用符号链接模式                           |
 | `-t, --tools <tools...>` | 指定目标工具（如 `copilot claude cursor`） |
-| `-d, --dirs <dirs...>` | 指定源目录（如 `skills agents`） |
-| `--dry-run` | 预览模式，不写入文件 |
-| `--quiet` | 极简输出 |
-| `--force` | 覆盖已存在文件，不备份 |
-| `--ssh` | 强制使用 SSH 协议 |
-| `--token <token>` | 使用 Personal Access Token |
-| `--clone-dir <path>` | 指定持久化克隆路径 |
-| `--list <dir>` | 列举指定顶层目录下的可安装子目录 |
-| `--filter <pattern>` | 按 glob 模式筛选子目录（如 `skills/git*`） |
-| `--no-universal` | 跳过通用目录安装（`.agents/`、`.agent/`） |
+| `-d, --dirs <dirs...>`   | 指定源目录（如 `skills agents`）           |
+| `--dry-run`              | 预览模式，不写入文件                       |
+| `--quiet`                | 极简输出                                   |
+| `--force`                | 覆盖已存在文件，不备份                     |
+| `--ssh`                  | 强制使用 SSH 协议                          |
+| `--token <token>`        | 使用 Personal Access Token                 |
+| `--clone-dir <path>`     | 指定持久化克隆路径                         |
+| `--list <dir>`           | 列举指定顶层目录下的可安装子目录           |
+| `--filter <pattern>`     | 按 glob 模式筛选子目录（如 `skills/git*`） |
+| `--no-universal`         | 跳过通用目录安装（`.agents/`、`.agent/`）  |
 
 ### 使用示例
 
 ```bash
 # 使用已配置的默认仓库
-npx aiforge
+npx @fancyliu/aiforge
 
 # 指定仓库 URL
-npx aiforge https://your-git-host.com/team/ai-configs.git
+npx @fancyliu/aiforge https://your-git-host.com/team/ai-configs.git
 
 # 全局 + 符号链接（推荐长期使用）
-npx aiforge -g -l
+npx @fancyliu/aiforge -g -l
 
 # 只安装 Skills 和 Agents 到 Copilot
-npx aiforge -t copilot -d skills agents
+npx @fancyliu/aiforge -t copilot -d skills agents
 
 # 预览安装计划
-npx aiforge --dry-run
+npx @fancyliu/aiforge --dry-run
 
 # 强制覆盖所有文件
-npx aiforge --force
+npx @fancyliu/aiforge --force
 
 # 使用 SSH 认证
-npx aiforge --ssh
+npx @fancyliu/aiforge --ssh
 
 # 列举 skills/ 下的可安装子目录
-npx aiforge --list skills
+npx @fancyliu/aiforge --list skills
 
 # 只安装匹配 glob 模式的 skills
-npx aiforge --filter "skills/git*"
+npx @fancyliu/aiforge --filter "skills/git*"
 
 # 跳过通用目录安装
-npx aiforge --no-universal
+npx @fancyliu/aiforge --no-universal
 ```
 
 ### 子命令
 
 ```bash
 # 交互式初始化配置
-npx aiforge init
+npx @fancyliu/aiforge init
 
-# 更新已持久化的仓库
-npx aiforge update
+# 重新运行持久化符号链接安装以更新克隆仓库
+npx @fancyliu/aiforge -g -l
 ```
 
 ## 支持的 AI 工具
 
 > **v2.0**：`vscode` 工具已移除，VS Code MCP 配置现由 `copilot` 项目规则管理。详见 [docs/migration-v2.zh.md](docs/migration-v2.zh.md)。
 
-| 工具 | 全局安装 | 项目安装 | 主要资源类型 | 备注 |
-|------|:--------:|:--------:|--------------|------|
-| GitHub Copilot | ✅ | ✅ | Agents、Skills、Instructions、MCP Tools | `.vscode/` 项目 MCP 文件由 Copilot 管理 |
-| Claude Code | ✅ | ✅ | Agents、Skills、Instructions | 项目 instructions 会同时写入 `.claude/` 与仓库根 |
-| Cursor | ✅ | ✅ | Agents、Skills | skills 使用 Flatten 模式 |
-| Codex CLI | ✅ | ✅ | Agents、Skills、MCP Tools | MCP 模板需要手动合并 |
-| OpenCode | ✅ | ✅ | Agents、Skills、Instructions、MCP Tools | 使用 XDG 全局路径 |
-| Auggie | ✅ | ✅ | Agents、Skills、Instructions | 项目 instructions 把 `AGENTS.md` 写到仓库根 |
-| Gemini CLI | ✅ | ✅ | Skills、Instructions | skills 需要 Gemini CLI `v0.26.0+` |
-| Windsurf | ✅ | ✅ | Skills、Rules、Agents | `agents/` 会映射到 `workflows/` 并提示 |
-| Kiro | ✅ | ✅ | Skills、Instructions | instructions 写入 `steering/` |
-| Antigravity | ✅ | ✅ | Agents、Skills | 全局路径位于 `~/.gemini/antigravity/` |
-| Trae | — | ✅ | Rules、Instructions | 明确不支持 skills |
-| 通用目录 (`.agents/`, `.agent/`) | — | ✅ | Agents、Skills | 与工具矩阵并行执行的附加路径 |
+| 工具                             | 全局安装 | 项目安装 | 主要资源类型                            | 备注                                             |
+| -------------------------------- | :------: | :------: | --------------------------------------- | ------------------------------------------------ |
+| GitHub Copilot                   |    ✅    |    ✅    | Agents、Skills、Instructions、MCP Tools | `.vscode/` 项目 MCP 文件由 Copilot 管理          |
+| Claude Code                      |    ✅    |    ✅    | Agents、Skills、Instructions            | 项目 instructions 会同时写入 `.claude/` 与仓库根 |
+| Cursor                           |    ✅    |    ✅    | Agents、Skills                          | skills 使用 Flatten 模式                         |
+| Codex CLI                        |    ✅    |    ✅    | Agents、Skills、MCP Tools               | MCP 模板需要手动合并                             |
+| OpenCode                         |    ✅    |    ✅    | Agents、Skills、Instructions、MCP Tools | 使用 XDG 全局路径                                |
+| Auggie                           |    ✅    |    ✅    | Agents、Skills、Instructions            | 项目 instructions 把 `AGENTS.md` 写到仓库根      |
+| Gemini CLI                       |    ✅    |    ✅    | Skills、Instructions                    | skills 需要 Gemini CLI `v0.26.0+`                |
+| Windsurf                         |    ✅    |    ✅    | Skills、Rules、Agents                   | `agents/` 会映射到 `workflows/` 并提示           |
+| Kiro                             |    ✅    |    ✅    | Skills、Instructions                    | instructions 写入 `steering/`                    |
+| Antigravity                      |    ✅    |    ✅    | Agents、Skills                          | 全局路径位于 `~/.gemini/antigravity/`            |
+| Trae                             |    —     |    ✅    | Rules、Instructions                     | 明确不支持 skills                                |
+| 通用目录 (`.agents/`, `.agent/`) |    —     |    ✅    | Agents、Skills                          | 与工具矩阵并行执行的附加路径                     |
 
 ### 完整安装规则矩阵
 
@@ -245,16 +256,16 @@ your-knowledge-repo/
 将文件从仓库复制到目标目录。文件作为独立副本存在，适合项目级安装。
 
 ```bash
-npx aiforge          # 项目安装，复制文件
-npx aiforge -g       # 全局安装，复制文件
+npx @fancyliu/aiforge          # 项目安装，复制文件
+npx @fancyliu/aiforge -g       # 全局安装，复制文件
 ```
 
 ### 符号链接模式
 
-将仓库持久化到本地，在目标目录创建符号链接。后续通过 `git pull` 或 `npx aiforge update` 即可自动更新。
+将仓库持久化到本地，在目标目录创建符号链接。后续在克隆目录运行 `git pull`，或重新运行 `npx @fancyliu/aiforge -g -l` 即可更新。
 
 ```bash
-npx aiforge -g -l    # 全局安装，符号链接
+npx @fancyliu/aiforge -g -l    # 全局安装，符号链接
 ```
 
 > **注意：** 符号链接模式仅支持全局安装。项目级安装始终使用复制模式。
@@ -274,19 +285,19 @@ aiforge 按以下优先级解析认证信息：
 
 ```bash
 # SSH 方式
-npx aiforge https://your-git-host.com/team/repo.git --ssh
+npx @fancyliu/aiforge https://your-git-host.com/team/repo.git --ssh
 
 # Token 方式
-npx aiforge https://your-git-host.com/team/repo.git --token <your-access-token>
+npx @fancyliu/aiforge https://your-git-host.com/team/repo.git --token <your-access-token>
 
 # 环境变量方式（适合 CI/CD）
 export GIT_TOKEN=<your-access-token>
-npx aiforge https://your-git-host.com/team/repo.git
+npx @fancyliu/aiforge https://your-git-host.com/team/repo.git
 ```
 
 ## 配置文件
 
-首次运行 `npx aiforge init` 后，配置保存在 `~/.aiforge/config.json`：
+首次运行 `npx @fancyliu/aiforge init` 后，配置保存在 `~/.aiforge/config.json`：
 
 ```jsonc
 {
@@ -297,20 +308,20 @@ npx aiforge https://your-git-host.com/team/repo.git
   "universalDirs": true,
   "auth": {
     "your-git-host.com": {
-      "method": "ssh"
-    }
-  }
+      "method": "ssh",
+    },
+  },
 }
 ```
 
-| 字段 | 说明 |
-|------|------|
-| `defaultRepo` | 默认仓库 URL（省略 repo-url 参数时使用） |
-| `preferSSH` | 全局 SSH 偏好 |
-| `cloneDir` | 持久化克隆目录路径 |
-| `language` | 输出语言：`zh-CN`（默认）或 `en` |
+| 字段            | 说明                                                    |
+| --------------- | ------------------------------------------------------- |
+| `defaultRepo`   | 默认仓库 URL（省略 repo-url 参数时使用）                |
+| `preferSSH`     | 全局 SSH 偏好                                           |
+| `cloneDir`      | 持久化克隆目录路径                                      |
+| `language`      | 输出语言：`zh-CN`（默认）或 `en`                        |
 | `universalDirs` | 启用通用目录安装（`.agents/`、`.agent/`）。默认：`true` |
-| `auth` | 按 hostname 索引的认证配置 |
+| `auth`          | 按 hostname 索引的认证配置                              |
 
 ## 项目架构
 
@@ -343,7 +354,7 @@ aiforge/
 │   │   └── install-rules.ts  # 安装规则常量
 │   └── commands/
 │       └── init.ts           # aiforge init 子命令
-├── tests/                    # 708 测试（镜像 src/ 结构）
+├── tests/                    # 976 测试（镜像 src/ 结构）
 └── dist/                     # 构建输出（ESM）
 ```
 
@@ -387,23 +398,23 @@ export const BUILTIN_RULES: InstallRule[] = [
 
 ## 技术栈
 
-| 技术 | 用途 |
-|------|------|
-| TypeScript (ESM) | 开发语言，严格模式 |
-| [tsup](https://www.npmjs.com/package/tsup) | 构建工具（esbuild-based） |
-| [commander](https://www.npmjs.com/package/commander) | CLI 参数解析 |
-| [chalk](https://www.npmjs.com/package/chalk) v5+ | 终端彩色输出 |
-| [ora](https://www.npmjs.com/package/ora) v8+ | Spinner 动画 |
-| [@inquirer/prompts](https://www.npmjs.com/package/@inquirer/prompts) | 交互式提示 |
-| [simple-git](https://www.npmjs.com/package/simple-git) ~3.32 | Git 操作封装 |
-| [vitest](https://www.npmjs.com/package/vitest) | 测试框架（708 测试） |
+| 技术                                                                 | 用途                      |
+| -------------------------------------------------------------------- | ------------------------- |
+| TypeScript (ESM)                                                     | 开发语言，严格模式        |
+| [tsup](https://www.npmjs.com/package/tsup)                           | 构建工具（esbuild-based） |
+| [commander](https://www.npmjs.com/package/commander)                 | CLI 参数解析              |
+| [chalk](https://www.npmjs.com/package/chalk) v5+                     | 终端彩色输出              |
+| [ora](https://www.npmjs.com/package/ora) v8+                         | Spinner 动画              |
+| [@inquirer/prompts](https://www.npmjs.com/package/@inquirer/prompts) | 交互式提示                |
+| [simple-git](https://www.npmjs.com/package/simple-git) ~3.32         | Git 操作封装              |
+| [vitest](https://www.npmjs.com/package/vitest)                       | 测试框架（976 测试）      |
 
 ## 兼容性
 
-| 维度 | 要求 |
-|------|------|
-| Node.js | >= 18.0.0 |
-| Git | >= 2.20 |
+| 维度     | 要求                               |
+| -------- | ---------------------------------- |
+| Node.js  | >= 18.0.0                          |
+| Git      | >= 2.20                            |
 | 操作系统 | macOS、Linux（Windows 支持计划中） |
 
 ## 文档
@@ -413,18 +424,21 @@ export const BUILTIN_RULES: InstallRule[] = [
 - [故障排除](docs/troubleshooting.zh.md) — 常见错误及解决方案
 - [扩展指南](docs/extending.zh.md) — 添加新 AI 工具支持
 - [安装规则矩阵](docs/install-rules-matrix.zh.md) — 完整规则参考
+- [v2 迁移指南](docs/migration-v2.zh.md) — `vscode` 归并到 Copilot 的升级说明
+- [npm 发布指南](docs/npm-publishing-guide.zh.md) — npm 构建、发布、验证与常见问题手册
+- [变更日志](CHANGELOG.md) — 发布历史与重要变更
 
 ## 版本号规则
 
-aiforge 遵循 [语义化版本](https://semver.org/)，当前已进入稳定的 `1.x` 主线：
+aiforge 遵循 [语义化版本](https://semver.org/)，当前已进入稳定的 `2.x` 主线：
 
-| 版本 | 触发场景 | 示例 |
-|------|---------|------|
-| `v1.x.y` | 向后兼容的修复与小幅改进 | `v1.0.1` — bug 修复 |
-| `v1.y.0` | 向后兼容的新功能发布 | `v1.1.0` — 下一个 milestone |
-| `v2.0.0` | 存在破坏性变更 | `v2.0.0` — 下一条主版本线 |
+| 版本     | 触发场景                               | 示例                        |
+| -------- | -------------------------------------- | --------------------------- |
+| `v2.x.y` | 当前主版本线上的向后兼容修复与小幅改进 | `v2.0.4` — bug 修复         |
+| `v2.y.0` | 向后兼容的新功能发布                   | `v2.1.0` — 下一个 milestone |
+| `v3.0.0` | 存在破坏性变更                         | `v3.0.0` — 下一条主版本线   |
 
-当前基线版本为 `v1.0.0`，表示核心产品范围已经完成，进入首个稳定版本。
+当前 npm 发布版本为 `v2.0.4`。`2.x` 基线始于 `v2.0.0`，这是移除 `vscode` 工具 ID、扩展到 11 工具、并将 VS Code 项目级 MCP 处理归并到 Copilot 的破坏性变更版本。
 
 ## AI 辅助配置
 
@@ -435,26 +449,29 @@ aiforge 遵循 [语义化版本](https://semver.org/)，当前已进入稳定的
 > 我需要在本机首次配置 **aiforge**（一个 AI 编码配置安装 CLI 工具）。
 >
 > 背景信息：
+>
 > - aiforge 通过 `npx` 运行（无需全局安装），要求 Node.js >= 18、Git >= 2.20
 > - 配置文件存储在 `~/.aiforge/config.json`
 > - 我们团队的知识仓库地址是：`<在此粘贴你的仓库 URL>`
 > - 认证方式：SSH / Token（选一个）
 >
 > 请按顺序执行以下步骤：
+>
 > 1. 检查前置条件：确认 `node -v`（>= 18）和 `git -v`（>= 2.20）
-> 2. 运行 `npx aiforge init`，引导我完成交互式配置
-> 3. 运行 `npx aiforge -g -l --dry-run` 预览全局符号链接安装计划
-> 4. 如果预览结果正确，运行 `npx aiforge -g -l` 执行安装
-> 5. 展示安装摘要，并用 `npx aiforge list` 验证结果
+> 2. 运行 `npx @fancyliu/aiforge init`，引导我完成交互式配置
+> 3. 运行 `npx @fancyliu/aiforge -g -l --dry-run` 预览全局符号链接安装计划
+> 4. 如果预览结果正确，运行 `npx @fancyliu/aiforge -g -l` 执行安装
+> 5. 展示安装摘要，并用 `npx @fancyliu/aiforge --list skills` 验证可用 skills
 >
 > 如果任何步骤失败，先展示完整的错误输出并给出修复建议，再继续下一步。
 
 ### 项目级安装
 
 > 为当前项目配置 **aiforge**，请按以下步骤执行：
-> 1. 运行 `npx aiforge --dry-run` 预览将要安装的内容
+>
+> 1. 运行 `npx @fancyliu/aiforge --dry-run` 预览将要安装的内容
 > 2. 展示文件列表和目标路径，等我确认
-> 3. 运行 `npx aiforge` 执行安装
+> 3. 运行 `npx @fancyliu/aiforge` 执行安装
 > 4. 展示已安装/已更新/已跳过的文件摘要
 >
 > 除非我明确要求，否则不要使用 `--force`。
@@ -462,8 +479,9 @@ aiforge 遵循 [语义化版本](https://semver.org/)，当前已进入稳定的
 ### 排查问题
 
 > 我在使用 **aiforge** 时遇到了问题，请帮我诊断：
-> 1. 运行 `npx aiforge --version` 记录版本号
-> 2. 运行 `npx aiforge --dry-run` 检查输出中是否有错误
+>
+> 1. 运行 `npx @fancyliu/aiforge --version` 记录版本号
+> 2. 运行 `npx @fancyliu/aiforge --dry-run` 检查输出中是否有错误
 > 3. 检查 `~/.aiforge/config.json` 是否存在配置问题
 > 4. 如果是认证相关错误，用 `ssh -T git@<host>` 或 `git ls-remote <repo-url>` 测试
 > 5. 汇总发现并给出修复建议
@@ -472,17 +490,17 @@ aiforge 遵循 [语义化版本](https://semver.org/)，当前已进入稳定的
 
 ## 提交 Issue
 
-发现 Bug 或有功能建议？请在 GitLab 上[创建 Issue](https://gitlab.wshmi.com/chunxiao/aiforge/-/issues/new)。
+发现 Bug 或有功能建议？请通过你所在团队配置的项目跟踪系统提交。
 
 为了帮助我们快速定位问题，请在 Issue 中包含以下信息：
 
-1. **aiforge 版本** — `npx aiforge --version`
+1. **aiforge 版本** — `npx @fancyliu/aiforge --version`
 2. **运行环境** — 操作系统、Node.js 版本（`node -v`）、Git 版本（`git -v`）
 3. **复现步骤** — 你执行的完整命令
 4. **期望 vs 实际行为** — 你期望发生什么，实际发生了什么
 5. **错误输出** — 完整的三段式错误提示（如有）
 
-> **提示：** 运行 `npx aiforge --dry-run` 并附上输出，可以帮助我们在不产生副作用的情况下诊断安装规则问题。
+> **提示：** 运行 `npx @fancyliu/aiforge --dry-run` 并附上输出，可以帮助我们在不产生副作用的情况下诊断安装规则问题。
 
 ### Issue 模板
 
@@ -490,6 +508,7 @@ aiforge 遵循 [语义化版本](https://semver.org/)，当前已进入稳定的
 **类型：** Bug / 功能建议
 
 **运行环境：**
+
 - aiforge: <版本号>
 - Node.js: <版本号>
 - Git: <版本号>
@@ -499,7 +518,8 @@ aiforge 遵循 [语义化版本](https://semver.org/)，当前已进入稳定的
 <清晰描述问题或功能建议>
 
 **复现步骤：**（仅 Bug）
-1. 运行 `npx aiforge ...`
+
+1. 运行 `npx @fancyliu/aiforge ...`
 2. ...
 
 **期望行为：**
@@ -512,7 +532,7 @@ aiforge 遵循 [语义化版本](https://semver.org/)，当前已进入稳定的
 <粘贴完整的三段式错误提示>
 
 **Dry-run 输出：**（如有）
-<粘贴 `npx aiforge --dry-run` 的输出>
+<粘贴 `npx @fancyliu/aiforge --dry-run` 的输出>
 ```
 
 ### AI 辅助撰写 Issue
@@ -528,7 +548,7 @@ aiforge 遵循 [语义化版本](https://semver.org/)，当前已进入稳定的
 > 5. 复现步骤（仅 Bug）：编号列出确切命令
 > 6. 期望 vs 实际行为：明确区分
 > 7. 错误输出：如有，粘贴完整的三段式错误提示（发生了什么 / 为什么 / 怎么修）
-> 8. Dry-run 输出：如果与安装规则相关，附上 `npx aiforge --dry-run` 的输出
+> 8. Dry-run 输出：如果与安装规则相关，附上 `npx @fancyliu/aiforge --dry-run` 的输出
 >
 > 保持客观陈述，不要猜测根因，只包含可验证的信息。
 

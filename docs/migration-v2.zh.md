@@ -55,7 +55,7 @@ mkdir -p ~/.copilot/
 4. 使用新的工具 ID 重新执行安装：
 
 ```bash
-npx aiforge --tools copilot
+npx @fancyliu/aiforge --tools copilot
 ```
 
 5. 验证项目级 MCP 文件是否写入 `.vscode/`。
@@ -68,18 +68,18 @@ npm install
 npm run build
 
 # 正式写入前先预览
-npx aiforge --dry-run
+npx @fancyliu/aiforge --dry-run
 
 # 面向 VS Code 旧用户的定向迁移
-npx aiforge --tools copilot --dry-run
-npx aiforge --tools copilot
+npx @fancyliu/aiforge --tools copilot --dry-run
+npx @fancyliu/aiforge --tools copilot
 ```
 
 ### 回滚命令
 
 ```bash
 # 如需对照旧版本行为，可临时查看上一个大版本
-npx aiforge@1 --help
+npx @fancyliu/aiforge@1 --help
 
 # 如果本地测试改动了构建产物，可清理后重建
 rm -rf dist
@@ -147,4 +147,4 @@ A：因为它们的正式配置文件需要与工具自管配置合并，aiforge
 
 **Q：有没有不写文件的迁移验证方式？**
 
-A：有。先执行 `npx aiforge --dry-run`，或者执行 `npx aiforge --tools <tool> --dry-run`。
+A：有。先执行 `npx @fancyliu/aiforge --dry-run`，或者执行 `npx @fancyliu/aiforge --tools <tool> --dry-run`。

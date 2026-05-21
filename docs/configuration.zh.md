@@ -4,7 +4,7 @@
 
 位置：`~/.aiforge/config.json`
 
-由 `npx aiforge init` 创建。文件权限：`0o600`（仅用户可读写）。
+由 `npx @fancyliu/aiforge init` 创建。文件权限：`0o600`（仅用户可读写）。
 
 ```jsonc
 {
@@ -59,7 +59,7 @@ aiforge 按以下顺序解析认证信息：
 ```bash
 # CI/CD 示例
 export GIT_TOKEN=<your-access-token>
-npx aiforge --quiet
+npx @fancyliu/aiforge --quiet
 ```
 
 ## CLI 选项参考
@@ -67,7 +67,7 @@ npx aiforge --quiet
 ### 主命令
 
 ```bash
-npx aiforge [repo-url] [options]
+npx @fancyliu/aiforge [repo-url] [options]
 ```
 
 | 选项 | 类型 | 默认值 | 说明 |
@@ -125,7 +125,7 @@ aiforge 支持双语输出：
 | `zh-CN` | 中文（默认） |
 | `en` | English |
 
-通过 `npx aiforge init` 设置，或手动修改 `config.json`：
+通过 `npx @fancyliu/aiforge init` 设置，或手动修改 `config.json`：
 
 ```jsonc
 {

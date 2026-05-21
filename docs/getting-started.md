@@ -21,7 +21,7 @@ git --version    # Should print git version 2.20 or higher
 Run the interactive setup wizard:
 
 ```bash
-npx aiforge init
+npx @fancyliu/aiforge init
 ```
 
 The wizard will ask you:
@@ -41,10 +41,10 @@ Before making any changes, preview what aiforge will install:
 
 ```bash
 # Preview project-level installation
-npx aiforge --dry-run
+npx @fancyliu/aiforge --dry-run
 
 # Preview global installation
-npx aiforge -g --dry-run
+npx @fancyliu/aiforge -g --dry-run
 ```
 
 The dry-run output shows:
@@ -60,7 +60,7 @@ Installs configurations to your current project directory:
 
 ```bash
 cd your-project
-npx aiforge
+npx @fancyliu/aiforge
 ```
 
 Files are **copied** into your project (e.g., `.github/agents/`, `.claude/skills/`). These are independent snapshots — changes to the knowledge repo don't affect installed files until you re-run aiforge.
@@ -71,16 +71,16 @@ Installs to your user-level tool directories:
 
 ```bash
 # Copy mode (snapshot)
-npx aiforge -g
+npx @fancyliu/aiforge -g
 
 # Symlink mode (recommended — auto-updates with git pull)
-npx aiforge -g -l
+npx @fancyliu/aiforge -g -l
 ```
 
 **Symlink mode** (`-l`) is recommended for global installs because:
 - The knowledge repo is cloned and persisted locally
 - Target directories get symlinks pointing to the cloned files
-- Running `git pull` in the clone directory or `npx aiforge update` instantly updates all tools
+- Running `git pull` in the clone directory or re-running `npx @fancyliu/aiforge -g -l` instantly updates all tools
 
 ## Step 4: Verify
 
@@ -99,7 +99,7 @@ Open your AI tool (e.g., VS Code with Copilot) and verify the configurations are
 
 ## Local Development
 
-> **Note:** This package has NOT been published to npm, and the name `aiforge` is already taken on the npm registry. All `npx aiforge` commands above will **not** run this project's code. Use the following local methods instead.
+The npm package is published as `@fancyliu/aiforge`. The installed CLI command remains `aiforge`; use the following commands only when developing from a local checkout.
 
 ### Run from Source (Recommended)
 
@@ -148,27 +148,27 @@ npm unlink -g aiforge
 
 ```bash
 # Only install Skills and Agents
-npx aiforge -d skills agents
+npx @fancyliu/aiforge -d skills agents
 
 # Only install to Copilot
-npx aiforge -t copilot
+npx @fancyliu/aiforge -t copilot
 ```
 
 ### Scenario 2: Browse and Select Specific Subdirectories
 
 ```bash
 # List all installable subdirectories under skills/
-npx aiforge --list skills
+npx @fancyliu/aiforge --list skills
 
 # Install only skills matching a pattern
-npx aiforge --filter "skills/git*"
+npx @fancyliu/aiforge --filter "skills/git*"
 ```
 
 ### Scenario 3: Different Repository per Project
 
 ```bash
 # Use a specific repository for this project
-npx aiforge https://your-git-host.com/team-b/special-configs.git
+npx @fancyliu/aiforge https://your-git-host.com/team-b/special-configs.git
 ```
 
 ### Scenario 4: CI/CD Pipeline
@@ -176,14 +176,14 @@ npx aiforge https://your-git-host.com/team-b/special-configs.git
 ```bash
 # Use environment variable for authentication
 export GIT_TOKEN=<your-access-token>
-npx aiforge --quiet
+npx @fancyliu/aiforge --quiet
 ```
 
 ### Scenario 5: Force Update Everything
 
 ```bash
 # Overwrite all existing files without confirmation
-npx aiforge --force
+npx @fancyliu/aiforge --force
 ```
 
 ## Next Steps

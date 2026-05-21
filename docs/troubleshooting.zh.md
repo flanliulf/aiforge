@@ -8,7 +8,7 @@ aiforge 使用**三段式错误格式**：
 ❌ 发生了什么                ← What went wrong
    为什么                    ← Why it happened
    怎么修：                  ← How to fix
-     → npx aiforge --ssh     ← 可复制的修复命令
+     → npx @fancyliu/aiforge --ssh     ← 可复制的修复命令
 ```
 
 仔细阅读每一部分 — "怎么修" 通常包含解决问题的确切命令。
@@ -23,9 +23,9 @@ aiforge 使用**三段式错误格式**：
 ```
 ❌ Cannot access repository
    Git server returned 401 (authentication failed)
-   → npx aiforge --ssh
-   → npx aiforge --token <your-access-token>
-   → npx aiforge init
+   → npx @fancyliu/aiforge --ssh
+   → npx @fancyliu/aiforge --token <your-access-token>
+   → npx @fancyliu/aiforge init
 ```
 
 **解决方案：**
@@ -42,21 +42,21 @@ aiforge 使用**三段式错误格式**：
 2. **尝试不同的认证方式：**
    ```bash
    # 强制使用 SSH
-   npx aiforge --ssh
+   npx @fancyliu/aiforge --ssh
 
    # 使用显式 Token
-   npx aiforge --token <your-access-token>
+   npx @fancyliu/aiforge --token <your-access-token>
    ```
 
 3. **重新运行 init 进行配置：**
    ```bash
-   npx aiforge init
+   npx @fancyliu/aiforge init
    ```
 
 4. **CI/CD 环境使用环境变量：**
    ```bash
    export GIT_TOKEN=<your-access-token>
-   npx aiforge
+   npx @fancyliu/aiforge
    ```
 
 ---
@@ -89,7 +89,7 @@ aiforge 使用**三段式错误格式**：
 4. **清除缓存克隆并重试：**
    ```bash
    rm -rf ~/.aiforge/repos/<repo-name>
-   npx aiforge
+   npx @fancyliu/aiforge
    ```
 
 ---
@@ -109,7 +109,7 @@ aiforge 使用**三段式错误格式**：
 rm /path/to/target
 
 # 重新安装
-npx aiforge
+npx @fancyliu/aiforge
 ```
 
 ---
@@ -150,7 +150,7 @@ npx aiforge
 
 2. **手动指定工具：**
    ```bash
-   npx aiforge -t copilot claude
+   npx @fancyliu/aiforge -t copilot claude
    ```
 
 3. **对于项目级检测**，确保你在包含工具配置目录（如 `.github/`、`.claude/`）的项目目录中。
@@ -173,10 +173,10 @@ npx aiforge
 2. **使用简单目录名**（不含路径分隔符）：
    ```bash
    # 正确
-   npx aiforge --list skills
+   npx @fancyliu/aiforge --list skills
 
    # 错误
-   npx aiforge --list skills/code-review
+   npx @fancyliu/aiforge --list skills/code-review
    ```
 
 ---
@@ -192,7 +192,7 @@ npx aiforge
 
 **解决方案：** 提供简单的顶层目录名：
 ```bash
-npx aiforge --list skills
+npx @fancyliu/aiforge --list skills
 ```
 
 ---
@@ -210,12 +210,12 @@ npx aiforge --list skills
 
 1. **先浏览可用的子目录：**
    ```bash
-   npx aiforge --list skills
+   npx @fancyliu/aiforge --list skills
    ```
 
 2. **检查 glob 模式** — 支持的通配符：`*`（任意字符串）、`?`（单个字符）：
    ```bash
-   npx aiforge --filter "skills/code*"
+   npx @fancyliu/aiforge --filter "skills/code*"
    ```
 
 ---
@@ -239,7 +239,7 @@ npx aiforge --list skills
 
 ```bash
 export GIT_TOKEN=<your-access-token>
-npx aiforge --quiet
+npx @fancyliu/aiforge --quiet
 ```
 
 CI/CD 关键参数：
@@ -257,14 +257,14 @@ CI/CD 关键参数：
 }
 ```
 
-或重新运行 `npx aiforge init` 选择语言。
+或重新运行 `npx @fancyliu/aiforge init` 选择语言。
 
 ### 问：符号链接和复制模式有什么区别？
 
 | 方面 | 复制模式 | 符号链接模式（`-l`） |
 |------|---------|---------------------|
 | 文件独立性 | 文件为独立副本 | 链接指向克隆仓库 |
-| 更新方式 | 重新运行 `npx aiforge` | `git pull` 或 `npx aiforge update` |
+| 更新方式 | 重新运行 `npx @fancyliu/aiforge` | `git pull` 或重新运行 `npx @fancyliu/aiforge -g -l` |
 | 适用范围 | 全局 + 项目 | **仅限全局** |
 | 磁盘占用 | 文件重复存储 | 单一来源，多处链接 |
 | 适合场景 | 项目级配置 | 长期全局配置 |

@@ -5,9 +5,9 @@
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**English** | [中文](README.zh.md)
+**English** | [中文](https://cdn.jsdelivr.net/npm/@fancyliu/aiforge@latest/README.zh.md)
 
-> **v2.0**: Breaking change release. The `vscode` tool ID has been removed, support now covers 11 tools, and migration guidance is available in [docs/migration-v2.md](docs/migration-v2.md).
+> **Current npm release: v2.0.4**. The `v2.0` line is the current stable major line; `vscode` has been merged into Copilot, support now covers 11 tools, and migration guidance is available in [docs/migration-v2.md](docs/migration-v2.md).
 
 ## What is aiforge?
 
@@ -41,6 +41,16 @@ Knowledge Repo (Git)            aiforge              Local AI Tools
 - **Universal directories** — Parallel install to `.agents/` and `.agent/` for tool-agnostic access (opt-out via `--no-universal`)
 - **Bilingual output** — Chinese and English interface (`zh-CN` / `en`)
 
+## v2.0 Highlights
+
+Recent Epic 7 commits completed the v2.0 tool matrix and release wrap-up:
+
+- Tool coverage expanded from 4 to 11 tools: Codex CLI, OpenCode, Auggie, Gemini CLI, Windsurf, Kiro, Antigravity, and Trae were added while the `vscode` tool ID was merged into Copilot.
+- Built-in install rules now cover 55 tool-specific rules plus 4 universal directory rules, with bilingual matrix and migration documentation.
+- Codex CLI and OpenCode use a safer MCP downgrade strategy: aiforge copies template files and prints manual merge guidance instead of mutating tool-owned config directly.
+- Tool-specific safeguards cover Gemini CLI version checks, Windsurf `agents/` to `workflows/` warnings, Trae skills unsupported notices, and stale iFlow detection.
+- Regression coverage now includes the 11-tool matrix, detection, dry-run, rule matching, and tool-specific rule behavior.
+
 ## Quick Start
 
 ### Prerequisites
@@ -51,7 +61,7 @@ Knowledge Repo (Git)            aiforge              Local AI Tools
 ### First-time Setup
 
 ```bash
-npx aiforge init
+npx @fancyliu/aiforge init
 ```
 
 Interactive wizard guides you through configuring your default repository and authentication method. Settings are saved to `~/.aiforge/config.json`.
@@ -60,19 +70,19 @@ Interactive wizard guides you through configuring your default repository and au
 
 ```bash
 # Symlink mode: persistent repo + auto-updates via git pull
-npx aiforge -g -l
+npx @fancyliu/aiforge -g -l
 ```
 
 ### Install to Current Project
 
 ```bash
 cd your-project
-npx aiforge
+npx @fancyliu/aiforge
 ```
 
 ## Local Development
 
-> **Note:** This package has NOT been published to npm, and the name `aiforge` is already taken by an unrelated project on the npm registry. All `npx aiforge` commands shown below will **not** run this project's code. Use the following local methods instead.
+The npm package is published as `@fancyliu/aiforge`. The installed CLI command remains `aiforge`; for local source changes, use the development commands below.
 
 ### Run from Source (Recommended for Development)
 
@@ -123,7 +133,7 @@ npm unlink -g aiforge
 ### Main Command
 
 ```bash
-npx aiforge [repo-url] [options]
+npx @fancyliu/aiforge [repo-url] [options]
 ```
 
 | Option | Description |
@@ -147,44 +157,44 @@ npx aiforge [repo-url] [options]
 
 ```bash
 # Use configured default repository
-npx aiforge
+npx @fancyliu/aiforge
 
 # Specify a repository URL
-npx aiforge https://your-git-host.com/team/ai-configs.git
+npx @fancyliu/aiforge https://your-git-host.com/team/ai-configs.git
 
 # Global install with symlinks (recommended for long-term use)
-npx aiforge -g -l
+npx @fancyliu/aiforge -g -l
 
 # Install only Skills and Agents for Copilot
-npx aiforge -t copilot -d skills agents
+npx @fancyliu/aiforge -t copilot -d skills agents
 
 # Preview what would be installed
-npx aiforge --dry-run
+npx @fancyliu/aiforge --dry-run
 
 # Force overwrite all existing files
-npx aiforge --force
+npx @fancyliu/aiforge --force
 
 # Use SSH authentication
-npx aiforge --ssh
+npx @fancyliu/aiforge --ssh
 
 # List installable subdirectories under skills/
-npx aiforge --list skills
+npx @fancyliu/aiforge --list skills
 
 # Install only skills matching a glob pattern
-npx aiforge --filter "skills/git*"
+npx @fancyliu/aiforge --filter "skills/git*"
 
 # Skip universal directory installation
-npx aiforge --no-universal
+npx @fancyliu/aiforge --no-universal
 ```
 
 ### Subcommands
 
 ```bash
 # Interactive initial configuration
-npx aiforge init
+npx @fancyliu/aiforge init
 
-# Update a previously cloned repository
-npx aiforge update
+# Re-run a persisted symlink install to update the cloned repository
+npx @fancyliu/aiforge -g -l
 ```
 
 ## Supported AI Tools
@@ -245,16 +255,16 @@ your-knowledge-repo/
 Copies files from the repository to target directories. Files are independent snapshots.
 
 ```bash
-npx aiforge          # Project install, copy mode
-npx aiforge -g       # Global install, copy mode
+npx @fancyliu/aiforge          # Project install, copy mode
+npx @fancyliu/aiforge -g       # Global install, copy mode
 ```
 
 ### Symlink Mode
 
-Persists the repository locally and creates symlinks in target directories. Updates automatically when you run `git pull` or `npx aiforge update`.
+Persists the repository locally and creates symlinks in target directories. Updates automatically when you run `git pull` in the clone directory or re-run `npx @fancyliu/aiforge -g -l`.
 
 ```bash
-npx aiforge -g -l    # Global install, symlink mode
+npx @fancyliu/aiforge -g -l    # Global install, symlink mode
 ```
 
 > **Note:** Symlink mode is available for global installs only. Project-level installs always use copy mode.
@@ -274,19 +284,19 @@ aiforge resolves authentication in the following priority order:
 
 ```bash
 # SSH authentication
-npx aiforge https://your-git-host.com/team/repo.git --ssh
+npx @fancyliu/aiforge https://your-git-host.com/team/repo.git --ssh
 
 # Token authentication
-npx aiforge https://your-git-host.com/team/repo.git --token <your-access-token>
+npx @fancyliu/aiforge https://your-git-host.com/team/repo.git --token <your-access-token>
 
 # Environment variable (recommended for CI/CD)
 export GIT_TOKEN=<your-access-token>
-npx aiforge https://your-git-host.com/team/repo.git
+npx @fancyliu/aiforge https://your-git-host.com/team/repo.git
 ```
 
 ## Configuration
 
-After running `npx aiforge init`, settings are saved to `~/.aiforge/config.json`:
+After running `npx @fancyliu/aiforge init`, settings are saved to `~/.aiforge/config.json`:
 
 ```jsonc
 {
@@ -327,18 +337,21 @@ After running `npx aiforge init`, settings are saved to `~/.aiforge/config.json`
 - [Troubleshooting](docs/troubleshooting.md) — Common errors and solutions
 - [Extending aiforge](docs/extending.md) — Adding support for new AI tools
 - [Install Rules Matrix](docs/install-rules-matrix.md) — Complete rule reference
+- [Migration v2](docs/migration-v2.md) — Upgrade guide for the `vscode` to Copilot merge
+- [npm Publishing Guide](docs/npm-publishing-guide.zh.md) — Maintainer guide for npm build, publish, verification, and common release issues
+- [Changelog](CHANGELOG.md) — Release history and notable changes
 
 ## Versioning
 
-aiforge follows [Semantic Versioning](https://semver.org/) and is now in the stable `1.x` line:
+aiforge follows [Semantic Versioning](https://semver.org/) and is now in the stable `2.x` line:
 
 | Version | Trigger | Example |
 |---------|---------|---------|
-| `v1.x.y` | Backward-compatible fixes and improvements | `v1.0.1` — bug fix |
-| `v1.y.0` | Backward-compatible feature release | `v1.1.0` — next milestone |
-| `v2.0.0` | Breaking changes | `v2.0.0` — next major line |
+| `v2.x.y` | Backward-compatible fixes and improvements on the current major line | `v2.0.4` — bug fix |
+| `v2.y.0` | Backward-compatible feature release | `v2.1.0` — next milestone |
+| `v3.0.0` | Breaking changes | `v3.0.0` — next major line |
 
-Current baseline: `v1.0.0`, which marks the first stable release after completing the core product scope.
+Current npm release: `v2.0.4`. The `2.x` baseline starts at `v2.0.0`, the breaking release that removes the `vscode` tool ID, expands support to 11 tools, and moves VS Code project MCP handling under Copilot.
 
 ## AI-Assisted Setup
 
@@ -356,19 +369,19 @@ If you use an AI assistant (e.g., Copilot, Claude, Cursor) in your terminal or I
 >
 > Please run the following steps in order:
 > 1. Verify prerequisites: check `node -v` (>= 18) and `git -v` (>= 2.20)
-> 2. Run `npx aiforge init` and guide me through the interactive setup
-> 3. Run `npx aiforge -g -l --dry-run` to preview the global symlink installation plan
-> 4. If the preview looks correct, run `npx aiforge -g -l` to install
-> 5. Show the installation summary and verify with `npx aiforge list`
+> 2. Run `npx @fancyliu/aiforge init` and guide me through the interactive setup
+> 3. Run `npx @fancyliu/aiforge -g -l --dry-run` to preview the global symlink installation plan
+> 4. If the preview looks correct, run `npx @fancyliu/aiforge -g -l` to install
+> 5. Show the installation summary and verify available skills with `npx @fancyliu/aiforge --list skills`
 >
 > If any step fails, show the full error output and suggest a fix before proceeding.
 
 ### Project-Level Install
 
 > Set up **aiforge** for the current project. Run these steps:
-> 1. Run `npx aiforge --dry-run` to preview what will be installed
+> 1. Run `npx @fancyliu/aiforge --dry-run` to preview what will be installed
 > 2. Show me the file list and target paths, ask for confirmation
-> 3. Run `npx aiforge` to install
+> 3. Run `npx @fancyliu/aiforge` to install
 > 4. Show the summary of installed/updated/skipped files
 >
 > Do NOT use `--force` unless I explicitly ask for it.
@@ -376,8 +389,8 @@ If you use an AI assistant (e.g., Copilot, Claude, Cursor) in your terminal or I
 ### Troubleshooting
 
 > I'm having an issue with **aiforge**. Help me diagnose it:
-> 1. Run `npx aiforge --version` and record the version
-> 2. Run `npx aiforge --dry-run` and check for errors in the output
+> 1. Run `npx @fancyliu/aiforge --version` and record the version
+> 2. Run `npx @fancyliu/aiforge --dry-run` and check for errors in the output
 > 3. Check `~/.aiforge/config.json` for configuration issues
 > 4. If the error is authentication-related, test with `ssh -T git@<host>` or `git ls-remote <repo-url>`
 > 5. Summarize the findings and suggest a fix
@@ -386,17 +399,17 @@ If you use an AI assistant (e.g., Copilot, Claude, Cursor) in your terminal or I
 
 ## Reporting Issues
 
-Found a bug or have a feature request? Please [open an issue](https://gitlab.wshmi.com/chunxiao/aiforge/-/issues/new) on GitLab.
+Found a bug or have a feature request? Please report it through your team's configured project tracker.
 
 To help us resolve the issue quickly, please include:
 
-1. **aiforge version** — `npx aiforge --version`
+1. **aiforge version** — `npx @fancyliu/aiforge --version`
 2. **Environment** — OS, Node.js version (`node -v`), Git version (`git -v`)
 3. **Steps to reproduce** — Exact commands you ran
 4. **Expected vs actual behavior** — What you expected to happen and what actually happened
 5. **Error output** — Full three-part error message (if applicable)
 
-> **Tip:** Running `npx aiforge --dry-run` and attaching the output can help us diagnose installation rule issues without any side effects.
+> **Tip:** Running `npx @fancyliu/aiforge --dry-run` and attaching the output can help us diagnose installation rule issues without any side effects.
 
 ### Issue Template
 
@@ -413,7 +426,7 @@ To help us resolve the issue quickly, please include:
 <Clear description of the problem or feature request>
 
 **Steps to Reproduce:** (Bug only)
-1. Run `npx aiforge ...`
+1. Run `npx @fancyliu/aiforge ...`
 2. ...
 
 **Expected Behavior:**
@@ -426,7 +439,7 @@ To help us resolve the issue quickly, please include:
 <Paste the full three-part error message here>
 
 **Dry-run Output:** (if applicable)
-<Paste the output of `npx aiforge --dry-run` here>
+<Paste the output of `npx @fancyliu/aiforge --dry-run` here>
 ```
 
 ### AI-Assisted Issue Writing
@@ -442,7 +455,7 @@ If you use an AI assistant (e.g., Copilot, Claude, Cursor) to help draft issues,
 > 5. Steps to Reproduce (bugs only): numbered list of exact commands
 > 6. Expected vs Actual Behavior: clearly separated
 > 7. Error Output: full three-part error (What / Why / How to fix) if available
-> 8. Dry-run Output: output of `npx aiforge --dry-run` if relevant to install rules
+> 8. Dry-run Output: output of `npx @fancyliu/aiforge --dry-run` if relevant to install rules
 >
 > Keep the tone factual, avoid speculation on root cause, and include only verifiable information.
 

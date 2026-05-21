@@ -55,7 +55,7 @@ mkdir -p ~/.copilot/
 4. Re-run installation with the new tool ID:
 
 ```bash
-npx aiforge --tools copilot
+npx @fancyliu/aiforge --tools copilot
 ```
 
 5. Verify that project-level MCP files land in `.vscode/`.
@@ -68,18 +68,18 @@ npm install
 npm run build
 
 # preview before writing
-npx aiforge --dry-run
+npx @fancyliu/aiforge --dry-run
 
 # targeted migration for VS Code users
-npx aiforge --tools copilot --dry-run
-npx aiforge --tools copilot
+npx @fancyliu/aiforge --tools copilot --dry-run
+npx @fancyliu/aiforge --tools copilot
 ```
 
 ### Rollback Commands
 
 ```bash
 # run the previous major locally if you still need v1 behavior for comparison
-npx aiforge@1 --help
+npx @fancyliu/aiforge@1 --help
 
 # clean and rebuild this repo if a local test run changed build output
 rm -rf dist
@@ -147,4 +147,4 @@ A: Their production config formats require merging into existing tool-owned conf
 
 **Q: Can I validate the migration without writing files?**
 
-A: Yes. Run `npx aiforge --dry-run` or `npx aiforge --tools <tool> --dry-run` first.
+A: Yes. Run `npx @fancyliu/aiforge --dry-run` or `npx @fancyliu/aiforge --tools <tool> --dry-run` first.

@@ -100,10 +100,10 @@ export const BUILTIN_RULES: InstallRule[] = [
 npm test
 
 # 验证检测功能
-npx aiforge list
+npx @fancyliu/aiforge --list skills
 
 # 预览安装（不实际写入）
-npx aiforge -t newtool --dry-run
+npx @fancyliu/aiforge -t newtool --dry-run
 ```
 
 ## 类型定义参考

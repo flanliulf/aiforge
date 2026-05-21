@@ -19,7 +19,7 @@ git --version    # 应输出 git version 2.20 或更高
 运行交互式设置向导：
 
 ```bash
-npx aiforge init
+npx @fancyliu/aiforge init
 ```
 
 向导会引导你完成：
@@ -39,10 +39,10 @@ npx aiforge init
 
 ```bash
 # 预览项目级安装
-npx aiforge --dry-run
+npx @fancyliu/aiforge --dry-run
 
 # 预览全局安装
-npx aiforge -g --dry-run
+npx @fancyliu/aiforge -g --dry-run
 ```
 
 预览输出会展示：
@@ -58,7 +58,7 @@ npx aiforge -g --dry-run
 
 ```bash
 cd your-project
-npx aiforge
+npx @fancyliu/aiforge
 ```
 
 文件以**复制**方式放入项目（如 `.github/agents/`、`.claude/skills/`）。这些是独立副本 — 知识仓库的变更不会影响已安装的文件，除非重新运行 aiforge。
@@ -69,16 +69,16 @@ npx aiforge
 
 ```bash
 # 复制模式（快照）
-npx aiforge -g
+npx @fancyliu/aiforge -g
 
 # 符号链接模式（推荐 — git pull 自动更新）
-npx aiforge -g -l
+npx @fancyliu/aiforge -g -l
 ```
 
 **符号链接模式**（`-l`）推荐用于全局安装，因为：
 - 知识仓库会被克隆并持久化到本地
 - 目标目录通过符号链接指向克隆的文件
-- 运行 `git pull` 或 `npx aiforge update` 即可立即更新所有工具
+- 在克隆目录运行 `git pull`，或重新运行 `npx @fancyliu/aiforge -g -l` 即可立即更新所有工具
 
 ## 第四步：验证
 
@@ -101,22 +101,22 @@ npx aiforge -g -l
 
 ```bash
 # 1. 初始化（选 SSH，输入你的 Git 仓库地址）
-npx aiforge init
+npx @fancyliu/aiforge init
 
 # 2. 全局安装 + 符号链接
-npx aiforge -g -l
+npx @fancyliu/aiforge -g -l
 
 # 3. 验证（可选）
-npx aiforge --dry-run
+npx @fancyliu/aiforge --dry-run
 ```
 
-> **本地开发？** 项目未发布到 npm，请将上述 `npx aiforge` 替换为 `npm run dev --`，例如 `npm run dev -- init`。详见下方[本地开发运行](#本地开发运行)章节。
+> **本地开发？** 如果你正在本仓库中调试源码，请将上述 `npx @fancyliu/aiforge` 替换为 `npm run dev --`，例如 `npm run dev -- init`。详见下方[本地开发运行](#本地开发运行)章节。
 
 遇到认证问题？查看 [故障排除](troubleshooting.zh.md)。
 
 ## 本地开发运行
 
-> **注意：** 本项目尚未发布到 npm，且包名 `aiforge` 已被 npm 上一个无关项目占用。上文所有 `npx aiforge` 命令**不会**运行本项目代码。请使用以下本地方式运行。
+npm 包名为 `@fancyliu/aiforge`。安装后的 CLI 命令仍然是 `aiforge`；以下命令仅用于在本地 checkout 中开发或调试源码。
 
 ### 源码运行（推荐）
 
@@ -165,27 +165,27 @@ npm unlink -g aiforge
 
 ```bash
 # 只安装 Skills 和 Agents
-npx aiforge -d skills agents
+npx @fancyliu/aiforge -d skills agents
 
 # 只安装到 Copilot
-npx aiforge -t copilot
+npx @fancyliu/aiforge -t copilot
 ```
 
 ### 场景二：浏览并选择特定子目录
 
 ```bash
 # 列举 skills/ 下所有可安装的子目录
-npx aiforge --list skills
+npx @fancyliu/aiforge --list skills
 
 # 只安装匹配模式的 skills
-npx aiforge --filter "skills/git*"
+npx @fancyliu/aiforge --filter "skills/git*"
 ```
 
 ### 场景三：不同项目用不同仓库
 
 ```bash
 # 为当前项目使用特定仓库
-npx aiforge https://your-git-host.com/team-b/special-configs.git
+npx @fancyliu/aiforge https://your-git-host.com/team-b/special-configs.git
 ```
 
 ### 场景四：CI/CD 管道中使用
@@ -193,14 +193,14 @@ npx aiforge https://your-git-host.com/team-b/special-configs.git
 ```bash
 # 使用环境变量认证
 export GIT_TOKEN=<your-access-token>
-npx aiforge --quiet
+npx @fancyliu/aiforge --quiet
 ```
 
 ### 场景五：强制更新所有文件
 
 ```bash
 # 覆盖所有已存在文件，不确认
-npx aiforge --force
+npx @fancyliu/aiforge --force
 ```
 
 ## 下一步
