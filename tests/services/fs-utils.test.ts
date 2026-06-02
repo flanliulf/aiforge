@@ -384,6 +384,18 @@ describe('services/fs-utils', () => {
       })
     })
 
+    it('throws PATH_NOT_DIRECTORY when targetPath has trailing slash but actual path is a plain file', async () => {
+      // 回归场景：规则 targetDir 带尾斜杠时，lstat(file/) 会返回 ENOTDIR。
+      // preflight 应识别其实际命中的是普通文件，而不是把它误判为“目录不存在”。
+      const target = join(tmpDir, 'existing-trailing.txt')
+      await writeFile(target, 'content')
+      const plan = makeMatchedPlan([`${target}/`])
+      await expect(preflight(plan, pathResolver)).rejects.toMatchObject({
+        code: 'PATH_NOT_DIRECTORY',
+        severity: 'fatal',
+      })
+    })
+
     it('throws PERMISSION_DENIED when parent dir is not writable (AC #4)', async () => {
       // 创建一个只读父目录
       const readonlyParent = join(tmpDir, 'readonly-parent')

@@ -315,6 +315,66 @@ function validatePathSecurity(targetPath: string, allowedRoot: string): void {
   }
 }
 
+function stripTrailingPathSeparators(path: string): string {
+  if (/^[A-Za-z]:[\\/]?$/.test(path)) return path
+  const stripped = path.replace(/[\\/]+$/, '')
+  return stripped === '' ? path : stripped
+}
+
+function createPathNotDirectoryError(path: string): AiforgeError {
+  return new AiforgeError(
+    msg('fsUtils.pathNotDirectory').replace('{path}', path),
+    'PATH_NOT_DIRECTORY',
+    EXIT_INSTALL_FAILURE,
+    'fatal',
+    msg('fsUtils.pathNotDirectoryWhy').replace('{path}', path),
+    [msg('fsUtils.fixRemoveFileAndRetry').replace('{path}', path)],
+  )
+}
+
+/**
+ * 识别“目标路径带尾斜杠，但去掉尾斜杠后实际命中普通文件/非目录 symlink”的场景。
+ *
+ * 例：targetPath=`/tmp/.claude/agents/`，文件系统中实际存在 `/tmp/.claude/agents` 普通文件。
+ * 此时 `lstat(targetPath)` 会返回 ENOTDIR。若直接当作“目标不存在”，后续会滑入 ensureDir()
+ * 并报出较晚、较模糊的 ENSURE_DIR_FAILED。这里需提前收口为 PATH_NOT_DIRECTORY。
+ */
+async function detectTrailingSlashNonDirectoryTarget(targetPath: string): Promise<void> {
+  if (!/[\\/]+$/.test(targetPath)) return
+
+  const strippedTargetPath = stripTrailingPathSeparators(targetPath)
+  if (strippedTargetPath === targetPath) return
+
+  let entryStat: Awaited<ReturnType<typeof lstat>>
+  try {
+    entryStat = await lstat(strippedTargetPath)
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code
+    if (code === 'ENOENT' || code === 'ENOTDIR') return
+    throw e
+  }
+
+  if (entryStat.isSymbolicLink()) {
+    try {
+      const targetStat = await stat(strippedTargetPath)
+      if (!targetStat.isDirectory()) {
+        throw createPathNotDirectoryError(targetPath)
+      }
+      return
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code
+      if (code === 'ENOENT') {
+        throw createPathNotDirectoryError(targetPath)
+      }
+      throw e
+    }
+  }
+
+  if (!entryStat.isDirectory()) {
+    throw createPathNotDirectoryError(targetPath)
+  }
+}
+
 /**
  * 对已存在的祖先目录进行 realpath 验证，防止 symlink 逃逸绕过 allowedRoot。
  *
@@ -435,6 +495,9 @@ async function checkTargetWritability(
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code
     if (code === 'ENOENT' || code === 'ENOTDIR') {
+      if (code === 'ENOTDIR') {
+        await detectTrailingSlashNonDirectoryTarget(targetPath)
+      }
       targetStat = null
     } else if (code === 'EACCES') {
       // 父目录不可读时 lstat 报 EACCES，当作目标不存在处理
@@ -490,14 +553,7 @@ async function checkTargetWritability(
     // CR TODO-006: 提前拒绝"目标是普通文件"的情况，给出明确错误，
     // 避免延迟到 ensureDir 阶段以 ENSURE_DIR_FAILED 失败（诊断信息不清晰）
     if (targetStat.isFile()) {
-      throw new AiforgeError(
-        msg('fsUtils.pathNotDirectory').replace('{path}', targetPath),
-        'PATH_NOT_DIRECTORY',
-        EXIT_INSTALL_FAILURE,
-        'fatal',
-        msg('fsUtils.pathNotDirectoryWhy').replace('{path}', targetPath),
-        [msg('fsUtils.fixRemoveFileAndRetry').replace('{path}', targetPath)],
-      )
+      throw createPathNotDirectoryError(targetPath)
     }
     // 其他非目录/非文件/非 symlink 类型（设备文件、FIFO 等）→ 检查目标本身可写
     let writable: boolean
