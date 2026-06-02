@@ -4,7 +4,7 @@ user_name: 'Fancyliu'
 date: '2026-05-24'
 sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 127
+rule_count: 128
 optimized_for_llm: true
 ---
 
@@ -41,7 +41,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Git ops:** `simple-git ~3.32`
 - **Terminal UI:** `ora ^8.2.0`, `chalk ^5.6.2`
 - **Interactive prompts:** `@inquirer/prompts ^8.3.2`
-- **Distribution:** npm public registry via `npx`, package `files` include `dist`, `README.zh.md`, `docs/*.md`, `CHANGELOG.md`
+- **Distribution:** npm public registry via `npx`, package `files` include `dist`, `README.md`, `README.zh.md`, `docs/*.md`, `CHANGELOG.md`
 
 ## Current Codebase Shape
 
@@ -142,6 +142,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 - **npm package must contain zero company info:** no company/internal URLs, hostnames, real credentials, or platform-specific token prefixes such as `glpat-`/`ghp_`; generic placeholders like `your-git-host.com` are allowed.
 - **Package security verification scans content, not pack summary:** use `npm pack --json` to get files, then grep actual packed file contents; `README.md` is always included by npm and must be scanned.
+- **README language switch must be dual-environment safe:** source `README.md` uses `[中文](README.zh.md)` for GitHub rendering; npm packaging relies on `prepack/postpack` via `scripts/prepare-npm-readme.mjs` to temporarily rewrite that link to jsDelivr and restore it. Do not commit the jsDelivr link into source `README.md`.
 - **Token handling is memory-only during clone:** tokens must be sanitized before logs/errors and removed from persisted git remote URLs after clone/update.
 - **Use the right sanitizer:** `sanitizeToken()` for standalone tokens, `sanitizeUrl()` for pure URLs, `sanitizeMessage()` for arbitrary error messages containing token-bearing URLs.
 - **`oauth2:token@host` needs special treatment:** keep the `oauth2:` prefix and sanitize only the credential portion.

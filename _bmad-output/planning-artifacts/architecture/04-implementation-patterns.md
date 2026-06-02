@@ -1144,6 +1144,22 @@ npm package MUST contain ZERO company info：
 
 > 来源：Story 5-5c CR R1 — B5 验证方法 `npm pack --dry-run 2>&1 | grep` 只扫描了 npm 输出流中的文件名，README.md 中的 `gitlab.example.com` 和 `glpat-xxxx` 未被检出，产生假阴性。
 
+**README 语言切换链接必须同时兼容 GitHub 源页面与 npm 包页：**
+
+仓库源 `README.md` 必须保留 GitHub 可渲染跳转的相对链接：
+
+```markdown
+[中文](README.zh.md)
+```
+
+npm 打包阶段由 `prepack/postpack` 调用 `scripts/prepare-npm-readme.mjs`，临时把源 `README.md` 中的中文链接改写为 jsDelivr `@latest` 绝对链接并在打包后恢复：
+
+```markdown
+[中文](https://cdn.jsdelivr.net/npm/@fancyliu/aiforge@latest/README.zh.md)
+```
+
+禁止把 jsDelivr 链接直接提交到源 `README.md`。发布验证必须确认 `npm pack --dry-run --json` 后源 `README.md` 已恢复为 `[中文](README.zh.md)`。
+
 ### Testing Patterns
 
 **测试命名：** `describe` 用模块名，`it` 用行为描述

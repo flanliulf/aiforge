@@ -187,6 +187,8 @@ npm package MUST contain ZERO company info：no company/internal repo URLs、no 
 
 **npm 包安全验证方法必须扫描入包文件的实际内容：** 禁止仅扫描 `npm pack --dry-run` 的输出流（仅含文件名+大小）。必须用 `npm pack --json` 获取入包文件列表后，逐个 `grep -in <pattern> <file>` 扫描文件内容。`README.md` 是 npm 硬编码始终包含的文件，无法通过 `.npmignore` 或 `files` 字段排除，因此 README.md 的内容安全必须作为独立验证项。（来源：Story 5-5c CR R1 — B5 验证方法只扫 `npm pack` 输出流，README.md 中的敏感示例未被检出）
 
+**README 语言切换链接双环境决策：** 源 `README.md` 必须使用 `[中文](README.zh.md)`，保证 GitHub 页面切换到渲染后的中文 README；npm 包页所需的 jsDelivr 链接只允许由 `prepack/postpack` 调用 `scripts/prepare-npm-readme.mjs` 在打包窗口内临时生成并恢复，禁止把 jsDelivr 链接提交到源 README。（来源：当前发布兼容性修复 — npm README 相对链接不可靠，但 GitHub 源页面需要相对链接渲染）
+
 #### D5: Tool Detection & Platform Abstraction
 
 **工具检测 — 数据驱动注册表：**

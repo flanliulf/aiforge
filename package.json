@@ -17,10 +17,13 @@
     "lint:src": "eslint src/ tests/ && prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
     "lint:fix": "eslint . --fix && prettier --write .",
     "release:check": "npm run lint && npm test && npm run build && npm pack --dry-run",
+    "prepack": "node scripts/prepare-npm-readme.mjs --apply",
+    "postpack": "node scripts/prepare-npm-readme.mjs --restore",
     "prepublishOnly": "npm run lint && npm test && npm run build"
   },
   "files": [
     "dist",
+    "README.md",
     "README.zh.md",
     "docs/*.md",
     "CHANGELOG.md"

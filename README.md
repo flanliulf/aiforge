@@ -5,7 +5,7 @@
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**English** | [中文](https://cdn.jsdelivr.net/npm/@fancyliu/aiforge@latest/README.zh.md) | [Docs Hub](docs/index.md) | [Contributing](docs/contributing.md)
+**English** | [中文](README.zh.md) | [Docs Hub](docs/index.md) | [Contributing](docs/contributing.md)
 
 > **Current npm release: v2.0.4**. The `v2.0` line is the current stable major line; `vscode` has been merged into Copilot, support now covers 11 tools, and migration guidance is available in [docs/migration-v2.md](docs/migration-v2.md).
 

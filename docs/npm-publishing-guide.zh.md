@@ -92,7 +92,7 @@ npm pack --dry-run
 - Vitest 测试全部通过
 - `tsup` 构建成功
 - `npm pack --dry-run` 的 tarball 内容只包含可公开发布的文件
-- `README.zh.md`、`docs/*.md`、`CHANGELOG.md` 被正确包含
+- `README.md`、`README.zh.md`、`docs/*.md`、`CHANGELOG.md` 被正确包含
 - 不包含内部仓库地址、token、缓存目录、测试源码或本地 AI 工具目录
 
 ## 修改版本号
@@ -231,17 +231,28 @@ npm install @fancyliu/aiforge@2.0.1 --registry https://registry.npmjs.org/
 ./node_modules/.bin/aiforge --version
 ```
 
-### 3. 验证 npm README 中的中文链接
+### 3. 验证 README 中的中文链接
 
-npm 包页面不会可靠地服务 tarball 内的相对 README 文件；同时，部分外部 Markdown 链接如果响应头没有显式 UTF-8 charset，可能在 npm 的预览弹窗中显示乱码。因此中文 README 链接应指向带显式 UTF-8 charset 的 jsDelivr 地址：
+仓库源文件必须保留 GitHub 友好的相对链接：
+
+```markdown
+[中文](README.zh.md)
+```
+
+npm 包页面不会可靠地服务 tarball 内的相对 README 文件；同时，部分外部 Markdown 链接如果响应头没有显式 UTF-8 charset，可能在 npm 的预览弹窗中显示乱码。因此 `prepack` 会在打包前临时把 `README.md` 中的中文 README 链接改写为带显式 UTF-8 charset 的 jsDelivr 地址：
 
 ```markdown
 [中文](https://cdn.jsdelivr.net/npm/@fancyliu/aiforge@latest/README.zh.md)
 ```
 
+`postpack` 会在打包后恢复仓库源文件。不要把 jsDelivr 链接直接提交到源 `README.md`。
+
 验证命令：
 
 ```bash
+grep -n "\\[中文\\](README.zh.md)" README.md
+npm pack --dry-run --json
+grep -n "\\[中文\\](README.zh.md)" README.md
 curl -L -I https://cdn.jsdelivr.net/npm/@fancyliu/aiforge@latest/README.zh.md
 ```
 
@@ -446,18 +457,19 @@ bin = { aiforge: 'dist/index.js' }
 
 原因：npm 包页面渲染 README 时，不会按普通仓库页面方式解析 tarball 内的相对文件链接；部分 CDN 或重定向后的 Markdown 响应头也可能缺少显式 UTF-8 charset。
 
-处理：改为 jsDelivr `@latest` 绝对链接，该地址返回 `text/markdown; charset=utf-8`：
+处理：仓库源 `README.md` 保持 GitHub 相对链接，npm 打包时由 `prepack/postpack` 生命周期临时改写并恢复。打包产物中的链接应为 jsDelivr `@latest` 绝对链接，该地址返回 `text/markdown; charset=utf-8`：
 
 ```markdown
 [中文](https://cdn.jsdelivr.net/npm/@fancyliu/aiforge@latest/README.zh.md)
 ```
 
-该文件必须包含在 `package.json` 的 `files` 中：
+`README.md` 和 `README.zh.md` 必须包含在 `package.json` 的 `files` 中：
 
 ```json
 {
   "files": [
     "dist",
+    "README.md",
     "README.zh.md",
     "docs/*.md",
     "CHANGELOG.md"
