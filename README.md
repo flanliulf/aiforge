@@ -5,7 +5,7 @@
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**English** | [中文](https://cdn.jsdelivr.net/npm/@fancyliu/aiforge@latest/README.zh.md)
+**English** | [中文](https://cdn.jsdelivr.net/npm/@fancyliu/aiforge@latest/README.zh.md) | [Docs Hub](docs/index.md) | [Contributing](docs/contributing.md)
 
 > **Current npm release: v2.0.4**. The `v2.0` line is the current stable major line; `vscode` has been merged into Copilot, support now covers 11 tools, and migration guidance is available in [docs/migration-v2.md](docs/migration-v2.md).
 
@@ -78,54 +78,6 @@ npx @fancyliu/aiforge -g -l
 ```bash
 cd your-project
 npx @fancyliu/aiforge
-```
-
-## Local Development
-
-The npm package is published as `@fancyliu/aiforge`. The installed CLI command remains `aiforge`; for local source changes, use the development commands below.
-
-### Run from Source (Recommended for Development)
-
-```bash
-# Install dependencies
-npm install
-
-# Run directly via tsx (no build required)
-npm run dev -- [repo-url] [options]
-
-# Examples
-npm run dev -- init
-npm run dev -- -g -l --dry-run
-npm run dev -- --help
-```
-
-### Run from Build Output
-
-```bash
-# Build first
-npm run build
-
-# Run the compiled CLI
-node dist/index.js [repo-url] [options]
-
-# Examples
-node dist/index.js init
-node dist/index.js -g -l --dry-run
-```
-
-### Link as Global Command
-
-```bash
-# Build and register as a global command
-npm run build
-npm link
-
-# Now you can use `aiforge` directly
-aiforge init
-aiforge -g -l
-
-# Unlink when no longer needed
-npm unlink -g aiforge
 ```
 
 ## Usage
@@ -332,14 +284,25 @@ After running `npx @fancyliu/aiforge init`, settings are saved to `~/.aiforge/co
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md) — Step-by-step first-use guide
-- [Configuration Reference](docs/configuration.md) — All settings and environment variables
-- [Troubleshooting](docs/troubleshooting.md) — Common errors and solutions
-- [Extending aiforge](docs/extending.md) — Adding support for new AI tools
-- [Install Rules Matrix](docs/install-rules-matrix.md) — Complete rule reference
-- [Migration v2](docs/migration-v2.md) — Upgrade guide for the `vscode` to Copilot merge
-- [npm Publishing Guide](docs/npm-publishing-guide.zh.md) — Maintainer guide for npm build, publish, verification, and common release issues
-- [Changelog](CHANGELOG.md) — Release history and notable changes
+### User Docs
+
+- [Docs Hub](docs/index.md) — audience-based documentation entry point
+- [Getting Started](docs/getting-started.md) — step-by-step first-use guide
+- [Configuration Reference](docs/configuration.md) — all settings and environment variables
+- [Troubleshooting](docs/troubleshooting.md) — common errors and solutions
+- [Install Rules Matrix](docs/install-rules-matrix.md) — complete rule reference
+- [Migration v2](docs/migration-v2.md) — upgrade guide for the `vscode` to Copilot merge
+
+### Contributors And Maintainers
+
+- [Contributing Guide](docs/contributing.md) — development setup, validation checklist, and docs sync expectations
+- [Extending aiforge](docs/extending.md) — adding support for new AI tools
+- [npm Publishing Guide](docs/npm-publishing-guide.zh.md) — Chinese-only maintainer release runbook
+- [Changelog](CHANGELOG.md) — release history and notable changes
+
+## Contributing
+
+If you plan to change code, docs, or package-bound artifacts, start with [docs/contributing.md](docs/contributing.md). It consolidates the local workflow, validation commands, documentation update expectations, and release entry points.
 
 ## Versioning
 

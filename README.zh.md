@@ -5,7 +5,7 @@
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[English](README.md) | **中文**
+[English](README.md) | **中文** | [文档中心](docs/index.zh.md) | [贡献指南](docs/contributing.zh.md)
 
 > **当前 npm 发布版本：v2.0.4**。`v2.0` 是当前稳定主版本线；`vscode` 工具 ID 已归并到 Copilot，当前支持 11 个工具，迁移说明见 [docs/migration-v2.zh.md](docs/migration-v2.zh.md)。
 
@@ -78,55 +78,6 @@ npx @fancyliu/aiforge -g -l
 ```bash
 cd your-project
 npx @fancyliu/aiforge
-```
-
-## 本地开发运行
-
-npm 包名为 `@fancyliu/aiforge`。安装后的 CLI 命令仍然是 `aiforge`；如果需要在本仓库中开发或调试源码，
-请使用以下本地运行方式。
-
-### 源码运行（推荐用于开发）
-
-```bash
-# 安装依赖
-npm install
-
-# 通过 tsx 直接运行（无需构建）
-npm run dev -- [repo-url] [options]
-
-# 示例
-npm run dev -- init
-npm run dev -- -g -l --dry-run
-npm run dev -- --help
-```
-
-### 构建后运行
-
-```bash
-# 先构建
-npm run build
-
-# 运行编译后的 CLI
-node dist/index.js [repo-url] [options]
-
-# 示例
-node dist/index.js init
-node dist/index.js -g -l --dry-run
-```
-
-### 注册为全局命令
-
-```bash
-# 构建并注册为全局命令
-npm run build
-npm link
-
-# 之后可直接使用 aiforge 命令
-aiforge init
-aiforge -g -l
-
-# 不再需要时取消注册
-npm unlink -g aiforge
 ```
 
 ## 使用方式
@@ -323,92 +274,6 @@ npx @fancyliu/aiforge https://your-git-host.com/team/repo.git
 | `universalDirs` | 启用通用目录安装（`.agents/`、`.agent/`）。默认：`true` |
 | `auth`          | 按 hostname 索引的认证配置                              |
 
-## 项目架构
-
-```
-aiforge/
-├── src/
-│   ├── index.ts              # CLI 入口 (commander.js)
-│   ├── pipeline.ts           # 管道编排器
-│   ├── core/                 # 核心模块（零外部依赖）
-│   │   ├── types.ts          # 类型定义
-│   │   ├── errors.ts         # AiforgeError 统一错误
-│   │   ├── reporter.ts       # 输出抽象（Tty/Plain/Quiet）
-│   │   ├── messages.ts       # i18n 消息字符串
-│   │   ├── path-resolver.ts  # 平台路径解析
-│   │   └── sanitize.ts       # Token 脱敏
-│   ├── stages/               # 管道阶段
-│   │   ├── resolve-source.ts # 解析仓库地址
-│   │   ├── authenticate.ts   # 四层认证链
-│   │   ├── clone.ts          # Git 克隆/增量更新
-│   │   ├── detect-tools.ts   # AI 工具检测
-│   │   ├── match-rules.ts    # 规则匹配引擎
-│   │   └── execute-install.ts# 安装执行（含 preflight）
-│   ├── services/             # 服务层
-│   │   ├── config.ts         # 配置管理
-│   │   ├── git.ts            # simple-git 封装
-│   │   ├── manifest.ts       # manifest.json 管理
-│   │   └── fs-utils.ts       # 文件系统工具
-│   ├── data/                 # 纯数据（零运行时依赖）
-│   │   ├── tool-registry.ts  # 工具检测注册表
-│   │   └── install-rules.ts  # 安装规则常量
-│   └── commands/
-│       └── init.ts           # aiforge init 子命令
-├── tests/                    # 976 测试（镜像 src/ 结构）
-└── dist/                     # 构建输出（ESM）
-```
-
-### 管道流程
-
-```
-Resolve → Auth → Clone → Detect → Match → [Install(含preflight)] → Report
-                                            ↑ dry-run 在此跳过
-```
-
-## 扩展新的 AI 工具
-
-只需在两个数据文件中添加配置，无需修改引擎代码：
-
-```typescript
-// 1. 在 src/data/tool-registry.ts 注册工具
-export const TOOL_DEFINITIONS: ToolDefinition[] = [
-  // ...existing tools...
-  {
-    id: 'newtool',
-    name: 'New AI Tool',
-    detect: {
-      global: ['~/.newtool'],
-      project: ['.newtool'],
-    },
-  },
-]
-
-// 2. 在 src/data/install-rules.ts 添加规则
-export const BUILTIN_RULES: InstallRule[] = [
-  // ...existing rules...
-  {
-    tool: 'newtool',
-    scope: 'project',
-    sourceDir: 'skills',
-    type: 'Flatten' as InstallType,
-    targetDir: '.newtool/rules/',
-  },
-]
-```
-
-## 技术栈
-
-| 技术                                                                 | 用途                      |
-| -------------------------------------------------------------------- | ------------------------- |
-| TypeScript (ESM)                                                     | 开发语言，严格模式        |
-| [tsup](https://www.npmjs.com/package/tsup)                           | 构建工具（esbuild-based） |
-| [commander](https://www.npmjs.com/package/commander)                 | CLI 参数解析              |
-| [chalk](https://www.npmjs.com/package/chalk) v5+                     | 终端彩色输出              |
-| [ora](https://www.npmjs.com/package/ora) v8+                         | Spinner 动画              |
-| [@inquirer/prompts](https://www.npmjs.com/package/@inquirer/prompts) | 交互式提示                |
-| [simple-git](https://www.npmjs.com/package/simple-git) ~3.32         | Git 操作封装              |
-| [vitest](https://www.npmjs.com/package/vitest)                       | 测试框架（976 测试）      |
-
 ## 兼容性
 
 | 维度     | 要求                               |
@@ -419,14 +284,25 @@ export const BUILTIN_RULES: InstallRule[] = [
 
 ## 文档
 
+### 用户文档
+
+- [文档中心](docs/index.zh.md) — 按受众整理的统一入口
 - [快速入门](docs/getting-started.zh.md) — 分步首次使用指南
 - [配置参考](docs/configuration.zh.md) — 完整配置和环境变量
 - [故障排除](docs/troubleshooting.zh.md) — 常见错误及解决方案
-- [扩展指南](docs/extending.zh.md) — 添加新 AI 工具支持
 - [安装规则矩阵](docs/install-rules-matrix.zh.md) — 完整规则参考
 - [v2 迁移指南](docs/migration-v2.zh.md) — `vscode` 归并到 Copilot 的升级说明
-- [npm 发布指南](docs/npm-publishing-guide.zh.md) — npm 构建、发布、验证与常见问题手册
+
+### 贡献者与维护者
+
+- [贡献指南](docs/contributing.zh.md) — 开发环境、验证清单与文档同步要求
+- [扩展指南](docs/extending.zh.md) — 添加新 AI 工具支持
+- [npm 发布指南](docs/npm-publishing-guide.zh.md) — 详细发布操作手册
 - [变更日志](CHANGELOG.md) — 发布历史与重要变更
+
+## 参与贡献
+
+如果你要修改源码、公开文档或会进入 npm 包的产物，请先阅读 [docs/contributing.zh.md](docs/contributing.zh.md)。这里集中说明了本地工作流、验证命令、文档同步要求和发布入口。
 
 ## 版本号规则
 
