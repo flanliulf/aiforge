@@ -750,19 +750,26 @@ if (scanSourceFiles('skills').length > 0) reporter.info(...)
 
 > 来源：Story 5-3 CR R1 — `reportPlan()` 主数据行用双空格而非 `\t`；CR R2 — `reportResult()` 明细行已用 `\t` 但统计行仍用双空格，同一方法内两套分隔规则，两轮 CR 才全部收口。
 
-**v2.0 工具注册表变更（Story 7-1）：**
+**2026-05-24 工具矩阵基线：**
 
-- `TOOL_DEFINITIONS`：4 工具 → 3 工具（移除 `vscode`，保留 `copilot | claude | cursor`）
-- `BUILTIN_RULES`：16 条 → 19 条（+4 新规则，-1 vscode 规则）
-  - 新增：claude 全局 instructions（`~/.claude/`）
-  - 新增：claude 项目 instructions（`.claude/`）
-  - 新增：cursor 全局 agents（`~/.cursor/rules/`）
-  - 新增：copilot 项目 mcp-tools → `.vscode/`（承接原 vscode 项目级 MCP 语义）
-  - 删除：vscode 全局 mcp（`~/.vscode/`）
-- 新增/删除工具只修改 `src/data/tool-registry.ts` + `src/data/install-rules.ts`，引擎层（`src/stages/`）零改动（NFR-I5）
+- `TOOL_DEFINITIONS` 当前为 11 个工具：`copilot`、`claude`、`cursor`、`codex`、`opencode`、`windsurf`、`auggie`、`gemini`、`antigravity`、`kiro`、`trae`
+- `BUILTIN_RULES` 当前为 55 条，`UNIVERSAL_RULES` 为 4 条；后者使用虚拟 tool id `universal`，不进入 `TOOL_DEFINITIONS`
+- 当前 `BUILTIN_RULES` 分布：copilot 9、claude 7、cursor 4、codex 5、opencode 7、windsurf 5、auggie 5、gemini 4、antigravity 3、kiro 4、trae 2
+- `vscode` 已不在注册表中；项目级 MCP 语义由 `copilot` 的 `.vscode/` 规则承接，但 `vscode` 在 `--tools` 中仍必须报 `UNKNOWN_TOOL`
+- 新增/删除工具只修改 `src/data/tool-registry.ts` 与 `src/data/install-rules.ts`；引擎层（`src/stages/`）零改动（NFR-I5）
 - `BUILTIN_RULES` 总量验收必须从“已批准基线 + 当前 Story 明确增减范围”推导。若 Story/Epic/PLAN 的累计数字与实现、测试、Dev Agent Record 的自洽口径冲突，禁止为了凑数新增无需求来源的规则；应先裁定有效基线，更新测试与 Story 记录口径，并把残留规格文档澄清交给 CR TODO 跟踪。（来源：Story 7-3 CR — 30 vs 29；Story 7-5 CR — 41 vs 40）
 
-**删除工具时必须提供一次性 migration 提示（vscodeMergedNote 模式）：**
+**工具专用模式摘要：**
+
+- `codex` global `mcp-tools` 只复制模板到 `~/.codex/` 并输出 `[mcp]` merge hint；绝不自动改写 `~/.codex/config.toml`
+- `opencode` global 安装根必须使用 XDG 路径 `~/.config/opencode`，不是 `~/.opencode`
+- `gemini` 的 `skills/` 规则必须先过 CLI 版本前置条件（`v0.26.0+`）；失败时仅移除受影响项并 warn
+- `windsurf` 项目 `agents/` -> `workflows/` 属于语义映射，必须经 `semanticWarning: 'windsurfAgentsToWorkflows'`
+- `trae` 的 `skills/` 不受支持，只能输出 unsupported notice，不得偷偷当成可安装项
+- `antigravity` global 命名空间固定为 `~/.gemini/antigravity/...`，project `skills/` 继续复用 `.agents/skills/`
+- `.iflow/` stale notice 属于纯信息提示，home/project 检查失败不得阻断安装路径
+
+**Legacy VS Code 迁移提示（`vscodeMergedNote` 模式）仍保留：**
 
 当工具从注册表删除时，若用户环境仍存在该工具的历史标志路径（如 `~/.vscode/`），必须在 `detect-tools.ts` 中通过 `reporter.warn()` 输出迁移提示。
 
@@ -1532,8 +1539,8 @@ Story 开发及 CR 修复的质量门禁验证必须使用 `npm run lint:src`（
 | 检查项 | 结果 |
 |--------|------|
 | npm run lint:src | ✅ All matched files use Prettier code style! |
-| npm run build    | ✅ ESM 136.26 KB |
-| npm test         | ✅ 853/853 passed (33 test files) |
+| npm run build    | ✅ ESM <bundle-size> KB |
+| npm test         | ✅ <passed>/<total> passed (<fileCount> test files) |
 ```
 
 即使修改内容看似与测试无关也必须重新执行（文档类修改不能"借用"上轮结果）。

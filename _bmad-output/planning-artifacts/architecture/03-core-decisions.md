@@ -193,7 +193,7 @@ npm package MUST contain ZERO company info：no company/internal repo URLs、no 
 
 ```typescript
 interface ToolDefinition {
-  id: string;                  // 'copilot' | 'claude' | 'cursor'  (v2.0: vscode removed)
+  id: string;                  // 'copilot' | 'claude' | ... | 'trae'（当前基线 11 个工具）
   name: string;                // 'GitHub Copilot'
   detect: {
     global: string[];          // ['~/.copilot'] — 标志路径
@@ -222,19 +222,31 @@ interface PathResolver {
 - M2 扩展 Windows（AppData 路径映射）
 - 测试时可注入 mock 实现
 
-**v2.0 工具注册表变更（Story 7-1）：**
+**2026-05-24 工具注册表基线与演化约束：**
 
-- `TOOL_DEFINITIONS` 从 4 条降为 3 条（移除 `vscode`），`BUILTIN_RULES` 从 16 条增至 19 条
-- vscode 工具的 MCP 配置由新增的 `copilot` project 规则接管（`.vscode/` 目标路径）
-- NFR-I5 约束：工具增删只修改 `src/data/`，不触及 `src/stages/`
+- 当前 `TOOL_DEFINITIONS` = 11：`copilot`、`claude`、`cursor`、`codex`、`opencode`、`windsurf`、`auggie`、`gemini`、`antigravity`、`kiro`、`trae`
+- 当前 `BUILTIN_RULES` = 55，`UNIVERSAL_RULES` = 4；`UNIVERSAL_RULES` 使用虚拟 tool id `universal`，不进入 `TOOL_DEFINITIONS`
+- `BUILTIN_RULES` 当前分布：copilot 9、claude 7、cursor 4、codex 5、opencode 7、windsurf 5、auggie 5、gemini 4、antigravity 3、kiro 4、trae 2
+- `vscode` 不再是注册工具；项目级 MCP 规则由 `copilot` 的 `.vscode/` 目标路径承接，但 `vscode` 在 `--tools` 中仍必须报 `UNKNOWN_TOOL`
+- NFR-I5 约束保持不变：工具增删、路径映射和规则总量调整只修改 `src/data/tool-registry.ts`、`src/data/install-rules.ts`，不触及 `src/stages/`
 - 工具规则总量验收口径必须按“已批准基线 + 当前 Story 明确增减范围”推导；不得为满足过期规格数字新增无需求来源的规则。若 Story/Epic/PLAN 的累计数字与实现/测试自洽口径冲突，应将其裁定为规格澄清或 CR TODO，而不是扩大工具注册表行为。（来源：Story 7-3 CR — 30 vs 29；Story 7-5 CR — 41 vs 40）
 
-**vscodeMergedNote 检测设计决策（Story 7-1）：**
+**Legacy VS Code 迁移提示（`vscodeMergedNote`）仍保留：**
 
-- 场景：用户历史上仅用 vscode tool，`~/.vscode/` 存在但 `~/.copilot/` 不存在
-- 检测函数 `detectLegacyVscodeOnly(detected, pathResolver)` 封装在 `detect-tools.ts`，不作为独立管道阶段
+- 场景：用户历史上仅用 VS Code 工具，`~/.vscode/` 存在但 `~/.copilot/` 不存在
+- 检测函数 `detectLegacyVscodeOnly(pathResolver)` 封装在 `detect-tools.ts`，不作为独立管道阶段
 - 检测结果为非阻塞警告（`reporter.warn`），不影响安装继续执行
 - NFR-C7 约束：aiforge 不读写 `~/.vscode/` 等旧工具目录，仅检测路径是否存在
+
+**工具专用契约纳入 D5 决策基线：**
+
+- `codex` global `mcp-tools` 只复制模板到 `~/.codex/` 并输出 `[mcp]` 合并提示，绝不修改 `~/.codex/config.toml`
+- `opencode` global 路径采用 XDG（`~/.config/opencode`），不是 `~/.opencode`；其 MCP 模板需要手工 merge 到 `opencode.json` 的 `"mcp"` 字段
+- `gemini` 的 `skills/` 规则必须先通过 CLI 版本前置条件（`v0.26.0+`）；前置条件失败时移除受影响项并 warn，而不是整体安装失败
+- `windsurf` 项目级 `agents/` 目标目录语义映射为 `workflows/`，必须走 `semanticWarning: 'windsurfAgentsToWorkflows'`
+- `trae` 仅支持 project `rules` 与根 `AGENTS.md`；若知识仓库存在 `skills/`，只发 unsupported notice，不改变安装语义
+- `antigravity` global 命名空间嵌套在 `~/.gemini/antigravity/...`，project `skills/` 继续复用 `.agents/skills/`
+- `.iflow/` stale notice 仅为信息提示；home/project `.iflow` 的存在不能阻断自动检测或手动 `--tools` 路径
 
 **unsupported/stale/迁移类 notice 触发契约与非阻断边界：**
 
@@ -258,15 +270,17 @@ interface PathResolver {
 
 #### D6: Pipeline Orchestration
 
-**类型安全的阶段链：**
+**类型安全的阶段链与分叉点：**
 
 ```typescript
 type ResolveStage   = (args: ParsedArgs) => Promise<ResolvedSource>;
 type AuthStage      = (source: ResolvedSource) => Promise<AuthenticatedSource>;
 type CloneStage     = (source: AuthenticatedSource) => Promise<LocalRepo>;
+type ListStage      = (repo: LocalRepo, args: ParsedArgs) => Promise<void>;
 type DetectStage    = (repo: LocalRepo, args: ParsedArgs) => Promise<DetectedEnv>;
 type MatchStage     = (env: DetectedEnv, args: ParsedArgs) => Promise<MatchedPlan>;
-type InstallStage   = (plan: MatchedPlan) => Promise<InstallResult>;
+type InstallStage   = (plan: MatchedPlan, args: ParsedArgs) => Promise<InstallResult>;
+type SaveManifestStage = (result: InstallResult) => Promise<void>;
 type ReportStage    = (results: InstallResult | MatchedPlan) => void;
 ```
 
@@ -274,21 +288,26 @@ type ReportStage    = (results: InstallResult | MatchedPlan) => void;
 
 `ParsedArgs` 包含用户 CLI 输入（`--dirs`、`--tools`、`--force`、`--dry-run` 等），需要在多个阶段被访问：
 - `ResolveStage`：读取 repo-url、`--clone-dir`、`--ssh`、`--token`
+- `ListStage`：读取 `--list`，且调用分叉判定必须使用 `args.list !== undefined`
 - `DetectStage`：读取 `--tools` 手动指定（FR-014）
 - `MatchStage`：读取 `--dirs` 过滤源目录（FR-024），只匹配用户指定的资源类型
+- `InstallStage`：读取 `--force`、`--link`、`--flatten`、`--no-universal`
 - 管道编排器：读取 `--dry-run`、`--quiet`、`--force` 控制流程分叉和 Reporter 选择
 
 `ParsedArgs` 不通过阶段链逐级传递，而是由管道编排器持有，按需注入到需要的阶段。
 
-**dry-run 管道分叉：**
+**当前管道分叉：**
 
 ```
-正常模式: Resolve → Auth → Clone → Detect → Match → Install → Report(results)
-dry-run:  Resolve → Auth → Clone → Detect → Match → Report(plan)
+list 模式:   Resolve → Auth → Clone → List
+正常模式:   Resolve → Auth → Clone → Detect → Match → Install → SaveManifest → Report(results)
+dry-run:    Resolve → Auth → Clone → Detect → Match → Report(plan)
 ```
 
-- 管道编排器根据 `dryRun` 标志决定是否执行 Install 阶段
-- dry-run 与正常模式共享 Resolve~Match 全部阶段，架构保证预览一致性
+- `args.list !== undefined` 必须在 `Clone` 后直接分叉到 `listContents()`，不能继续落到 detect/match/install
+- 管道编排器根据 `dryRun` 标志决定是否执行 `Install` / `SaveManifest`
+- dry-run 与正常模式共享 `Resolve~Match` 全部阶段，架构保证预览一致性
+- `SaveManifest` 是 install 成功后的独立后处理步骤，不参与 dry-run，也不在 list 模式下执行
 
 **预检查(preflight)设计决策：**
 

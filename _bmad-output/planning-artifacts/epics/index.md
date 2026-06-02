@@ -12,6 +12,8 @@ shards:
   - epic-5.md
   - epic-6.md
   - epic-7.md
+  - epic-8.md
+  - epic-9.md
 ---
 
 # ai-forge - Epic Breakdown
@@ -290,6 +292,22 @@ This document provides the complete epic and story breakdown for ai-forge, decom
 **FRs 覆盖：** FR-047~053（共 7 条）
 **关键交付：** `--list` 子命令逻辑 + `--filter` 参数解析与 Match 阶段过滤 + `BUILTIN_RULES` 通用目录规则 + `config.json universalDirs` 字段 + `aiforge init` 新增偏好步骤
 **NFRs：** NFR-P6, NFR-U6, NFR-C7
+
+### [Epic 8: 多 Git 仓库知识源编排](epic-8.md)
+
+用户可以在一次 dry-run 或安装中选择多个知识仓库来源，并获得带来源标识的安装计划、冲突诊断和 manifest 追踪。该 Epic 明确不负责建设“聚合知识仓库”平台；聚合仓库可作为当前版本的组织治理方案，由 aiforge 继续按单仓标准消费。
+
+**需求编号：** 暂用 E8-FR-001~015 / E8-NFR-001~007，待 PRD 正式合并时统一 renumber
+**关键交付：** 多仓配置模型 + 多仓 CLI 选择 + Resolve/Auth/Clone 多源编排 + source-aware plan merge + source-aware manifest + 跨源冲突阻断
+**NFRs：** 单仓零回归、多仓 dry-run 可审查、默认不静默覆盖跨源冲突、Token 不进入输出或 manifest
+
+### [Epic 9: Universal-first 安装策略与重复触发治理](epic-9.md)
+
+用户可以在项目级安装时获得能力矩阵驱动的安装目标选择：对已确认支持 `.agents/skills/` 的工具优先使用通用目录，对未确认工具继续使用专属目录，并通过 `auto`、`universal-only`、`tool-specific-only`、`both` 策略避免重复触发和假成功。
+
+**需求编号：** 暂用 E9-FR-001~018 / E9-NFR-001~007，待 PRD 正式合并时统一 renumber
+**关键交付：** 工具能力矩阵 + 安装目标策略配置/CLI + target selection + plan 去重 + dry-run/report 策略解释 + Epic 6 并行行为回退
+**NFRs：** 默认不制造假成功、旧行为可回退、dry-run 可审查、能力矩阵数据驱动、策略选择不绕过现有安全保护
 
 ---
 
