@@ -8,27 +8,27 @@
 
 ## 核心组件总览
 
-| 组件 | 位置 | 类型 | 职责 | 变更时通常联动 |
-| --- | --- | --- | --- | --- |
-| CLI 入口 | `src/index.ts` | 入口组件 | 定义主命令、解析参数、创建 Reporter、启动流水线 | `pipeline.ts`、`commands/` |
-| Init 向导 | `src/commands/init.ts` | 交互命令组件 | 首次配置、仓库地址与认证方式验证、语言选择、通用目录偏好 | `services/config.ts`、`services/git.ts`、`core/messages.ts` |
-| 流水线编排器 | `src/pipeline.ts` | 编排组件 | 串联各阶段、处理 dry-run/list 分叉、持久化 manifest | `stages/*`、`services/manifest.ts` |
-| Reporter | `src/core/reporter.ts` | 输出组件 | 普通/TTY/quiet 三种输出风格，计划与结果渲染 | `core/messages.ts` |
-| 消息目录 | `src/core/messages.ts` | i18n 组件 | 双语文案与 key 访问 | `core/reporter.ts`、所有用户可见输出 |
-| 类型契约 | `src/core/types.ts` | 契约组件 | 定义阶段输入输出和规则模型 | `pipeline.ts`、`stages/*` |
-| 工具注册表 | `src/data/tool-registry.ts` | 数据组件 | 定义 11 个 AI 工具的检测路径 | `stages/detect-tools.ts` |
-| 安装规则表 | `src/data/install-rules.ts` | 数据组件 | 定义 55 条工具规则 + 4 条通用规则 | `stages/match-rules.ts`、`execute-install.ts` |
-| 源地址解析 | `src/stages/resolve-source.ts` + `src/services/git.ts` | 阶段/服务组件 | 从 CLI/config 解析知识仓库 URL，并生成标准化 Git 源对象 | `commands/init.ts` |
-| 认证链 | `src/stages/authenticate.ts` | 阶段组件 | 处理 CLI/env/config/credential-manager 四层认证 | `services/config.ts` |
-| 仓库同步 | `src/stages/clone.ts` | 阶段组件 | clone/pull、token remote 清理、源文件扫描 | `services/git.ts` |
-| 环境检测 | `src/stages/detect-tools.ts` | 阶段组件 | 自动或手动确定目标 AI 工具集合 | `data/tool-registry.ts` |
-| 计划构建 | `src/stages/match-rules.ts` | 阶段组件 | 根据工具、scope、dirs、filter 产出安装计划 | `data/install-rules.ts` |
-| 列表模式 | `src/stages/list-contents.ts` | 阶段组件 | 实现 `--list` 子流程 | `core/reporter.ts` |
-| 安装执行器 | `src/stages/execute-install.ts` | 核心执行组件 | preflight、冲突检测、复制/链接/flatten、零结果诊断 | `services/fs-utils.ts`、`services/manifest.ts` |
-| 冲突处理器 | `src/stages/conflict-resolver.ts` | 交互组件 | 用户文件冲突时给出交互选项 | `execute-install.ts` |
-| 文件系统安全层 | `src/services/fs-utils.ts` | 安全基础组件 | hash、复制、symlink、preflight、路径边界验证 | `execute-install.ts` |
-| Manifest 管理 | `src/services/manifest.ts` | 状态组件 | 已安装文件记录、冲突类型推断、合并更新 | `pipeline.ts`、`execute-install.ts` |
-| Gemini 预检查 | `src/services/version-check.ts` | 约束组件 | 校验 Gemini CLI 版本下限 | `data/install-rules.ts`、匹配/提示逻辑 |
+| 组件           | 位置                                                   | 类型          | 职责                                                     | 变更时通常联动                                              |
+| -------------- | ------------------------------------------------------ | ------------- | -------------------------------------------------------- | ----------------------------------------------------------- |
+| CLI 入口       | `src/index.ts`                                         | 入口组件      | 定义主命令、解析参数、创建 Reporter、启动流水线          | `pipeline.ts`、`commands/`                                  |
+| Init 向导      | `src/commands/init.ts`                                 | 交互命令组件  | 首次配置、仓库地址与认证方式验证、语言选择、通用目录偏好 | `services/config.ts`、`services/git.ts`、`core/messages.ts` |
+| 流水线编排器   | `src/pipeline.ts`                                      | 编排组件      | 串联各阶段、处理 dry-run/list 分叉、持久化 manifest      | `stages/*`、`services/manifest.ts`                          |
+| Reporter       | `src/core/reporter.ts`                                 | 输出组件      | 普通/TTY/quiet 三种输出风格，计划与结果渲染              | `core/messages.ts`                                          |
+| 消息目录       | `src/core/messages.ts`                                 | i18n 组件     | 双语文案与 key 访问                                      | `core/reporter.ts`、所有用户可见输出                        |
+| 类型契约       | `src/core/types.ts`                                    | 契约组件      | 定义阶段输入输出和规则模型                               | `pipeline.ts`、`stages/*`                                   |
+| 工具注册表     | `src/data/tool-registry.ts`                            | 数据组件      | 定义 11 个 AI 工具的检测路径                             | `stages/detect-tools.ts`                                    |
+| 安装规则表     | `src/data/install-rules.ts`                            | 数据组件      | 定义 55 条工具规则 + 4 条通用规则                        | `stages/match-rules.ts`、`execute-install.ts`               |
+| 源地址解析     | `src/stages/resolve-source.ts` + `src/services/git.ts` | 阶段/服务组件 | 从 CLI/config 解析知识仓库 URL，并生成标准化 Git 源对象  | `commands/init.ts`                                          |
+| 认证链         | `src/stages/authenticate.ts`                           | 阶段组件      | 处理 CLI/env/config/credential-manager 四层认证          | `services/config.ts`                                        |
+| 仓库同步       | `src/stages/clone.ts`                                  | 阶段组件      | clone/pull、token remote 清理、源文件扫描                | `services/git.ts`                                           |
+| 环境检测       | `src/stages/detect-tools.ts`                           | 阶段组件      | 自动或手动确定目标 AI 工具集合                           | `data/tool-registry.ts`                                     |
+| 计划构建       | `src/stages/match-rules.ts`                            | 阶段组件      | 根据工具、scope、dirs、filter 产出安装计划               | `data/install-rules.ts`                                     |
+| 列表模式       | `src/stages/list-contents.ts`                          | 阶段组件      | 实现 `--list` 子流程                                     | `core/reporter.ts`                                          |
+| 安装执行器     | `src/stages/execute-install.ts`                        | 核心执行组件  | preflight、冲突检测、复制/链接/flatten、零结果诊断       | `services/fs-utils.ts`、`services/manifest.ts`              |
+| 冲突处理器     | `src/stages/conflict-resolver.ts`                      | 交互组件      | 用户文件冲突时给出交互选项                               | `execute-install.ts`                                        |
+| 文件系统安全层 | `src/services/fs-utils.ts`                             | 安全基础组件  | hash、复制、symlink、preflight、路径边界验证             | `execute-install.ts`                                        |
+| Manifest 管理  | `src/services/manifest.ts`                             | 状态组件      | 已安装文件记录、冲突类型推断、合并更新                   | `pipeline.ts`、`execute-install.ts`                         |
+| Gemini 预检查  | `src/services/version-check.ts`                        | 约束组件      | 校验 Gemini CLI 版本下限                                 | `data/install-rules.ts`、匹配/提示逻辑                      |
 
 ## 组件分组
 

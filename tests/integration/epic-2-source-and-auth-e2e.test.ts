@@ -199,7 +199,12 @@ describe('Epic 2: 知识仓库获取与认证 E2E', () => {
     )
     const source = await resolveSource(createArgs(), createReporter(), pathResolver)
 
-    const cliSsh = await authenticate(source, createArgs({ ssh: true }), createReporter(), pathResolver)
+    const cliSsh = await authenticate(
+      source,
+      createArgs({ ssh: true }),
+      createReporter(),
+      pathResolver,
+    )
     expect(cliSsh.authMethod).toBe('ssh')
     expect(cliSsh.cloneUrl).toBe('git@gitlab.example.com:platform/aicoding-base.git')
 
@@ -233,8 +238,7 @@ describe('Epic 2: 知识仓库获取与认证 E2E', () => {
       repoPath: 'platform/aicoding-base',
       protocol: 'https',
       authMethod: 'token',
-      cloneUrl:
-        'https://oauth2:glpat-secret12345678@gitlab.example.com/platform/aicoding-base.git',
+      cloneUrl: 'https://oauth2:glpat-secret12345678@gitlab.example.com/platform/aicoding-base.git',
     }
 
     const first = await cloneRepo(source, createArgs(), createReporter(), pathResolver)
@@ -275,9 +279,7 @@ describe('Epic 2: 知识仓库获取与认证 E2E', () => {
     const raw = vi.fn().mockResolvedValue('')
     mocks.createGit.mockReturnValue({ raw })
     mocks.input.mockResolvedValue(repoUrl)
-    mocks.select
-      .mockResolvedValueOnce('zh-CN')
-      .mockResolvedValueOnce('token')
+    mocks.select.mockResolvedValueOnce('zh-CN').mockResolvedValueOnce('token')
     mocks.password.mockResolvedValue(token)
     mocks.confirm.mockResolvedValue(true)
 
@@ -333,9 +335,11 @@ describe('Epic 2: 知识仓库获取与认证 E2E', () => {
   it('Story 2.2: 缺少 URL 且没有默认配置时保留 NO_REPO fatal 失败语义', async () => {
     await mkdir(join(homeDir, '.aiforge'), { recursive: true })
 
-    await expect(resolveSource(createArgs(), createReporter(), pathResolver)).rejects.toMatchObject({
-      code: 'NO_REPO',
-      severity: 'fatal',
-    } satisfies Partial<AiforgeError>)
+    await expect(resolveSource(createArgs(), createReporter(), pathResolver)).rejects.toMatchObject(
+      {
+        code: 'NO_REPO',
+        severity: 'fatal',
+      } satisfies Partial<AiforgeError>,
+    )
   })
 })

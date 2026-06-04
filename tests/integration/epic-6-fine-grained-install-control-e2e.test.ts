@@ -202,7 +202,11 @@ describe('Epic 6 精细化安装控制与通用目录适配 E2E', () => {
     const reporter = createRecordingReporter()
     const stages = createProductionStages(pathResolver)
 
-    await runPipeline(createArgs({ dirs: ['skills'], filter: 'skills/git-commit' }), reporter, stages)
+    await runPipeline(
+      createArgs({ dirs: ['skills'], filter: 'skills/git-commit' }),
+      reporter,
+      stages,
+    )
 
     await expect(
       readFile(join(tmpDir, '.claude', 'skills', 'git-commit', 'index.md'), 'utf-8'),

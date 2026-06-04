@@ -181,7 +181,14 @@ describe('Epic 4: 安装执行与冲突保护 E2E', () => {
 
     const manifest = JSON.parse(
       await readFile(join(homeDir, '.aiforge', 'manifest.json'), 'utf-8'),
-    ) as Array<{ source: string; target: string; tool: string; scope: string; mode: string; hash: string }>
+    ) as Array<{
+      source: string
+      target: string
+      tool: string
+      scope: string
+      mode: string
+      hash: string
+    }>
     const codingAgentEntry = manifest.find((entry) => entry.target === targetFile)
     expect(codingAgentEntry).toMatchObject({
       source: 'agents/coding-agent.md',

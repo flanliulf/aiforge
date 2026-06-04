@@ -36,13 +36,13 @@ node dist/index.js --help
 
 ## 常用命令
 
-| 命令 | 用途 |
-| --- | --- |
-| `npm run dev -- --help` | 通过 `tsx` 直接运行源码 |
-| `npm test` | 运行完整 Vitest 测试套件 |
-| `npm run build` | 生成 `dist/` 构建产物 |
-| `npm run lint:src` | 只检查 `src/` 和 `tests/` |
-| `npm run lint` | 检查整个仓库 |
+| 命令                    | 用途                                       |
+| ----------------------- | ------------------------------------------ |
+| `npm run dev -- --help` | 通过 `tsx` 直接运行源码                    |
+| `npm test`              | 运行完整 Vitest 测试套件                   |
+| `npm run build`         | 生成 `dist/` 构建产物                      |
+| `npm run lint:src`      | 只检查 `src/` 和 `tests/`                  |
+| `npm run lint`          | 检查整个仓库                               |
 | `npm run release:check` | lint + test + build + `npm pack --dry-run` |
 
 ## 当前已验证基线

@@ -31,17 +31,17 @@ flowchart LR
 
 ## 技术栈
 
-| 维度 | 选型 | 说明 |
-| --- | --- | --- |
-| 运行时 | Node.js 18+ | CLI 与文件系统操作基础 |
-| 语言 | TypeScript | 强类型契约与跨阶段数据对象 |
-| 命令解析 | Commander | 主命令/子命令/选项解析 |
-| 交互 | Inquirer Prompts | `init`、冲突选择、确认流程 |
-| Git 能力 | simple-git | `ls-remote`、clone、pull 等 |
-| 输出体验 | Ora + Chalk | 普通/TTY/quiet 三种输出体验 |
-| 构建 | tsup | 打包 ESM CLI 到 `dist/` |
-| 测试 | Vitest | 单元、集成、E2E 一体化 |
-| 发布 | npm + GitLab CI | 包分发与质量门禁 |
+| 维度     | 选型             | 说明                        |
+| -------- | ---------------- | --------------------------- |
+| 运行时   | Node.js 18+      | CLI 与文件系统操作基础      |
+| 语言     | TypeScript       | 强类型契约与跨阶段数据对象  |
+| 命令解析 | Commander        | 主命令/子命令/选项解析      |
+| 交互     | Inquirer Prompts | `init`、冲突选择、确认流程  |
+| Git 能力 | simple-git       | `ls-remote`、clone、pull 等 |
+| 输出体验 | Ora + Chalk      | 普通/TTY/quiet 三种输出体验 |
+| 构建     | tsup             | 打包 ESM CLI 到 `dist/`     |
+| 测试     | Vitest           | 单元、集成、E2E 一体化      |
+| 发布     | npm + GitLab CI  | 包分发与质量门禁            |
 
 ## 运行时主流程
 

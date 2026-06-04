@@ -174,7 +174,9 @@ describe('Epic 3: 智能检测与安装规划 E2E', () => {
       join(homeDir, '.copilot', 'skills/'),
     ])
 
-    const plannedNames = plan.items.flatMap((item) => item.sourceFiles.map((file) => basename(file)))
+    const plannedNames = plan.items.flatMap((item) =>
+      item.sourceFiles.map((file) => basename(file)),
+    )
     expect(plannedNames).toEqual(expect.arrayContaining(['epic3-agent.md', 'testing-skill']))
     expect(plannedNames).not.toEqual(expect.arrayContaining(['README.md', '.gitkeep', '.DS_Store']))
   })

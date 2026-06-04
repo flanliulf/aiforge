@@ -25,20 +25,20 @@
 
 ## 技术栈摘要
 
-| 类别 | 技术 | 版本/约束 | 用途 |
-| --- | --- | --- | --- |
-| 运行时 | Node.js | `>=18.0.0` | CLI 执行环境 |
-| 语言 | TypeScript | `^5.9.3` | 主实现语言 |
-| CLI 解析 | `commander` | `^14.0.3` | 主命令与参数解析 |
-| 交互输入 | `@inquirer/prompts` | `^8.3.2` | `init` 子命令与冲突处理 |
-| Git 访问 | `simple-git` | `~3.32` | clone/pull/ls-remote |
-| 终端体验 | `ora`、`chalk` | `^8.2.0`、`^5.6.2` | 进度与彩色输出 |
-| 构建 | `tsup` | `^8.5.1` | ESM CLI 打包 |
-| 源码运行 | `tsx` | `^4.21.0` | 本地开发调试 |
-| 测试 | `vitest` | `^4.1.0` | 单元/集成/E2E 测试 |
-| 质量 | `eslint`、`prettier`、`typescript-eslint` | 当前 package.json | 规范与格式校验 |
-| CI/CD | GitLab CI | `.gitlab-ci.yml` | 质量门禁与 npm 发布 |
-| 分发 | npm | `@fancyliu/aiforge@2.0.4` | 对外发布 |
+| 类别     | 技术                                      | 版本/约束                 | 用途                    |
+| -------- | ----------------------------------------- | ------------------------- | ----------------------- |
+| 运行时   | Node.js                                   | `>=18.0.0`                | CLI 执行环境            |
+| 语言     | TypeScript                                | `^5.9.3`                  | 主实现语言              |
+| CLI 解析 | `commander`                               | `^14.0.3`                 | 主命令与参数解析        |
+| 交互输入 | `@inquirer/prompts`                       | `^8.3.2`                  | `init` 子命令与冲突处理 |
+| Git 访问 | `simple-git`                              | `~3.32`                   | clone/pull/ls-remote    |
+| 终端体验 | `ora`、`chalk`                            | `^8.2.0`、`^5.6.2`        | 进度与彩色输出          |
+| 构建     | `tsup`                                    | `^8.5.1`                  | ESM CLI 打包            |
+| 源码运行 | `tsx`                                     | `^4.21.0`                 | 本地开发调试            |
+| 测试     | `vitest`                                  | `^4.1.0`                  | 单元/集成/E2E 测试      |
+| 质量     | `eslint`、`prettier`、`typescript-eslint` | 当前 package.json         | 规范与格式校验          |
+| CI/CD    | GitLab CI                                 | `.gitlab-ci.yml`          | 质量门禁与 npm 发布     |
+| 分发     | npm                                       | `@fancyliu/aiforge@2.0.4` | 对外发布                |
 
 ## 关键能力
 

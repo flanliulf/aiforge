@@ -229,7 +229,9 @@ describe('Epic 1 Foundation E2E', () => {
     expect(stderr).toContain('检测 AI 工具')
     expect(stdout).toContain('foundation-agent.md')
     expect(stdout).toContain('.claude')
+    // eslint-disable-next-line no-control-regex
     expect(stdout).not.toMatch(/\u001b\[/)
+    // eslint-disable-next-line no-control-regex
     expect(stderr).not.toMatch(/\u001b\[/)
   })
 

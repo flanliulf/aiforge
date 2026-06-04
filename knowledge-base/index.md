@@ -63,7 +63,7 @@
 
 ### 架构与治理证据
 
-- [_bmad-output/project-context.md](../_bmad-output/project-context.md) - 本地 AI 规则基线
+- [\_bmad-output/project-context.md](../_bmad-output/project-context.md) - 本地 AI 规则基线
 - [Architecture Core Decisions](../_bmad-output/planning-artifacts/architecture/03-core-decisions.md) - 关键技术决策
 - [Architecture Implementation Patterns](../_bmad-output/planning-artifacts/architecture/04-implementation-patterns.md) - 实现模式与一致性规则
 - [Implementation Artifacts Index](../_bmad-output/implementation-artifacts/index.md) - Story/CR/retro 汇总入口
