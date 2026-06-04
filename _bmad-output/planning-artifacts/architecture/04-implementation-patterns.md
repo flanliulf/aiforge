@@ -153,6 +153,22 @@ grep -rn "console\.log\|硬编码中文" src/ --include="*.ts"
 
 > 来源：Story 6-2 CR R1 — 空 item 守卫被提升为通用行为，超出 AC 要求，且 8 个既有测试被改写吸收回归而非保护回归。
 
+**Project-scope 安装必须先验证 cwd 不在全局 AI 配置根内：**
+
+当 `env.scope === 'project'` 时，`matchRules()` 在生成任何 `targetPath` 前必须检查当前工作目录是否位于 home 级 AI 全局配置根目录或其子目录内。命中时抛出 `PROJECT_SCOPE_GLOBAL_DIR_REJECTED`，不要继续生成 `.codex/skills/`、`.agents/skills/`、`.agent/skills/` 等相对目标路径。
+
+```typescript
+✅ // project scope: 在 match 阶段早期拒绝全局目录 cwd
+   if (env.scope === 'project') {
+     rejectProjectScopeInsideGlobalDirs(pathResolver)
+   }
+
+❌ // 直接把 project targetDir 拼到 cwd，cwd=~/.agents/skills 时会污染全局技能目录
+   return join(process.cwd(), rule.targetDir)
+```
+
+该 guard 必须使用归一化路径边界比较，覆盖符号链接展开后的 cwd；仅约束 project scope，不影响 `-g` 全局安装。
+
 <!-- PATTERNS_APPEND_1 -->
 
 ### Pipeline Stage Patterns

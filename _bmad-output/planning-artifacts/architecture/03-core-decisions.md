@@ -220,6 +220,12 @@ interface PathResolver {
 }
 ```
 
+**Project-scope 目标路径安全边界：**
+
+project scope 的安装目标仍以 `process.cwd()` 作为项目根目录，但 `matchRules()` 必须先拒绝位于 home 级 AI 全局配置根目录内的 cwd，包括 `~/.agents`、`~/.agent`、`~/.codex`、`~/.claude`、`~/.cursor`、`~/.gemini`、`~/.kiro`、`~/.trae`、`~/.augment`、`~/.config/opencode`、`~/.codeium/windsurf` 及其子目录。该场景应抛出 `AiforgeError(PROJECT_SCOPE_GLOBAL_DIR_REJECTED, exitCode=3)`，提示用户改用 `-g` 或切换到真实项目根目录。
+
+该决策避免在 `~/.agents/skills`、`~/.agents`、`~/.agent` 等全局技能目录下执行 project 安装时生成 `.codex/skills/`、`.agents/skills/`、`.agent/skills/` 嵌套目录，导致 skill 运行目录不规范和工具发现失败。该 guard 只约束 project scope，不改变 `-g` 全局安装语义。
+
 - MVP 实现 macOS + Linux（`os.homedir()` + `path.join()`）
 - M2 扩展 Windows（AppData 路径映射）
 - 测试时可注入 mock 实现

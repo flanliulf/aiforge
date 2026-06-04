@@ -238,7 +238,10 @@ vi.mock('../../src/data/install-rules.js', () => ({
 }))
 
 import { matchRules } from '../../src/stages/match-rules.js'
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { AiforgeError } from '../../src/core/errors.js'
 import { FilterCancelledSignal } from '../../src/stages/filter-utils.js'
 import { confirm, select } from '@inquirer/prompts'
@@ -706,6 +709,37 @@ describe('matchRules', () => {
     expect(agentsItem!.targetPath).not.toContain('~')
     // 应以 cwd 开头
     expect(agentsItem!.targetPath).toContain(process.cwd())
+  })
+
+  it('project scope 在典型全局技能目录下执行时拒绝匹配，避免嵌套安装污染', async () => {
+    vi.mocked(readdir).mockResolvedValue([])
+    const tempHome = mkdtempSync(join(tmpdir(), 'aiforge-global-dir-guard-'))
+    const skillsDir = join(tempHome, '.agents', 'skills')
+    mkdirSync(skillsDir, { recursive: true })
+    mockPathResolver.home.mockReturnValue(tempHome)
+    const originalCwd = process.cwd()
+
+    try {
+      process.chdir(skillsDir)
+
+      await expect(
+        matchRules(
+          mockRepo,
+          makeEnv(['claude'], 'project'),
+          makeArgs({ global: false, dirs: ['skills'] }),
+          mockReporter,
+          mockPathResolver,
+        ),
+      ).rejects.toSatisfy(
+        (error: unknown) =>
+          error instanceof AiforgeError &&
+          error.code === 'PROJECT_SCOPE_GLOBAL_DIR_REJECTED' &&
+          error.severity === 'fatal',
+      )
+    } finally {
+      process.chdir(originalCwd)
+      rmSync(tempHome, { recursive: true, force: true })
+    }
   })
 
   it('Story 7-3 fileFilter: auggie 项目级 instructions 只匹配 AGENTS.md', async () => {

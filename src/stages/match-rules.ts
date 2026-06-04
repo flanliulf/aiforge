@@ -14,7 +14,8 @@
  *   7. 构建 MatchedPlan 返回
  */
 
-import { basename, join } from 'node:path'
+import { realpathSync } from 'node:fs'
+import { basename, join, resolve, sep } from 'node:path'
 import { readdir } from 'node:fs/promises'
 import type { LocalRepo, ParsedArgs, DetectedEnv, MatchedPlan, InstallRule } from '../core/types.js'
 import { InstallType } from '../core/types.js'
@@ -32,6 +33,20 @@ import { DEFAULT_EXCLUDES } from '../data/excludes.js'
 import { msg } from '../core/messages.js'
 import { parseFilterPattern, matchesGlob, FilterCancelledSignal } from './filter-utils.js'
 import { applySemanticWarnings } from './semantic-warnings.js'
+
+const PROJECT_SCOPE_FORBIDDEN_GLOBAL_ROOTS = [
+  '.agents',
+  '.agent',
+  '.codex',
+  '.claude',
+  '.cursor',
+  '.gemini',
+  '.kiro',
+  '.trae',
+  '.augment',
+  join('.config', 'opencode'),
+  join('.codeium', 'windsurf'),
+]
 
 // ── 安装模式推导 ─────────────────────────────────────────────────────────────
 
@@ -59,6 +74,42 @@ function getInstallMode(args: ParsedArgs, scope: 'global' | 'project'): 'copy' |
   }
   if (args.link && scope === 'global') return 'symlink'
   return 'copy'
+}
+
+function normalizeBoundaryPath(path: string): string {
+  try {
+    return realpathSync.native(path)
+  } catch {
+    return resolve(path)
+  }
+}
+
+function isSameOrInsidePath(candidate: string, root: string): boolean {
+  const normalizedCandidate = normalizeBoundaryPath(candidate)
+  const normalizedRoot = normalizeBoundaryPath(root)
+  return (
+    normalizedCandidate === normalizedRoot || normalizedCandidate.startsWith(normalizedRoot + sep)
+  )
+}
+
+function rejectProjectScopeInsideGlobalDirs(pathResolver: PathResolver): void {
+  const cwd = process.cwd()
+
+  for (const relativeRoot of PROJECT_SCOPE_FORBIDDEN_GLOBAL_ROOTS) {
+    const globalRoot = join(pathResolver.home(), relativeRoot)
+    if (!isSameOrInsidePath(cwd, globalRoot)) continue
+
+    throw new AiforgeError(
+      msg('matchRules.projectScopeGlobalDirRejected'),
+      'PROJECT_SCOPE_GLOBAL_DIR_REJECTED',
+      EXIT_ARG_ERROR,
+      'fatal',
+      msg('matchRules.projectScopeGlobalDirRejectedWhy')
+        .replace('{cwd}', cwd)
+        .replace('{root}', globalRoot),
+      [msg('matchRules.fixUseGlobalInstall'), msg('matchRules.fixChangeToProjectRoot')],
+    )
+  }
 }
 
 // ── 目标路径解析 ─────────────────────────────────────────────────────────────
@@ -181,6 +232,10 @@ export async function matchRules(
   enableUniversal: boolean = false,
 ): Promise<MatchedPlan> {
   reporter.startPhase(msg('phases.match'))
+
+  if (env.scope === 'project') {
+    rejectProjectScopeInsideGlobalDirs(pathResolver)
+  }
 
   // LINK_PROJECT_REJECTED 校验提前执行（尽早发现参数错误）
   // 仅在 args.link 为 true 时才需要校验，getInstallMode 内部会抛出

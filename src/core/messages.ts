@@ -204,6 +204,10 @@ interface MessageSet {
   matchRules: {
     linkProjectRejected: string
     linkProjectRejectedWhy: string
+    projectScopeGlobalDirRejected: string
+    projectScopeGlobalDirRejectedWhy: string
+    fixUseGlobalInstall: string
+    fixChangeToProjectRoot: string
   }
   precondition: {
     geminiVersion: string
@@ -499,6 +503,11 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
     matchRules: {
       linkProjectRejected: '符号链接模式不支持项目级安装',
       linkProjectRejectedWhy: '-l/--link 仅支持全局安装模式（-g）',
+      projectScopeGlobalDirRejected: '项目级安装不能在全局 AI 目录内执行',
+      projectScopeGlobalDirRejectedWhy:
+        '当前目录 {cwd} 位于 {root} 内；项目级安装会创建嵌套工具目录，导致 skill 发现异常',
+      fixUseGlobalInstall: '使用全局安装: npx aiforge -g <repo>',
+      fixChangeToProjectRoot: '或切换到真实项目根目录后重新执行命令',
     },
     precondition: {
       geminiVersion:
@@ -810,6 +819,12 @@ const MESSAGES_MAP: Record<Language, MessageSet> = {
     matchRules: {
       linkProjectRejected: 'Symlink mode does not support project-scope installation',
       linkProjectRejectedWhy: '-l/--link only supports global installation mode (-g)',
+      projectScopeGlobalDirRejected:
+        'Project-scope install cannot run inside global AI directories',
+      projectScopeGlobalDirRejectedWhy:
+        'Current directory {cwd} is inside {root}; project-scope install would create nested tool directories and break skill discovery',
+      fixUseGlobalInstall: 'Use global install: npx aiforge -g <repo>',
+      fixChangeToProjectRoot: 'Or change to a real project root and rerun the command',
     },
     precondition: {
       geminiVersion:

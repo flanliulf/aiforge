@@ -1,6 +1,6 @@
 {
   "name": "@fancyliu/aiforge",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "description": "AI rules installer - sync AI tool configurations from a knowledge repository",
   "type": "module",
   "engines": {

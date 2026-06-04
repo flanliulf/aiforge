@@ -7,7 +7,7 @@
 
 [English](README.md) | **中文** | [文档中心](docs/index.zh.md) | [贡献指南](docs/contributing.zh.md)
 
-> **当前 npm 发布版本：v2.0.4**。`v2.0` 是当前稳定主版本线；`vscode` 工具 ID 已归并到 Copilot，当前支持 11 个工具，迁移说明见 [docs/migration-v2.zh.md](docs/migration-v2.zh.md)。
+> **当前 npm 发布版本：v2.0.5**。`v2.0` 是当前稳定主版本线；`vscode` 工具 ID 已归并到 Copilot，当前支持 11 个工具，迁移说明见 [docs/migration-v2.zh.md](docs/migration-v2.zh.md)。
 
 ## 简介
 
@@ -296,6 +296,7 @@ npx @fancyliu/aiforge https://your-git-host.com/team/repo.git
 ### 贡献者与维护者
 
 - [贡献指南](docs/contributing.zh.md) — 开发环境、验证清单与文档同步要求
+- [本地构建验证指南](docs/local-build-verification.zh.md) — 用 `dist/index.js` 或 `npm link` 验证尚未发布的 CLI 修复
 - [扩展指南](docs/extending.zh.md) — 添加新 AI 工具支持
 - [npm 发布指南](docs/npm-publishing-guide.zh.md) — 详细发布操作手册
 - [变更日志](CHANGELOG.md) — 发布历史与重要变更
@@ -310,11 +311,11 @@ aiforge 遵循 [语义化版本](https://semver.org/)，当前已进入稳定的
 
 | 版本     | 触发场景                               | 示例                        |
 | -------- | -------------------------------------- | --------------------------- |
-| `v2.x.y` | 当前主版本线上的向后兼容修复与小幅改进 | `v2.0.4` — bug 修复         |
+| `v2.x.y` | 当前主版本线上的向后兼容修复与小幅改进 | `v2.0.5` — bug 修复         |
 | `v2.y.0` | 向后兼容的新功能发布                   | `v2.1.0` — 下一个 milestone |
 | `v3.0.0` | 存在破坏性变更                         | `v3.0.0` — 下一条主版本线   |
 
-当前 npm 发布版本为 `v2.0.4`。`2.x` 基线始于 `v2.0.0`，这是移除 `vscode` 工具 ID、扩展到 11 工具、并将 VS Code 项目级 MCP 处理归并到 Copilot 的破坏性变更版本。
+当前 npm 发布版本为 `v2.0.5`。`2.x` 基线始于 `v2.0.0`，这是移除 `vscode` 工具 ID、扩展到 11 工具、并将 VS Code 项目级 MCP 处理归并到 Copilot 的破坏性变更版本。
 
 ## AI 辅助配置
 

@@ -7,7 +7,7 @@
 
 **English** | [中文](README.zh.md) | [Docs Hub](docs/index.md) | [Contributing](docs/contributing.md)
 
-> **Current npm release: v2.0.4**. The `v2.0` line is the current stable major line; `vscode` has been merged into Copilot, support now covers 11 tools, and migration guidance is available in [docs/migration-v2.md](docs/migration-v2.md).
+> **Current npm release: v2.0.5**. The `v2.0` line is the current stable major line; `vscode` has been merged into Copilot, support now covers 11 tools, and migration guidance is available in [docs/migration-v2.md](docs/migration-v2.md).
 
 ## What is aiforge?
 
@@ -296,6 +296,7 @@ After running `npx @fancyliu/aiforge init`, settings are saved to `~/.aiforge/co
 ### Contributors And Maintainers
 
 - [Contributing Guide](docs/contributing.md) — development setup, validation checklist, and docs sync expectations
+- [Local Build Verification](docs/local-build-verification.md) — validate unpublished CLI fixes with `dist/index.js` or `npm link`
 - [Extending aiforge](docs/extending.md) — adding support for new AI tools
 - [npm Publishing Guide](docs/npm-publishing-guide.zh.md) — Chinese-only maintainer release runbook
 - [Changelog](CHANGELOG.md) — release history and notable changes
@@ -310,11 +311,11 @@ aiforge follows [Semantic Versioning](https://semver.org/) and is now in the sta
 
 | Version | Trigger | Example |
 |---------|---------|---------|
-| `v2.x.y` | Backward-compatible fixes and improvements on the current major line | `v2.0.4` — bug fix |
+| `v2.x.y` | Backward-compatible fixes and improvements on the current major line | `v2.0.5` — bug fix |
 | `v2.y.0` | Backward-compatible feature release | `v2.1.0` — next milestone |
 | `v3.0.0` | Breaking changes | `v3.0.0` — next major line |
 
-Current npm release: `v2.0.4`. The `2.x` baseline starts at `v2.0.0`, the breaking release that removes the `vscode` tool ID, expands support to 11 tools, and moves VS Code project MCP handling under Copilot.
+Current npm release: `v2.0.5`. The `2.x` baseline starts at `v2.0.0`, the breaking release that removes the `vscode` tool ID, expands support to 11 tools, and moves VS Code project MCP handling under Copilot.
 
 ## AI-Assisted Setup
 

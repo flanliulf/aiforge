@@ -120,6 +120,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Branch option detection must use `!== undefined`:** options like `--list ""` are intentionally present and should enter the feature branch for validation, not fall through to install.
 - **Directory-like CLI args need three guards:** reject empty/blank strings, `/` or `\` path separators, and dot-prefixed names such as `.`, `..`, `.hidden`.
 - **`--link` is global-only:** `args.link && env.scope === 'project'` must throw `LINK_PROJECT_REJECTED` before install.
+- **Project scope must reject global AI config cwd:** when `env.scope === 'project'`, `matchRules()` must reject execution from inside home-level AI config roots such as `~/.agents`, `~/.agent`, `~/.codex`, `~/.claude`, `~/.cursor`, `~/.gemini`, `~/.kiro`, `~/.trae`, `~/.augment`, `~/.config/opencode`, or `~/.codeium/windsurf`; otherwise project targets like `.codex/skills/` or `.agents/skills/` become nested under global skill directories and break tool discovery.
 - **Manual `--tools` must validate against `TOOL_DEFINITIONS`:** unknown IDs throw `UNKNOWN_TOOL` and list current supported IDs.
 - **`aiforge init` is a command outside the pipeline:** it may use `console.log` and direct `@inquirer/prompts`, but must still use centralized messages and sanitization.
 

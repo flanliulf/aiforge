@@ -2,6 +2,16 @@
 
 All notable changes to aiforge are documented in this file.
 
+## [2.0.5] - 2026-06-04
+
+### Fixed
+
+- Rejected project-scope installs launched from home-level AI global directories such as `~/.agents/skills`, preventing nested `.codex/`, `.agents/`, and `.agent/` paths that break skill discovery.
+
+### Added
+
+- Added bilingual local build verification docs for validating unpublished CLI fixes with `node dist/index.js` or `npm link`.
+
 ## [2.0.4] - 2026-05-21
 
 ### Changed
